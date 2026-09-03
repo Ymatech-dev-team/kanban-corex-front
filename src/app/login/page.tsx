@@ -17,7 +17,17 @@ export default function LoginPage() {
     setError(null);
     try {
       const { data } = await api.post<{ mustChangePassword: boolean }>("/auth/login", values);
-      router.push(data.mustChangePassword ? "/first-login" : "/");
+      if (data.mustChangePassword) {
+        // Leva a senha temporária pro 1º acesso (só na sessão do navegador, apagada ao usar).
+        try {
+          sessionStorage.setItem("sdt_temp_pw", values.password);
+        } catch {
+          /* sem sessionStorage: a pessoa digita a senha de novo, sem problema */
+        }
+        router.push("/first-login");
+      } else {
+        router.push("/");
+      }
     } catch (e) {
       const err = e as AxiosError<{ error?: { message?: string } }>;
       if (err.response?.status === 429) {

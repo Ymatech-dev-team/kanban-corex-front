@@ -11,25 +11,40 @@ interface Props {
   onSubmit: (values: FirstLoginInput) => void;
   pending?: boolean;
   error?: string | null;
+  defaultCurrentPassword?: string;
 }
 
-export function ChangePasswordForm({ onSubmit, pending, error }: Props) {
+export function ChangePasswordForm({ onSubmit, pending, error, defaultCurrentPassword }: Props) {
+  const prefilled = !!defaultCurrentPassword;
   const {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<FirstLoginInput>({ resolver: zodResolver(firstLoginSchema) });
+  } = useForm<FirstLoginInput>({
+    resolver: zodResolver(firstLoginSchema),
+    defaultValues: { currentPassword: defaultCurrentPassword ?? "", newPassword: "", confirmPassword: "" },
+  });
 
   return (
     <form onSubmit={handleSubmit((v) => onSubmit(v))} className="flex w-full max-w-sm flex-col gap-4" noValidate>
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="current">Senha temporária</Label>
         <Input id="current" type="password" aria-invalid={!!errors.currentPassword} {...register("currentPassword")} />
-        {errors.currentPassword && <p className="text-xs text-destructive">{errors.currentPassword.message}</p>}
+        {prefilled ? (
+          <p className="text-xs text-muted-foreground">Já preenchemos com a senha que você usou pra entrar.</p>
+        ) : (
+          errors.currentPassword && <p className="text-xs text-destructive">{errors.currentPassword.message}</p>
+        )}
       </div>
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="new">Nova senha</Label>
-        <Input id="new" type="password" aria-invalid={!!errors.newPassword} {...register("newPassword")} />
+        <Input
+          id="new"
+          type="password"
+          autoFocus={prefilled}
+          aria-invalid={!!errors.newPassword}
+          {...register("newPassword")}
+        />
         {errors.newPassword && <p className="text-xs text-destructive">{errors.newPassword.message}</p>}
       </div>
       <div className="flex flex-col gap-1.5">

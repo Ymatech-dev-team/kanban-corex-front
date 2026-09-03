@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AxiosError } from "axios";
 import { api } from "@/lib/api";
@@ -11,6 +11,24 @@ export default function FirstLoginPage() {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Senha temporária vinda do login (só na sessão do navegador).
+  const [tempPassword] = useState<string>(() => {
+    if (typeof window === "undefined") return "";
+    try {
+      return sessionStorage.getItem("sdt_temp_pw") ?? "";
+    } catch {
+      return "";
+    }
+  });
+
+  // Apaga assim que a tela monta — a senha não fica guardada além do necessário.
+  useEffect(() => {
+    try {
+      sessionStorage.removeItem("sdt_temp_pw");
+    } catch {
+      /* nada a fazer */
+    }
+  }, []);
 
   async function onSubmit(values: FirstLoginInput) {
     setPending(true);
@@ -35,7 +53,12 @@ export default function FirstLoginPage() {
           Este é seu primeiro acesso. Defina uma senha nova para continuar.
         </p>
       </div>
-      <ChangePasswordForm onSubmit={onSubmit} pending={pending} error={error} />
+      <ChangePasswordForm
+        onSubmit={onSubmit}
+        pending={pending}
+        error={error}
+        defaultCurrentPassword={tempPassword}
+      />
     </main>
   );
 }
