@@ -1,0 +1,115 @@
+@import "tailwindcss";
+
+/*
+  Design System do Sistema de Tasks — dark-first, identidade YMA. [design.md §9]
+  3 camadas: primitivo → semântico (o que shadcn/Tailwind consomem) → componente.
+  INVARIANTE travado: --primary-foreground é near-black (nunca branco sobre amarelo). [DS]
+*/
+:root {
+  /* camada 1 — primitivos (único lugar com hex) */
+  --yma-yellow-500: #ffc600;
+  --yma-neutral-950: #0a0a0a;
+  --yma-neutral-900: #141414;
+  --yma-neutral-800: #1f1f1f;
+  --yma-neutral-700: #2e2e2e;
+  --yma-neutral-400: #a1a1a1;
+  --yma-neutral-50: #fafafa;
+  --yma-red-500: #e5484d;
+  --yma-amber-500: #e8912a;
+
+  /* camada 2 — semânticos (dark-first) */
+  --background: var(--yma-neutral-950);
+  --foreground: var(--yma-neutral-50);
+  --card: var(--yma-neutral-900);
+  --card-foreground: var(--yma-neutral-50);
+  --popover: var(--yma-neutral-800);
+  --popover-foreground: var(--yma-neutral-50);
+  --primary: var(--yma-yellow-500);
+  --primary-foreground: var(--yma-neutral-950); /* near-black — nunca branco */
+  --secondary: var(--yma-neutral-800);
+  --secondary-foreground: var(--yma-neutral-50);
+  --muted: var(--yma-neutral-800);
+  --muted-foreground: var(--yma-neutral-400);
+  --accent: var(--yma-neutral-800);
+  --accent-foreground: var(--yma-neutral-50);
+  --destructive: var(--yma-red-500);
+  --destructive-foreground: var(--yma-neutral-50);
+  --border: var(--yma-neutral-700);
+  --input: var(--yma-neutral-700);
+  --ring: var(--yma-yellow-500);
+  --radius: 0.5rem;
+
+  color-scheme: dark;
+}
+
+/* Tailwind v4: mapeia os tokens semânticos para utilitários (bg-primary, text-muted-foreground…) */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-amber: var(--yma-amber-500);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-inter), Inter, system-ui, -apple-system, sans-serif;
+}
+
+/* Aurora sutil do fundo do login — brilhos da marca flutuando devagar. */
+@keyframes sdt-drift-a {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(48px, 36px) scale(1.18);
+  }
+}
+@keyframes sdt-drift-b {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1.12);
+  }
+  50% {
+    transform: translate(-56px, -24px) scale(1);
+  }
+}
+@keyframes sdt-drift-c {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.5;
+  }
+  50% {
+    transform: translate(30px, -40px) scale(1.1);
+    opacity: 0.85;
+  }
+}
+.sdt-aurora {
+  will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sdt-aurora {
+    animation: none !important;
+  }
+}

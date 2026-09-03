@@ -1,0 +1,320 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { Check, Plus, Trash2, Loader2 } from "lucide-react";
+import { PERMISSIONS, type TaskPriority, type TaskStatus, type UpdateTaskInput } from "@sistema-tasks/contracts";
+import type { Member } from "@/lib/types";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { AssigneePicker } from "./assignee-picker";
+import {
+  useTaskDetail,
+  useUpdateTask,
+  useDeleteTask,
+  useAddSubtask,
+  useToggleSubtask,
+  useDeleteSubtask,
+} from "@/lib/hooks/use-tasks";
+import { useCan } from "@/lib/hooks/use-can";
+import { cn } from "@/lib/utils";
+
+const PRIOS: { value: TaskPriority; label: string }[] = [
+  { value: "LOW", label: "Baixa" },
+  { value: "MEDIUM", label: "Média" },
+  { value: "HIGH", label: "Alta" },
+];
+const STATUSES: { value: TaskStatus; label: string }[] = [
+  { value: "TODO", label: "A fazer" },
+  { value: "DOING", label: "Fazendo" },
+  { value: "DONE", label: "Feito" },
+];
+
+function Segmented<T extends string>({
+  value,
+  options,
+  onChange,
+  disabled,
+}: {
+  value: T;
+  options: { value: T; label: string }[];
+  onChange: (v: T) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="flex gap-0.5 rounded-lg border border-border bg-card p-[3px]">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          disabled={disabled}
+          onClick={() => onChange(o.value)}
+          className={cn(
+            "flex-1 rounded-md px-2.5 py-1.5 text-[12.5px] transition-colors disabled:opacity-60",
+            value === o.value ? "bg-accent text-foreground" : "text-muted-foreground enabled:hover:text-foreground",
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+interface Form {
+  title: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  due: string;
+  assigneeId: string | null;
+}
+
+export function TaskDetailDialog({
+  taskId,
+  members,
+  onOpenChange,
+}: {
+  taskId: string | null;
+  members: Member[];
+  onOpenChange: (o: boolean) => void;
+}) {
+  const detail = useTaskDetail(taskId);
+  const task = detail.data;
+  const projectId = task?.projectId ?? "";
+
+  const update = useUpdateTask(projectId);
+  const del = useDeleteTask(projectId);
+  const add = useAddSubtask(taskId ?? "");
+  const toggle = useToggleSubtask(taskId ?? "");
+  const removeSub = useDeleteSubtask(taskId ?? "");
+
+  const canEdit = useCan(PERMISSIONS.tarefas_editar);
+  const canDelete = useCan(PERMISSIONS.tarefas_excluir);
+
+  const [form, setForm] = useState<Form | null>(null);
+  const [newTitle, setNewTitle] = useState("");
+  const seededFor = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (taskId === null) {
+      seededFor.current = null;
+      setForm(null);
+      return;
+    }
+    if (task && seededFor.current !== task.id) {
+      setForm({
+        title: task.title,
+        status: task.status,
+        priority: task.priority,
+        due: task.dueDate ? task.dueDate.slice(0, 10) : "",
+        assigneeId: task.assigneeId,
+      });
+      seededFor.current = task.id;
+    }
+  }, [task, taskId]);
+
+  const subs = task?.subtasks ?? [];
+  const doneCount = subs.filter((s) => s.done).length;
+
+  const dueBaseline = task?.dueDate ? task.dueDate.slice(0, 10) : "";
+  const dirty =
+    !!form &&
+    !!task &&
+    (form.title.trim() !== task.title ||
+      form.status !== task.status ||
+      form.priority !== task.priority ||
+      form.due !== dueBaseline ||
+      form.assigneeId !== task.assigneeId);
+
+  async function save() {
+    if (!form || !task || !form.title.trim()) return;
+    const patch: UpdateTaskInput = {
+      title: form.title.trim(),
+      status: form.status,
+      priority: form.priority,
+      dueDate: form.due ? new Date(`${form.due}T12:00:00`).toISOString() : null,
+      assigneeId: form.assigneeId,
+    };
+    await update.mutateAsync({ id: task.id, patch, updatedAt: task.updatedAt });
+    seededFor.current = null; // re-semeia com o dado fresco após invalidar
+  }
+
+  async function addSub(e: React.FormEvent) {
+    e.preventDefault();
+    const t = newTitle.trim();
+    if (!t) return;
+    setNewTitle("");
+    await add.mutateAsync(t);
+  }
+
+  async function onDelete() {
+    if (!task) return;
+    await del.mutateAsync(task.id);
+    onOpenChange(false);
+  }
+
+  return (
+    <Dialog open={taskId !== null} onOpenChange={onOpenChange}>
+      <DialogContent>
+        {detail.isLoading || !task || !form ? (
+          <div className="flex items-center justify-center py-10 text-muted-foreground">
+            <Loader2 className="size-5 animate-spin" />
+          </div>
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle className="sr-only">Detalhe da tarefa</DialogTitle>
+            </DialogHeader>
+
+            <div className="flex items-start gap-2">
+              <Input
+                value={form.title}
+                disabled={!canEdit}
+                onChange={(e) => setForm({ ...form, title: e.target.value })}
+                maxLength={200}
+                className="h-auto border-0 bg-transparent px-0 text-[15px] font-medium tracking-tight focus-visible:ring-0"
+              />
+              {canDelete && (
+                <button
+                  type="button"
+                  aria-label="Excluir tarefa"
+                  onClick={onDelete}
+                  disabled={del.isPending}
+                  className="mt-0.5 shrink-0 text-muted-foreground transition-colors hover:text-amber disabled:opacity-50"
+                >
+                  <Trash2 className="size-4" />
+                </button>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[11px] uppercase tracking-wide text-muted-foreground/70">Status</span>
+                <Segmented
+                  value={form.status}
+                  options={STATUSES}
+                  disabled={!canEdit}
+                  onChange={(v) => setForm({ ...form, status: v })}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[11px] uppercase tracking-wide text-muted-foreground/70">Prioridade</span>
+                <Segmented
+                  value={form.priority}
+                  options={PRIOS}
+                  disabled={!canEdit}
+                  onChange={(v) => setForm({ ...form, priority: v })}
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[11px] uppercase tracking-wide text-muted-foreground/70">Prazo</span>
+                <Input
+                  type="date"
+                  value={form.due}
+                  disabled={!canEdit}
+                  onChange={(e) => setForm({ ...form, due: e.target.value })}
+                  className="h-9"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[11px] uppercase tracking-wide text-muted-foreground/70">Responsável</span>
+                <AssigneePicker
+                  members={members}
+                  value={form.assigneeId}
+                  disabled={!canEdit}
+                  onChange={(id) => setForm({ ...form, assigneeId: id })}
+                />
+              </div>
+            </div>
+
+            {canEdit && dirty && (
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() =>
+                    setForm({
+                      title: task.title,
+                      status: task.status,
+                      priority: task.priority,
+                      due: dueBaseline,
+                      assigneeId: task.assigneeId,
+                    })
+                  }
+                >
+                  Descartar
+                </Button>
+                <Button type="button" onClick={save} disabled={!form.title.trim() || update.isPending}>
+                  {update.isPending ? "Salvando…" : "Salvar"}
+                </Button>
+              </div>
+            )}
+
+            <div className="mt-1 border-t border-border pt-3">
+              <div className="mb-2 flex items-center justify-between text-[13px]">
+                <span className="font-medium">Subtarefas</span>
+                {subs.length > 0 && (
+                  <span className="text-muted-foreground">
+                    {doneCount}/{subs.length}
+                  </span>
+                )}
+              </div>
+
+              <ul className="flex flex-col gap-1">
+                {subs.map((s) => (
+                  <li key={s.id} className="group flex items-center gap-2.5 rounded-lg px-1 py-1">
+                    <button
+                      type="button"
+                      aria-label={s.done ? "Desmarcar" : "Marcar como feita"}
+                      onClick={() => toggle.mutate({ id: s.id, done: !s.done })}
+                      className={cn(
+                        "flex size-[18px] shrink-0 items-center justify-center rounded-[6px] border transition-colors",
+                        s.done
+                          ? "border-primary bg-primary text-primary-foreground"
+                          : "border-muted-foreground/50 text-transparent hover:border-foreground",
+                      )}
+                    >
+                      <Check className="size-3" strokeWidth={3} />
+                    </button>
+                    <span className={cn("flex-1 text-[13px]", s.done && "text-muted-foreground line-through")}>
+                      {s.title}
+                    </span>
+                    <button
+                      type="button"
+                      aria-label="Remover subtarefa"
+                      onClick={() => removeSub.mutate(s.id)}
+                      className="text-muted-foreground/0 transition-colors group-hover:text-muted-foreground hover:!text-amber"
+                    >
+                      <Trash2 className="size-3.5" />
+                    </button>
+                  </li>
+                ))}
+                {subs.length === 0 && (
+                  <li className="px-1 py-1 text-[12.5px] text-muted-foreground">Nenhuma subtarefa ainda.</li>
+                )}
+              </ul>
+
+              <form onSubmit={addSub} className="mt-2 flex items-center gap-2">
+                <Input
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  placeholder="Adicionar subtarefa"
+                  maxLength={200}
+                  className="h-9"
+                />
+                <button
+                  type="submit"
+                  aria-label="Adicionar"
+                  disabled={!newTitle.trim() || add.isPending}
+                  className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+                >
+                  <Plus className="size-4" />
+                </button>
+              </form>
+            </div>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}

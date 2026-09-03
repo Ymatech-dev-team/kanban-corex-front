@@ -1,0 +1,186 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { AxiosError } from "axios";
+import { toast } from "sonner";
+import type { CreateTaskInput, UpdateTaskInput, TaskStatus } from "@sistema-tasks/contracts";
+import { api } from "@/lib/api";
+import type { Task } from "@/lib/types";
+
+type ApiError = AxiosError<{ error?: { code?: string; message?: string } }>;
+export function errorCode(e: unknown): string | undefined {
+  return (e as ApiError)?.response?.data?.error?.code;
+}
+function idemKey(): string {
+  return typeof crypto !== "undefined" && crypto.randomUUID
+    ? crypto.randomUUID()
+    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+export function tasksKey(projectId: string | null) {
+  return ["tasks", projectId] as const;
+}
+
+export function useTasks(projectId: string | null) {
+  return useQuery<Task[]>({
+    queryKey: tasksKey(projectId),
+    enabled: !!projectId,
+    queryFn: async () => (await api.get<{ tasks: Task[] }>(`/projects/${projectId}/tasks`)).data.tasks,
+  });
+}
+
+export function useCreateTask(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: CreateTaskInput) =>
+      (
+        await api.post<Task>(`/projects/${projectId}/tasks`, input, {
+          headers: { "idempotency-key": idemKey() },
+        })
+      ).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: tasksKey(projectId) });
+      toast.success("Tarefa criada");
+    },
+    onError: () => toast.error("Não foi possível criar a tarefa"),
+  });
+}
+
+interface MoveVars {
+  id: string;
+  status: TaskStatus;
+  position: number;
+}
+
+/**
+ * Mover no Kanban com atualização otimista. O backend discrimina os erros:
+ * TAREFA_REMOVIDA (some), PROJETO_SEM_ACESSO (ejeta o cliente), SEM_PERMISSAO. [JOR-1c]
+ */
+export function useMoveTask(projectId: string) {
+  const qc = useQueryClient();
+  const key = tasksKey(projectId);
+  return useMutation({
+    mutationFn: async ({ id, status, position }: MoveVars) =>
+      (await api.patch<Task>(`/tasks/${id}/move`, { status, position })).data,
+    onMutate: async ({ id, status, position }) => {
+      await qc.cancelQueries({ queryKey: key });
+      const previous = qc.getQueryData<Task[]>(key);
+      qc.setQueryData<Task[]>(key, (old) =>
+        (old ?? []).map((t) => (t.id === id ? { ...t, status, position } : t)),
+      );
+      return { previous };
+    },
+    onError: (err, _vars, ctx) => {
+      if (ctx?.previous) qc.setQueryData(key, ctx.previous);
+      const code = errorCode(err);
+      if (code === "TAREFA_REMOVIDA") {
+        toast.error("Essa tarefa foi removida");
+        qc.invalidateQueries({ queryKey: key });
+      } else if (code === "PROJETO_SEM_ACESSO") {
+        toast.error("Seu acesso a este cliente foi removido");
+        qc.invalidateQueries({ queryKey: ["projects"] });
+        qc.invalidateQueries({ queryKey: ["me"] });
+      } else if (code === "SEM_PERMISSAO") {
+        toast.error("Você não tem permissão para mover tarefas");
+      } else {
+        toast.error("Não foi possível mover a tarefa");
+      }
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: key }),
+  });
+}
+
+export function useUpdateTask(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, patch, updatedAt }: { id: string; patch: UpdateTaskInput; updatedAt?: string }) =>
+      (
+        await api.patch<Task>(`/tasks/${id}`, patch, {
+          headers: updatedAt ? { "if-unmodified-since": updatedAt } : undefined,
+        })
+      ).data,
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: tasksKey(projectId) });
+      qc.invalidateQueries({ queryKey: taskKey(vars.id) });
+      toast.success("Tarefa atualizada");
+    },
+    onError: (err) => {
+      const code = errorCode(err);
+      if (code === "CONFLITO") toast.error("A tarefa foi alterada por outra pessoa. Recarregue.");
+      else if (code === "PROJETO_SEM_ACESSO") toast.error("Seu acesso a este cliente foi removido");
+      else if (code === "SEM_PERMISSAO") toast.error("Você não tem permissão para editar");
+      else toast.error("Não foi possível salvar a tarefa");
+    },
+  });
+}
+
+export function useDeleteTask(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => (await api.delete(`/tasks/${id}`)).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: tasksKey(projectId) });
+      toast.success("Tarefa excluída");
+    },
+    onError: (err) => {
+      const code = errorCode(err);
+      if (code === "SEM_PERMISSAO") toast.error("Você não tem permissão para excluir");
+      else toast.error("Não foi possível excluir a tarefa");
+    },
+  });
+}
+
+// ---- Detalhe + subtarefas ----
+
+export function taskKey(taskId: string | null) {
+  return ["task", taskId] as const;
+}
+
+export function useTaskDetail(taskId: string | null) {
+  return useQuery<Task>({
+    queryKey: taskKey(taskId),
+    enabled: !!taskId,
+    queryFn: async () => (await api.get<Task>(`/tasks/${taskId}`)).data,
+  });
+}
+
+export function useAddSubtask(taskId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (title: string) =>
+      (
+        await api.post(`/tasks/${taskId}/subtasks`, { title }, { headers: { "idempotency-key": idemKey() } })
+      ).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: taskKey(taskId) }),
+    onError: () => toast.error("Não foi possível adicionar a subtarefa"),
+  });
+}
+
+export function useToggleSubtask(taskId: string) {
+  const qc = useQueryClient();
+  const key = taskKey(taskId);
+  return useMutation({
+    mutationFn: async ({ id, done }: { id: string; done: boolean }) =>
+      (await api.patch(`/subtasks/${id}`, { done })).data,
+    onMutate: async ({ id, done }) => {
+      await qc.cancelQueries({ queryKey: key });
+      const previous = qc.getQueryData<Task>(key);
+      qc.setQueryData<Task>(key, (old) =>
+        old ? { ...old, subtasks: old.subtasks?.map((s) => (s.id === id ? { ...s, done } : s)) } : old,
+      );
+      return { previous };
+    },
+    onError: (_e, _v, ctx) => {
+      if (ctx?.previous) qc.setQueryData(key, ctx.previous);
+      toast.error("Não foi possível atualizar a subtarefa");
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: key }),
+  });
+}
+
+export function useDeleteSubtask(taskId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => (await api.delete(`/subtasks/${id}`)).data,
+    onSuccess: () => qc.invalidateQueries({ queryKey: taskKey(taskId) }),
+    onError: () => toast.error("Não foi possível remover a subtarefa"),
+  });
+}
