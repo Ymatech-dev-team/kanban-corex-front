@@ -10,3 +10,6 @@ build
 # build do contracts vendorizado (reconstruído no npm install via "prepare")
 vendor/contracts/dist
 vendor/contracts/node_modules
+
+# TS incremental build info
+*.tsbuildinfo
