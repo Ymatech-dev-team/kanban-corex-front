@@ -4,6 +4,8 @@ import { api } from "@/lib/api";
 export interface Me {
   userId: string;
   orgId: string;
+  name: string;
+  email: string;
   permissions: string[];
   mustChangePassword: boolean;
 }

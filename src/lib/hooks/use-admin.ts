@@ -3,6 +3,7 @@ import { toast } from "sonner";
 import type {
   CreateMemberInput,
   UpdateMemberInput,
+  SetCompensationInput,
   CreateRoleInput,
   UpdateRoleInput,
 } from "@sistema-tasks/contracts";
@@ -15,6 +16,8 @@ export interface AdminMember {
   roleId: string | null;
   extraPermissions: string[];
   mustChangePassword: boolean;
+  compensationType: "MONTHLY" | "HOURLY" | null;
+  compensationCents: number | null;
 }
 
 export interface AdminRole {
@@ -89,6 +92,18 @@ export function useDeleteRole() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["roles"] });
       toast.success("Perfil removido");
+    },
+  });
+}
+
+export function useSetCompensation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, input }: { id: string; input: SetCompensationInput }) =>
+      (await api.patch(`/members/${id}/compensation`, input)).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["members"] });
+      toast.success("Remuneração atualizada");
     },
   });
 }

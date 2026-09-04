@@ -37,7 +37,7 @@ export function TaskList({
 
   return (
     <div className="flex-1 overflow-auto p-6">
-      <div className="overflow-x-auto rounded-xl border border-border">
+      <div className="overflow-x-auto rounded-xl border border-border bg-card">
         <table className="w-full min-w-[640px] border-collapse text-[13px]">
           <thead>
             <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground/70">

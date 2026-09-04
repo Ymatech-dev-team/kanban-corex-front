@@ -72,11 +72,11 @@ export default function HomePage() {
 
   function openTask(t: Task) {
     nav.request(t.projectId, t.id);
-    router.push("/clientes");
+    router.push("/tarefas");
   }
   function openClient(projectId: string) {
     nav.request(projectId);
-    router.push("/clientes");
+    router.push("/tarefas");
   }
 
   const todayKey = dayKey(new Date(now));
@@ -114,7 +114,7 @@ export default function HomePage() {
                 Quando você for responsável por tarefas, elas aparecem aqui.
               </p>
             </div>
-            <Button onClick={() => router.push("/clientes")}>Ir para os clientes</Button>
+            <Button onClick={() => router.push("/tarefas")}>Ir para as tarefas</Button>
           </div>
         ) : (
           <>
@@ -173,8 +173,8 @@ export default function HomePage() {
                     <div
                       key={key}
                       className={cn(
-                        "flex min-h-[96px] flex-col gap-1 rounded-xl border border-border p-2",
-                        isToday && "border-muted-foreground/40 bg-card",
+                        "flex min-h-[96px] flex-col gap-1 rounded-xl border border-border bg-card p-2",
+                        isToday && "border-muted-foreground/40",
                       )}
                     >
                       <div className="mb-0.5 flex items-baseline justify-between px-0.5">
@@ -219,7 +219,7 @@ export default function HomePage() {
                       <button
                         type="button"
                         onClick={() => openClient(c.id)}
-                        className="flex w-full items-center gap-3 rounded-lg border border-border px-4 py-2.5 text-left text-[13px] transition-colors hover:border-muted-foreground/40"
+                        className="flex w-full items-center gap-3 rounded-lg border border-border bg-card px-4 py-2.5 text-left text-[13px] transition-colors hover:border-muted-foreground/40"
                       >
                         <span className="flex-1">{c.name}</span>
                         <span className="text-muted-foreground">

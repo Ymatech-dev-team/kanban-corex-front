@@ -3,16 +3,20 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, Folder, Users, ShieldCheck, LogOut, User, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Home, ListChecks, Building2, Users, ShieldCheck, LogOut, User, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { PERMISSIONS } from "@sistema-tasks/contracts";
 import { useCan } from "@/lib/hooks/use-can";
+import { useMe } from "@/lib/hooks/use-me";
 import { api } from "@/lib/api";
+import { initials } from "@/lib/initials";
 import { NotificationsBell } from "./notifications-bell";
+import { ThemeToggle } from "./theme-toggle";
 import { cn } from "@/lib/utils";
 
 const MAIN = [
   { href: "/", label: "Início", icon: Home },
-  { href: "/clientes", label: "Clientes", icon: Folder },
+  { href: "/tarefas", label: "Tarefas", icon: ListChecks },
+  { href: "/clientes", label: "Clientes", icon: Building2 },
 ];
 
 const STORAGE_KEY = "sdt_sidebar_collapsed";
@@ -22,6 +26,8 @@ export function Sidebar() {
   const router = useRouter();
   const canMembers = useCan(PERMISSIONS.membros_gerenciar);
   const canRoles = useCan(PERMISSIONS.perfis_gerenciar);
+  const me = useMe();
+  const accountName = me.data?.name?.trim() || "Minha conta";
   const [collapsed, setCollapsed] = useState(false);
 
   // Lê a preferência só no cliente (evita mismatch de hidratação).
@@ -50,7 +56,7 @@ export function Sidebar() {
     router.push("/login");
   }
 
-  const item = (href: string, label: string, Icon: typeof Folder) => {
+  const item = (href: string, label: string, Icon: typeof Home) => {
     const on = href === "/" ? pathname === "/" : pathname.startsWith(href);
     return (
       <Link
@@ -94,6 +100,7 @@ export function Sidebar() {
         )}
         <div className={cn("flex items-center gap-1", collapsed ? "flex-col" : "ml-auto")}>
           <NotificationsBell />
+          <ThemeToggle />
           <button
             type="button"
             onClick={toggle}
@@ -131,25 +138,40 @@ export function Sidebar() {
       <div
         className={cn(
           "mt-auto border-t border-border pt-3",
-          collapsed ? "flex flex-col items-center gap-2" : "flex items-center gap-2.5",
+          collapsed ? "flex flex-col items-center gap-2" : "flex items-center gap-2",
         )}
       >
-        <div className="flex size-8 shrink-0 items-center justify-center rounded-full border border-border bg-card text-muted-foreground">
-          <User className="size-4" />
-        </div>
-        {!collapsed && (
-          <div className="leading-tight">
-            <div className="text-[12.5px] font-medium">Minha conta</div>
-          </div>
-        )}
+        <Link
+          href="/conta"
+          title={collapsed ? accountName : undefined}
+          className={cn(
+            "flex min-w-0 items-center gap-2.5 rounded-lg transition-colors hover:bg-card",
+            collapsed ? "p-1" : "flex-1 p-1.5",
+            pathname.startsWith("/conta") && "bg-accent",
+          )}
+        >
+          <span
+            className={cn(
+              "flex size-8 shrink-0 items-center justify-center rounded-full border text-[11px] font-medium",
+              pathname.startsWith("/conta")
+                ? "border-muted-foreground/40 bg-accent text-foreground"
+                : "border-border bg-card text-muted-foreground",
+            )}
+          >
+            {me.data?.name ? initials(me.data.name) : <User className="size-4" />}
+          </span>
+          {!collapsed && (
+            <div className="min-w-0 leading-tight">
+              <div className="truncate text-[12.5px] font-medium">{accountName}</div>
+              <div className="text-[11px] text-muted-foreground">Ver conta</div>
+            </div>
+          )}
+        </Link>
         <button
           onClick={logout}
           title="Sair"
           aria-label="Sair"
-          className={cn(
-            "text-muted-foreground transition-colors hover:text-foreground",
-            !collapsed && "ml-auto",
-          )}
+          className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
         >
           <LogOut className="size-[17px]" strokeWidth={1.8} />
         </button>

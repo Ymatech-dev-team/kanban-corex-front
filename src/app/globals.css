@@ -39,7 +39,53 @@
   --ring: var(--yma-yellow-500);
   --radius: 0.5rem;
 
+  /* cor dos pontinhos do fundo (dot grid) — claro e discreto no escuro */
+  --dot-color: rgba(255, 255, 255, 0.09);
+
   color-scheme: dark;
+}
+
+/*
+  Modo claro — ativado por `.light` no <html>. Mantém o amarelo do BOTÃO (lê bem no claro)
+  e o primary-foreground near-black (invariante). O amber de atenção fica igual (laranja).
+*/
+:root.light {
+  /* primitivos claros */
+  --yma-l-bg: #f6f6f7;
+  --yma-l-surface: #ffffff;
+  --yma-l-100: #efeff1;
+  --yma-l-200: #e6e6e9;
+  --yma-l-text: #18181b;
+  --yma-l-muted: #6b6b74;
+
+  /* semânticos (só o que muda; primary/ring/amber/destructive herdam) */
+  --background: var(--yma-l-bg);
+  --foreground: var(--yma-l-text);
+  --card: var(--yma-l-surface);
+  --card-foreground: var(--yma-l-text);
+  --popover: var(--yma-l-surface);
+  --popover-foreground: var(--yma-l-text);
+  --secondary: var(--yma-l-100);
+  --secondary-foreground: var(--yma-l-text);
+  --muted: var(--yma-l-100);
+  --muted-foreground: var(--yma-l-muted);
+  --accent: var(--yma-l-200);
+  --accent-foreground: var(--yma-l-text);
+  --destructive-foreground: #ffffff;
+  --border: var(--yma-l-200);
+  --input: var(--yma-l-200);
+  /* pontinhos escuros e discretos no claro */
+  --dot-color: rgba(24, 24, 27, 0.11);
+
+  color-scheme: light;
+}
+
+/* No claro, o amarelo puro some como ícone/texto pequeno → dourado escuro legível. */
+:root.light .text-primary {
+  color: #a16207;
+}
+:root.light .\[\&_svg\]\:text-primary svg {
+  color: #a16207;
 }
 
 /* Tailwind v4: mapeia os tokens semânticos para utilitários (bg-primary, text-muted-foreground…) */
@@ -73,6 +119,13 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-inter), Inter, system-ui, -apple-system, sans-serif;
+}
+
+/* Dot grid sutil no fundo da área do app (cara de quadro/canvas). Atrás do conteúdo. */
+.app-dots {
+  background-image: radial-gradient(var(--dot-color) 1.4px, transparent 1.4px);
+  background-size: 20px 20px;
+  background-position: -1px -1px;
 }
 
 /* Aurora sutil do fundo do login — brilhos da marca flutuando devagar. */

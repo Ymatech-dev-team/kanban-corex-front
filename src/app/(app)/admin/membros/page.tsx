@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { MoreHorizontal, Plus, ShieldCheck, KeyRound, Trash2, Loader2, AlertTriangle } from "lucide-react";
+import { MoreHorizontal, Plus, ShieldCheck, KeyRound, Wallet, Trash2, Loader2, AlertTriangle } from "lucide-react";
 import type { AxiosError } from "axios";
 import { PERMISSIONS } from "@sistema-tasks/contracts";
 import { toast } from "sonner";
@@ -20,6 +20,8 @@ import { CreateMemberDialog } from "@/components/admin/create-member-dialog";
 import { ChangeRoleDialog } from "@/components/admin/change-role-dialog";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { TempPasswordDialog } from "@/components/admin/temp-password-dialog";
+import { CompensationDialog } from "@/components/admin/compensation-dialog";
+import { compensationLabel } from "@/lib/money";
 
 function apiMessage(e: unknown, fallback: string): string {
   return (e as AxiosError<{ error?: { message?: string } }>)?.response?.data?.error?.message ?? fallback;
@@ -39,6 +41,7 @@ export default function MembrosPage() {
   const [roleMember, setRoleMember] = useState<AdminMember | null>(null);
   const [resetMember, setResetMember] = useState<AdminMember | null>(null);
   const [deleteMember, setDeleteMember] = useState<AdminMember | null>(null);
+  const [compMember, setCompMember] = useState<AdminMember | null>(null);
 
   const rolesById = useMemo(
     () => Object.fromEntries((roles.data ?? []).map((r) => [r.id, r.name])),
@@ -107,12 +110,13 @@ export default function MembrosPage() {
             </Button>
           </Centered>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-border">
+          <div className="overflow-x-auto rounded-xl border border-border bg-card">
             <table className="w-full min-w-[620px] border-collapse text-[13px]">
               <thead>
                 <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground/70">
                   <th className="px-4 py-2.5 font-medium">Membro</th>
                   <th className="px-4 py-2.5 font-medium">Perfil</th>
+                  {canManage && <th className="px-4 py-2.5 font-medium">Remuneração</th>}
                   <th className="px-4 py-2.5 font-medium">Situação</th>
                   <th className="px-4 py-2.5" />
                 </tr>
@@ -144,6 +148,17 @@ export default function MembrosPage() {
                           </span>
                         )}
                       </td>
+                      {canManage && (
+                        <td className="px-4 py-3">
+                          {compensationLabel(m.compensationType, m.compensationCents) ? (
+                            <span className="text-[12.5px] text-foreground">
+                              {compensationLabel(m.compensationType, m.compensationCents)}
+                            </span>
+                          ) : (
+                            <span className="text-[12px] text-muted-foreground/50">—</span>
+                          )}
+                        </td>
+                      )}
                       <td className="px-4 py-3">
                         {m.mustChangePassword ? (
                           <span className="text-[12px] text-amber">senha temporária</span>
@@ -161,6 +176,10 @@ export default function MembrosPage() {
                               <MoreHorizontal className="size-4" />
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              <DropdownMenuItem onSelect={() => setCompMember(m)}>
+                                <Wallet className="size-4 text-muted-foreground" />
+                                Remuneração
+                              </DropdownMenuItem>
                               {!isSelf && (
                                 <DropdownMenuItem onSelect={() => setRoleMember(m)}>
                                   <ShieldCheck className="size-4 text-muted-foreground" />
@@ -201,6 +220,7 @@ export default function MembrosPage() {
         roles={roles.data ?? []}
         onOpenChange={(o) => !o && setRoleMember(null)}
       />
+      <CompensationDialog member={compMember} onOpenChange={(o) => !o && setCompMember(null)} />
       <ConfirmDialog
         open={resetMember !== null}
         title={`Redefinir senha de ${resetMember?.name ?? ""}?`}

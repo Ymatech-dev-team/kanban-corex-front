@@ -10,7 +10,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <BoardNavProvider>
         <div className="flex h-screen overflow-hidden">
           <Sidebar />
-          <main className="flex min-w-0 flex-1 flex-col">{children}</main>
+          <main className="app-dots flex min-w-0 flex-1 flex-col">{children}</main>
         </div>
         <DueReminder />
       </BoardNavProvider>

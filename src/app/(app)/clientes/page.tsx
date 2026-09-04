@@ -1,163 +1,167 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, Plus } from "lucide-react";
-import type { TaskStatus } from "@sistema-tasks/contracts";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Plus, ChevronRight, Building2, FolderTree, Loader2, AlertTriangle } from "lucide-react";
 import { useProjects } from "@/lib/hooks/use-projects";
-import { useTasks } from "@/lib/hooks/use-tasks";
-import { useProjectMembers } from "@/lib/hooks/use-members";
 import { useBoardNav } from "@/lib/board-nav";
-import { filterByAssignee, type AssigneeFilter } from "@/lib/filter";
-import { KanbanBoard } from "@/components/board/kanban-board";
-import { TaskList } from "@/components/board/task-list";
-import { TaskCalendar } from "@/components/board/task-calendar";
-import { AssigneeFilter as AssigneeFilterControl } from "@/components/board/assignee-filter";
 import { CreateProjectDialog } from "@/components/board/create-project-dialog";
-import { CreateTaskDialog } from "@/components/board/create-task-dialog";
-import { TaskDetailDialog } from "@/components/board/task-detail-dialog";
-import { BoardSkeleton, BoardError, EmptyClients, EmptyTasks } from "@/components/board/board-states";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
-export default function ClientsBoardPage() {
-  const projects = useProjects();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [addStatus, setAddStatus] = useState<TaskStatus | null>(null);
-  const [openTaskId, setOpenTaskId] = useState<string | null>(null);
-  const [assigneeFilter, setAssigneeFilter] = useState<AssigneeFilter>({ type: "all" });
-  const [view, setView] = useState<"kanban" | "lista" | "calendario">("kanban");
+type Tab = "clientes" | "projetos";
 
-  useEffect(() => {
-    if (!selectedId && projects.data?.length) setSelectedId(projects.data[0].id);
-  }, [projects.data, selectedId]);
-
-  // Trocar de cliente zera o filtro (o responsável selecionado pode não existir no novo).
-  useEffect(() => {
-    setAssigneeFilter({ type: "all" });
-  }, [selectedId]);
-
-  // Ponte (sino / resumo) → abrir um cliente e, se houver, uma tarefa.
+export default function ClientesPage() {
+  const router = useRouter();
   const nav = useBoardNav();
-  useEffect(() => {
-    if (!nav.pending) return;
-    setSelectedId(nav.pending.projectId);
-    setOpenTaskId(nav.pending.taskId ?? null);
-    nav.consume();
-  }, [nav]);
+  const projects = useProjects();
+  const [tab, setTab] = useState<Tab>("clientes");
+  const [createOpen, setCreateOpen] = useState(false);
 
-  const tasks = useTasks(selectedId);
-  const membersQuery = useProjectMembers(selectedId);
-  const members = membersQuery.data ?? [];
-  const membersById = useMemo(() => Object.fromEntries(members.map((m) => [m.id, m.name])), [members]);
-  const selected = projects.data?.find((p) => p.id === selectedId) ?? null;
-  const visibleTasks = useMemo(
-    () => filterByAssignee(tasks.data ?? [], assigneeFilter),
-    [tasks.data, assigneeFilter],
-  );
-
-  if (projects.isLoading) return <BoardSkeleton />;
-  if (projects.isError) return <BoardError onRetry={() => projects.refetch()} />;
-  if ((projects.data?.length ?? 0) === 0) {
-    return (
-      <>
-        <EmptyClients onCreate={() => setCreateOpen(true)} />
-        <CreateProjectDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={setSelectedId} />
-      </>
-    );
+  function openBoard(projectId: string) {
+    nav.request(projectId);
+    router.push("/tarefas");
   }
 
   return (
     <>
       <header className="flex items-center gap-4 border-b border-border px-6 py-3.5">
-        <DropdownMenu>
-          <DropdownMenuTrigger className="flex items-center gap-2 text-base font-medium tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">
-            {selected?.name ?? "Selecione um cliente"}
-            <ChevronDown className="size-4 text-muted-foreground" />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            {projects.data!.map((p) => (
-              <DropdownMenuItem key={p.id} active={p.id === selectedId} onSelect={() => setSelectedId(p.id)}>
-                {p.name}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <span className="rounded-md border border-border bg-card px-2 py-0.5 text-[11px] text-muted-foreground">
-          {assigneeFilter.type === "all"
-            ? `${tasks.data?.length ?? 0} tarefas`
-            : `${visibleTasks.length} de ${tasks.data?.length ?? 0}`}
-        </span>
-
-        <div className="ml-1 flex gap-0.5 rounded-lg border border-border bg-card p-[3px] text-[12.5px]">
-          {([
-            { key: "kanban", label: "Kanban" },
-            { key: "lista", label: "Lista" },
-            { key: "calendario", label: "Calendário" },
-          ] as const).map((v) => (
-            <button
-              key={v.key}
-              type="button"
-              onClick={() => setView(v.key)}
-              className={cn(
-                "rounded-md px-3 py-1 transition-colors",
-                view === v.key ? "bg-accent text-foreground" : "text-muted-foreground/60 hover:text-muted-foreground",
-              )}
-            >
-              {v.label}
-            </button>
-          ))}
+        <div>
+          <h1 className="text-base font-medium tracking-tight">Clientes</h1>
+          <p className="text-[12.5px] text-muted-foreground">Cadastre e organize seus clientes.</p>
         </div>
-
-        <div className="ml-auto flex items-center gap-2">
-          {members.length > 0 && (
-            <AssigneeFilterControl members={members} value={assigneeFilter} onChange={setAssigneeFilter} />
-          )}
-          <Button variant="secondary" onClick={() => setCreateOpen(true)}>
+        <div className="ml-auto">
+          <Button onClick={() => setCreateOpen(true)}>
             <Plus className="size-4" />
             Novo cliente
           </Button>
         </div>
       </header>
 
-      {tasks.isLoading ? (
-        <BoardSkeleton />
-      ) : tasks.isError ? (
-        <BoardError onRetry={() => tasks.refetch()} />
-      ) : (tasks.data?.length ?? 0) === 0 ? (
-        <EmptyTasks onAdd={() => setAddStatus("TODO")} />
-      ) : view === "lista" ? (
-        <TaskList tasks={visibleTasks} membersById={membersById} onOpenTask={setOpenTaskId} />
-      ) : view === "calendario" ? (
-        <TaskCalendar tasks={visibleTasks} onOpenTask={setOpenTaskId} />
-      ) : (
-        <KanbanBoard
-          tasks={visibleTasks}
-          projectId={selectedId!}
-          membersById={membersById}
-          dragDisabled={assigneeFilter.type !== "all"}
-          onOpenTask={setOpenTaskId}
-          onAddTask={setAddStatus}
-        />
-      )}
+      <div className="flex-1 overflow-auto p-6">
+        {/* Abas Clientes | Projetos (Projetos preparado pro futuro) */}
+        <div className="mb-5 flex w-fit gap-0.5 rounded-lg border border-border bg-card p-[3px] text-[12.5px]">
+          {([
+            { key: "clientes", label: "Clientes" },
+            { key: "projetos", label: "Projetos" },
+          ] as const).map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setTab(t.key)}
+              className={cn(
+                "rounded-md px-3 py-1 transition-colors",
+                tab === t.key ? "bg-accent text-foreground" : "text-muted-foreground/60 hover:text-muted-foreground",
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
 
-      <CreateProjectDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={setSelectedId} />
-      {selectedId && (
-        <CreateTaskDialog
-          projectId={selectedId}
-          status={addStatus}
-          members={members}
-          onOpenChange={(o) => !o && setAddStatus(null)}
-        />
-      )}
-      <TaskDetailDialog taskId={openTaskId} members={members} onOpenChange={(o) => !o && setOpenTaskId(null)} />
+        {tab === "clientes" ? (
+          <ClientesTab
+            state={projects}
+            onCreate={() => setCreateOpen(true)}
+            onOpen={openBoard}
+          />
+        ) : (
+          <ProjetosTab />
+        )}
+      </div>
+
+      <CreateProjectDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={openBoard} />
     </>
   );
+}
+
+function ClientesTab({
+  state,
+  onCreate,
+  onOpen,
+}: {
+  state: ReturnType<typeof useProjects>;
+  onCreate: () => void;
+  onOpen: (id: string) => void;
+}) {
+  if (state.isLoading) {
+    return (
+      <div className="flex justify-center py-16 text-muted-foreground">
+        <Loader2 className="size-5 animate-spin" />
+      </div>
+    );
+  }
+  if (state.isError) {
+    return (
+      <Centered>
+        <AlertTriangle className="size-6 text-amber" />
+        <p className="text-sm text-muted-foreground">Não foi possível carregar os clientes.</p>
+        <Button variant="secondary" onClick={() => state.refetch()}>
+          Tentar de novo
+        </Button>
+      </Centered>
+    );
+  }
+  const clients = state.data ?? [];
+  if (clients.length === 0) {
+    return (
+      <Centered>
+        <div className="flex size-12 items-center justify-center rounded-full border border-border bg-card text-muted-foreground">
+          <Building2 className="size-5" />
+        </div>
+        <div>
+          <h2 className="text-base font-medium tracking-tight">Nenhum cliente ainda</h2>
+          <p className="mt-1 max-w-xs text-sm text-muted-foreground">
+            Crie o primeiro cliente para começar a organizar as tarefas.
+          </p>
+        </div>
+        <Button onClick={onCreate}>Criar primeiro cliente</Button>
+      </Centered>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+      {clients.map((c) => (
+        <button
+          key={c.id}
+          type="button"
+          onClick={() => onOpen(c.id)}
+          className="group flex items-start gap-3 rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-muted-foreground/40"
+        >
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-accent text-muted-foreground">
+            <Building2 className="size-[18px]" strokeWidth={1.8} />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate font-medium tracking-tight">{c.name}</span>
+            <span className="mt-0.5 line-clamp-1 text-[12.5px] text-muted-foreground">
+              {c.description || "Sem descrição"}
+            </span>
+          </span>
+          <ChevronRight className="mt-1 size-4 shrink-0 text-muted-foreground/50 transition-colors group-hover:text-foreground" />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ProjetosTab() {
+  return (
+    <Centered>
+      <div className="flex size-12 items-center justify-center rounded-full border border-border bg-card text-muted-foreground">
+        <FolderTree className="size-5" />
+      </div>
+      <div>
+        <h2 className="text-base font-medium tracking-tight">Projetos por cliente — em breve</h2>
+        <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+          Aqui cada cliente vai poder ter vários projetos, e as tarefas ficarão organizadas por projeto dentro do
+          cliente. A estrutura já está preparada para isso.
+        </p>
+      </div>
+    </Centered>
+  );
+}
+
+function Centered({ children }: { children: React.ReactNode }) {
+  return <div className="flex flex-col items-center gap-3 py-16 text-center">{children}</div>;
 }

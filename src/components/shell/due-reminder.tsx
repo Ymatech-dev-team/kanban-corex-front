@@ -68,7 +68,7 @@ export function DueReminder() {
     markSeen([key]);
     setOpen(false);
     nav.request(projectId, taskId);
-    router.push("/clientes");
+    router.push("/tarefas");
   }
 
   return (

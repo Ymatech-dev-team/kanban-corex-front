@@ -44,7 +44,7 @@ export function NotificationsBell() {
   function open(projectId: string, taskId: string, key: string) {
     markSeen([key]);
     nav.request(projectId, taskId);
-    router.push("/clientes");
+    router.push("/tarefas");
   }
 
   return (
