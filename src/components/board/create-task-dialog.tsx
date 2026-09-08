@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AssigneePicker } from "./assignee-picker";
 import { useCreateTask } from "@/lib/hooks/use-tasks";
+import { parseHoursToMinutes } from "@/lib/duration";
 import { cn } from "@/lib/utils";
 
 const PRIOS: { value: TaskPriority; label: string }[] = [
@@ -32,6 +33,7 @@ export function CreateTaskDialog({ projectId, status, members, onOpenChange }: P
   const [priority, setPriority] = useState<TaskPriority>("MEDIUM");
   const [due, setDue] = useState("");
   const [assigneeId, setAssigneeId] = useState<string | null>(null);
+  const [estimated, setEstimated] = useState("");
 
   useEffect(() => {
     if (status) {
@@ -39,6 +41,7 @@ export function CreateTaskDialog({ projectId, status, members, onOpenChange }: P
       setPriority("MEDIUM");
       setDue("");
       setAssigneeId(null);
+      setEstimated("");
     }
   }, [status]);
 
@@ -51,6 +54,10 @@ export function CreateTaskDialog({ projectId, status, members, onOpenChange }: P
       status,
       ...(due ? { dueDate: new Date(`${due}T12:00:00`).toISOString() } : {}),
       ...(assigneeId ? { assigneeId } : {}),
+      ...((): { estimatedMinutes?: number } => {
+        const m = parseHoursToMinutes(estimated);
+        return m != null ? { estimatedMinutes: m } : {};
+      })(),
     };
     await create.mutateAsync(input);
     onOpenChange(false);
@@ -88,9 +95,21 @@ export function CreateTaskDialog({ projectId, status, members, onOpenChange }: P
             </div>
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor="tdue">Prazo (opcional)</Label>
-            <Input id="tdue" type="date" value={due} onChange={(e) => setDue(e.target.value)} />
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="tdue">Prazo (opcional)</Label>
+              <Input id="tdue" type="date" value={due} onChange={(e) => setDue(e.target.value)} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="test">Horas estimadas</Label>
+              <Input
+                id="test"
+                inputMode="decimal"
+                placeholder="ex.: 8 ou 1,5"
+                value={estimated}
+                onChange={(e) => setEstimated(e.target.value)}
+              />
+            </div>
           </div>
 
           <div className="flex flex-col gap-1.5">

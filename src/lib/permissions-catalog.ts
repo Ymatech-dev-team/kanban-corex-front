@@ -40,6 +40,17 @@ export const PERMISSION_GROUPS: PermGroup[] = [
     ],
   },
   {
+    title: "Custos",
+    items: [
+      {
+        perm: PERMISSIONS.custos_ver,
+        label: "Ver custos",
+        hint: "Vê o custo de alocação (derivado da remuneração) nos clientes com acesso",
+        meta: false,
+      },
+    ],
+  },
+  {
     title: "Administração",
     items: [
       { perm: PERMISSIONS.membros_ver, label: "Ver membros", meta: false },

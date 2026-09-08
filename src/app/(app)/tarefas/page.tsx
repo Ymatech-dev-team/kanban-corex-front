@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import type { TaskStatus } from "@sistema-tasks/contracts";
-import { useProjects } from "@/lib/hooks/use-projects";
+import { useProjects, useProject } from "@/lib/hooks/use-projects";
 import { useTasks } from "@/lib/hooks/use-tasks";
 import { useProjectMembers } from "@/lib/hooks/use-members";
 import { useBoardNav } from "@/lib/board-nav";
@@ -15,6 +15,7 @@ import { TaskCalendar } from "@/components/board/task-calendar";
 import { AssigneeFilter as AssigneeFilterControl } from "@/components/board/assignee-filter";
 import { CreateTaskDialog } from "@/components/board/create-task-dialog";
 import { TaskDetailDialog } from "@/components/board/task-detail-dialog";
+import { CostTab } from "@/components/board/cost-tab";
 import { BoardSkeleton, BoardError, EmptyClients, EmptyTasks } from "@/components/board/board-states";
 import {
   DropdownMenu,
@@ -24,6 +25,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
+type ViewKey = "kanban" | "lista" | "calendario" | "custo";
+
 export default function TarefasPage() {
   const router = useRouter();
   const projects = useProjects();
@@ -31,7 +34,7 @@ export default function TarefasPage() {
   const [addStatus, setAddStatus] = useState<TaskStatus | null>(null);
   const [openTaskId, setOpenTaskId] = useState<string | null>(null);
   const [assigneeFilter, setAssigneeFilter] = useState<AssigneeFilter>({ type: "all" });
-  const [view, setView] = useState<"kanban" | "lista" | "calendario">("kanban");
+  const [view, setView] = useState<ViewKey>("kanban");
 
   useEffect(() => {
     if (!selectedId && projects.data?.length) setSelectedId(projects.data[0].id);
@@ -50,6 +53,16 @@ export default function TarefasPage() {
     setOpenTaskId(nav.pending.taskId ?? null);
     nav.consume();
   }, [nav]);
+
+  // canSeeCost vem do detalhe do cliente (permissão POR cliente). undefined durante o load = tratado como "sem".
+  const project = useProject(selectedId);
+  const canSeeCost = project.data?.canSeeCost === true;
+  // View derivada: se cair num cliente sem custo com a aba Custo ativa, mostra kanban (sem race com o fetch).
+  const effectiveView: ViewKey = view === "custo" && !canSeeCost ? "kanban" : view;
+  // Saneamento do estado guardado — só quando o cliente já resolveu e não tem direito.
+  useEffect(() => {
+    if (view === "custo" && project.isSuccess && !canSeeCost) setView("kanban");
+  }, [view, project.isSuccess, canSeeCost]);
 
   const tasks = useTasks(selectedId);
   const membersQuery = useProjectMembers(selectedId);
@@ -95,14 +108,18 @@ export default function TarefasPage() {
             { key: "kanban", label: "Kanban" },
             { key: "lista", label: "Lista" },
             { key: "calendario", label: "Calendário" },
-          ] as const).map((v) => (
+            ...(canSeeCost ? [{ key: "custo", label: "Custo" } as const] : []),
+          ] as { key: ViewKey; label: string }[]).map((v) => (
             <button
               key={v.key}
               type="button"
               onClick={() => setView(v.key)}
+              aria-current={effectiveView === v.key ? "page" : undefined}
               className={cn(
-                "rounded-md px-3 py-1 transition-colors",
-                view === v.key ? "bg-accent text-foreground" : "text-muted-foreground/60 hover:text-muted-foreground",
+                "rounded-md px-3 py-1 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                effectiveView === v.key
+                  ? "bg-accent text-foreground"
+                  : "text-muted-foreground/60 hover:text-muted-foreground",
               )}
             >
               {v.label}
@@ -117,15 +134,17 @@ export default function TarefasPage() {
         )}
       </header>
 
-      {tasks.isLoading ? (
+      {effectiveView === "custo" ? (
+        <CostTab projectId={selectedId!} canSeeCost={canSeeCost} />
+      ) : tasks.isLoading ? (
         <BoardSkeleton />
       ) : tasks.isError ? (
         <BoardError onRetry={() => tasks.refetch()} />
       ) : (tasks.data?.length ?? 0) === 0 ? (
         <EmptyTasks onAdd={() => setAddStatus("TODO")} />
-      ) : view === "lista" ? (
+      ) : effectiveView === "lista" ? (
         <TaskList tasks={visibleTasks} membersById={membersById} onOpenTask={setOpenTaskId} />
-      ) : view === "calendario" ? (
+      ) : effectiveView === "calendario" ? (
         <TaskCalendar tasks={visibleTasks} onOpenTask={setOpenTaskId} />
       ) : (
         <KanbanBoard

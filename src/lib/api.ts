@@ -38,6 +38,13 @@ api.interceptors.response.use(
   (error) => {
     if (error?.response?.status === 403) {
       queryClient?.invalidateQueries({ queryKey: ["me"] });
+      // canSeeCost (permissão por cliente) vive em ["project", id]: marca stale SEM refetch imediato.
+      // refetchType:"none" evita loop invalidate→refetch→403 quando /clientes/[id] é aberto sem acesso;
+      // a revalidação acontece no próximo remount/refocus. [review seg — detalhe-do-cliente]
+      queryClient?.invalidateQueries({ queryKey: ["project"], refetchType: "none" });
+      // remove (não só invalida) valores de custo: senão o RQ mostra o número velho enquanto refetcha o gate. [review seg]
+      queryClient?.removeQueries({ queryKey: ["project-cost"] });
+      queryClient?.removeQueries({ queryKey: ["task-cost"] });
     }
     return Promise.reject(error);
   },

@@ -17,7 +17,48 @@ import {
   useDeleteSubtask,
 } from "@/lib/hooks/use-tasks";
 import { useCan } from "@/lib/hooks/use-can";
+import { useProject } from "@/lib/hooks/use-projects";
+import { useTaskCost } from "@/lib/hooks/use-cost";
+import { parseHoursToMinutes, minutesToHoursInput } from "@/lib/duration";
+import { formatBRL } from "@/lib/money";
+import type { CostState } from "@/lib/types";
 import { cn } from "@/lib/utils";
+
+const COST_MSG: Record<Exclude<CostState, "OK">, string> = {
+  SEM_HORAS: "Defina as horas estimadas para calcular.",
+  SEM_RESPONSAVEL: "Defina um responsável para calcular.",
+  SEM_REMUNERACAO: "O responsável não tem remuneração cadastrada.",
+  RESPONSAVEL_SEM_ACESSO: "Custo indisponível para o responsável atual.",
+};
+
+/** Linha "Custo estimado" — só renderiza para quem tem custos_ver no cliente (barreira real é o backend). */
+function CostLine({ taskId, enabled }: { taskId: string; enabled: boolean }) {
+  const cost = useTaskCost(taskId, enabled);
+  if (!enabled) return null;
+  return (
+    <div className="flex flex-col gap-1.5 border-t border-border pt-3">
+      <span className="text-[11px] uppercase tracking-wide text-muted-foreground/70">Custo estimado</span>
+      {cost.isLoading ? (
+        <span className="h-3.5 w-24 animate-pulse rounded bg-muted" />
+      ) : cost.isError || !cost.data ? (
+        <span className="text-[13px] text-muted-foreground">Não foi possível calcular agora.</span>
+      ) : cost.data.state === "OK" ? (
+        <div>
+          <span className="text-[15px] font-medium tabular-nums">{formatBRL(cost.data.cents ?? 0)}</span>
+          <span className="ml-2 text-[12px] text-muted-foreground">a preço de hoje</span>
+          <p className="mt-1 text-[12px] text-muted-foreground">
+            Calculado pelas horas estimadas. Salário mensal entra proporcional às horas.
+          </p>
+        </div>
+      ) : (
+        <div className="flex items-baseline gap-2">
+          <span className="text-[15px] text-muted-foreground">—</span>
+          <span className="text-[13px] text-muted-foreground">{COST_MSG[cost.data.state]}</span>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const PRIOS: { value: TaskPriority; label: string }[] = [
   { value: "LOW", label: "Baixa" },
@@ -67,6 +108,7 @@ interface Form {
   priority: TaskPriority;
   due: string;
   assigneeId: string | null;
+  estimated: string;
 }
 
 export function TaskDetailDialog({
@@ -90,6 +132,9 @@ export function TaskDetailDialog({
 
   const canEdit = useCan(PERMISSIONS.tarefas_editar);
   const canDelete = useCan(PERMISSIONS.tarefas_excluir);
+  // custos_ver é POR cliente: lê do detalhe do cliente da tarefa (mesma chave do board = sem fetch extra).
+  const projectDetail = useProject(projectId || null);
+  const canSeeCost = projectDetail.data?.canSeeCost === true;
 
   const [form, setForm] = useState<Form | null>(null);
   const [newTitle, setNewTitle] = useState("");
@@ -108,6 +153,7 @@ export function TaskDetailDialog({
         priority: task.priority,
         due: task.dueDate ? task.dueDate.slice(0, 10) : "",
         assigneeId: task.assigneeId,
+        estimated: minutesToHoursInput(task.estimatedMinutes),
       });
       seededFor.current = task.id;
     }
@@ -117,6 +163,7 @@ export function TaskDetailDialog({
   const doneCount = subs.filter((s) => s.done).length;
 
   const dueBaseline = task?.dueDate ? task.dueDate.slice(0, 10) : "";
+  const estimatedBaseline = minutesToHoursInput(task?.estimatedMinutes);
   const dirty =
     !!form &&
     !!task &&
@@ -124,7 +171,8 @@ export function TaskDetailDialog({
       form.status !== task.status ||
       form.priority !== task.priority ||
       form.due !== dueBaseline ||
-      form.assigneeId !== task.assigneeId);
+      form.assigneeId !== task.assigneeId ||
+      form.estimated !== estimatedBaseline);
 
   async function save() {
     if (!form || !task || !form.title.trim()) return;
@@ -134,6 +182,7 @@ export function TaskDetailDialog({
       priority: form.priority,
       dueDate: form.due ? new Date(`${form.due}T12:00:00`).toISOString() : null,
       assigneeId: form.assigneeId,
+      estimatedMinutes: parseHoursToMinutes(form.estimated),
     };
     await update.mutateAsync({ id: task.id, patch, updatedAt: task.updatedAt });
     seededFor.current = null; // re-semeia com o dado fresco após invalidar
@@ -155,7 +204,7 @@ export function TaskDetailDialog({
 
   return (
     <Dialog open={taskId !== null} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
         {detail.isLoading || !task || !form ? (
           <div className="flex items-center justify-center py-10 text-muted-foreground">
             <Loader2 className="size-5 animate-spin" />
@@ -217,6 +266,17 @@ export function TaskDetailDialog({
                 />
               </div>
               <div className="flex flex-col gap-1.5">
+                <span className="text-[11px] uppercase tracking-wide text-muted-foreground/70">Horas estimadas</span>
+                <Input
+                  inputMode="decimal"
+                  placeholder="ex.: 8 ou 1,5"
+                  value={form.estimated}
+                  disabled={!canEdit}
+                  onChange={(e) => setForm({ ...form, estimated: e.target.value })}
+                  className="h-9"
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
                 <span className="text-[11px] uppercase tracking-wide text-muted-foreground/70">Responsável</span>
                 <AssigneePicker
                   members={members}
@@ -225,6 +285,8 @@ export function TaskDetailDialog({
                   onChange={(id) => setForm({ ...form, assigneeId: id })}
                 />
               </div>
+
+              <CostLine taskId={task.id} enabled={canSeeCost} />
             </div>
 
             {canEdit && dirty && (
@@ -239,6 +301,7 @@ export function TaskDetailDialog({
                       priority: task.priority,
                       due: dueBaseline,
                       assigneeId: task.assigneeId,
+                      estimated: estimatedBaseline,
                     })
                   }
                 >

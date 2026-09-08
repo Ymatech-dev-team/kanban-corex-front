@@ -3,6 +3,7 @@ import type { AxiosError } from "axios";
 import { toast } from "sonner";
 import type { CreateTaskInput, UpdateTaskInput, TaskStatus } from "@sistema-tasks/contracts";
 import { api } from "@/lib/api";
+import { projectCostKey, taskCostKey } from "@/lib/hooks/use-cost";
 import type { Task } from "@/lib/types";
 
 type ApiError = AxiosError<{ error?: { code?: string; message?: string } }>;
@@ -38,6 +39,7 @@ export function useCreateTask(projectId: string) {
       ).data,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: tasksKey(projectId) });
+      qc.invalidateQueries({ queryKey: projectCostKey(projectId) }); // custo agregado muda
       toast.success("Tarefa criada");
     },
     onError: () => toast.error("Não foi possível criar a tarefa"),
@@ -84,7 +86,12 @@ export function useMoveTask(projectId: string) {
         toast.error("Não foi possível mover a tarefa");
       }
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: key }),
+    onSettled: (_d, _e, vars) => {
+      qc.invalidateQueries({ queryKey: key });
+      // mudar status (ex.: p/ DONE) troca realizado↔planejado do custo
+      qc.invalidateQueries({ queryKey: taskCostKey(vars.id) });
+      qc.invalidateQueries({ queryKey: projectCostKey(projectId) });
+    },
   });
 }
 
@@ -100,6 +107,9 @@ export function useUpdateTask(projectId: string) {
     onSuccess: (_data, vars) => {
       qc.invalidateQueries({ queryKey: tasksKey(projectId) });
       qc.invalidateQueries({ queryKey: taskKey(vars.id) });
+      // custo deriva de horas/responsável/status: sem isso o painel de custo fica stale [review jornada]
+      qc.invalidateQueries({ queryKey: taskCostKey(vars.id) });
+      qc.invalidateQueries({ queryKey: projectCostKey(projectId) });
       toast.success("Tarefa atualizada");
     },
     onError: (err) => {
@@ -118,6 +128,7 @@ export function useDeleteTask(projectId: string) {
     mutationFn: async (id: string) => (await api.delete(`/tasks/${id}`)).data,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: tasksKey(projectId) });
+      qc.invalidateQueries({ queryKey: projectCostKey(projectId) }); // custo agregado muda
       toast.success("Tarefa excluída");
     },
     onError: (err) => {
