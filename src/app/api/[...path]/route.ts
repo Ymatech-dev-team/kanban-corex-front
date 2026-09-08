@@ -50,7 +50,9 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
     }
   }
 
-  return NextResponse.json(res.data, { status: res.status });
+  // Respostas do domínio são autenticadas/dinâmicas (e podem conter custo/derivado de salário):
+  // nunca cachear no browser/proxy. [SEC-003]
+  return NextResponse.json(res.data, { status: res.status, headers: { "Cache-Control": "no-store" } });
 }
 
 export const GET = handle;
