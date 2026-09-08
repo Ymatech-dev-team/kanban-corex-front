@@ -23,6 +23,11 @@ export default function ClientesPage() {
     router.push("/tarefas");
   }
 
+  // Clicar no card abre o DETALHE do cliente (não o quadro). [detalhe-do-cliente RF-01]
+  function openDetail(projectId: string) {
+    router.push(`/clientes/${projectId}`);
+  }
+
   return (
     <>
       <header className="flex items-center gap-4 border-b border-border px-6 py-3.5">
@@ -63,7 +68,7 @@ export default function ClientesPage() {
           <ClientesTab
             state={projects}
             onCreate={() => setCreateOpen(true)}
-            onOpen={openBoard}
+            onOpen={openDetail}
           />
         ) : (
           <ProjetosTab />
