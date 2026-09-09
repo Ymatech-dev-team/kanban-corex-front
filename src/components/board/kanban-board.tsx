@@ -76,14 +76,23 @@ function SortableCard({
 interface Props {
   tasks: Task[];
   projectId: string;
+  engagementId?: string; // quando presente, a move otimista/invalidação usa a lista do projeto [B2]
   membersById: Record<string, string>;
   dragDisabled?: boolean;
   onOpenTask: (id: string) => void;
   onAddTask: (status: TaskStatus) => void;
 }
 
-export function KanbanBoard({ tasks, projectId, membersById, dragDisabled, onOpenTask, onAddTask }: Props) {
-  const move = useMoveTask(projectId);
+export function KanbanBoard({
+  tasks,
+  projectId,
+  engagementId,
+  membersById,
+  dragDisabled,
+  onOpenTask,
+  onAddTask,
+}: Props) {
+  const move = useMoveTask(projectId, engagementId);
   const [activeId, setActiveId] = useState<string | null>(null);
 
   const sensors = useSensors(

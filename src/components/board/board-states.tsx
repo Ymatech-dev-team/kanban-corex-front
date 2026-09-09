@@ -44,8 +44,8 @@ export function EmptyTasks({ onAdd }: { onAdd: () => void }) {
         <ListTodo className="size-5" />
       </div>
       <div>
-        <h2 className="text-base font-medium tracking-tight">Sem tarefas neste cliente</h2>
-        <p className="mt-1 max-w-xs text-sm text-muted-foreground">Adicione a primeira tarefa para montar o quadro.</p>
+        <h2 className="text-base font-medium tracking-tight">Sem tarefas neste projeto</h2>
+        <p className="mt-1 max-w-xs text-sm text-muted-foreground">Adicione a primeira tarefa deste projeto.</p>
       </div>
       <Button onClick={onAdd}>Criar primeira tarefa</Button>
     </Centered>

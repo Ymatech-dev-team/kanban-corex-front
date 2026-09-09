@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Plus, Pencil, Trash2, Users, Loader2, X } from "lucide-react";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Plus, Pencil, Trash2, Users, Loader2, X, ChevronRight } from "lucide-react";
 import { PERMISSIONS } from "@sistema-tasks/contracts";
 import type { Engagement } from "@/lib/types";
 import {
@@ -22,6 +23,7 @@ import { Label } from "@/components/ui/label";
 import { initials } from "@/lib/initials";
 
 export function ProjetosSection({ projectId }: { projectId: string }) {
+  const router = useRouter();
   const list = useEngagements(projectId);
   const canCreate = useCan(PERMISSIONS.engagements_criar);
   const canEdit = useCan(PERMISSIONS.engagements_editar);
@@ -71,7 +73,15 @@ export function ProjetosSection({ projectId }: { projectId: string }) {
           {(list.data ?? []).map((e) => (
             <article key={e.id} className="flex flex-col gap-2 rounded-xl border border-border bg-card p-4">
               <div className="flex items-start justify-between gap-2">
-                <h3 className="min-w-0 flex-1 truncate font-medium tracking-tight">{e.name}</h3>
+                <button
+                  type="button"
+                  aria-label={`Abrir projeto ${e.name}`}
+                  onClick={() => router.push(`/clientes/${projectId}/projetos/${e.id}`)}
+                  className="group/name flex min-w-0 flex-1 items-center gap-1.5 rounded text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <span className="truncate font-medium tracking-tight">{e.name}</span>
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground/50 transition-colors group-hover/name:text-foreground" />
+                </button>
                 <div className="flex shrink-0 gap-1 text-muted-foreground">
                   {canEdit && (
                     <button

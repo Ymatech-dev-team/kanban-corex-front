@@ -5,6 +5,9 @@ import { useProjectCost } from "@/lib/hooks/use-cost";
 import type { ProjectCost } from "@/lib/types";
 
 vi.mock("@/lib/hooks/use-cost", () => ({ useProjectCost: vi.fn() }));
+vi.mock("@/lib/hooks/use-engagement-board", () => ({
+  useEngagementCost: () => ({ isLoading: false, isError: false, data: undefined }),
+}));
 const mockCost = vi.mocked(useProjectCost);
 
 function state(data: ProjectCost | undefined, extra: Partial<ReturnType<typeof useProjectCost>> = {}) {

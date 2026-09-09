@@ -3,9 +3,9 @@ import { callApi } from "@/lib/server/api";
 import { getAccess, getRefresh, setSession, clearSession } from "@/lib/server/session";
 import { assertCsrf } from "@/lib/server/csrf";
 import { refreshSession } from "@/lib/server/refresh";
+import { isAllowedResource } from "@/lib/server/allowed-resources";
 
 // Só proxia rotas de domínio — /auth/* e /internal/* NÃO passam por aqui. [SEC]
-const ALLOWED = new Set(["me", "projects", "tasks", "subtasks", "members", "roles"]);
 const MUTATIONS = new Set(["POST", "PATCH", "DELETE"]);
 // Charset seguro por segmento (cuid/kebab) — bloqueia `..`, `.`, `/`, `%2e` etc. [SEC-001]
 const SAFE_SEGMENT = /^[A-Za-z0-9_-]+$/;
@@ -13,7 +13,7 @@ const SAFE_SEGMENT = /^[A-Za-z0-9_-]+$/;
 async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] }> }) {
   const { path } = await ctx.params;
   // 1º segmento na allowlist E todos os segmentos no charset seguro (anti path-traversal).
-  if (path.length === 0 || !ALLOWED.has(path[0]) || !path.every((s) => SAFE_SEGMENT.test(s))) {
+  if (path.length === 0 || !isAllowedResource(path[0]) || !path.every((s) => SAFE_SEGMENT.test(s))) {
     return NextResponse.json({ error: { code: "NAO_ENCONTRADO", message: "Recurso não encontrado" } }, { status: 404 });
   }
 

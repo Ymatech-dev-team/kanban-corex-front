@@ -16,6 +16,7 @@ vi.mock("@/lib/hooks/use-engagements", () => ({
 }));
 vi.mock("@/lib/hooks/use-can", () => ({ useCan: vi.fn() }));
 vi.mock("@/lib/hooks/use-members", () => ({ useProjectMembers: () => ({ data: [], isLoading: false }) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
 const mockList = vi.mocked(useEngagements);
 const mockCan = vi.mocked(useCan);
@@ -24,7 +25,9 @@ function eng(p: Partial<Engagement>): Engagement {
   return { id: "e1", projectId: "p1", name: "Projeto", description: null, taskCount: 0, consultorCount: 0, isGeneral: false, ...p };
 }
 function state(data: Engagement[] | undefined, extra = {}) {
-  return { isLoading: false, isError: false, data, refetch: vi.fn(), ...extra } as ReturnType<typeof useEngagements>;
+  return { isLoading: false, isError: false, data, refetch: vi.fn(), ...extra } as unknown as ReturnType<
+    typeof useEngagements
+  >;
 }
 
 beforeEach(() => {

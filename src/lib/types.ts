@@ -64,6 +64,7 @@ export interface Member {
 export interface Task {
   id: string;
   projectId: string;
+  engagementId?: string; // projeto ao qual a tarefa pertence [hierarquia-projetos]
   title: string;
   description: string | null;
   status: TaskStatus;

@@ -2,6 +2,7 @@
 
 import { Wallet } from "lucide-react";
 import { useProjectCost } from "@/lib/hooks/use-cost";
+import { useEngagementCost } from "@/lib/hooks/use-engagement-board";
 import { CostSummary } from "@/components/cost/cost-summary";
 import { BoardError } from "./board-states";
 
@@ -18,8 +19,18 @@ function CostSkeleton() {
   );
 }
 
-export function CostTab({ projectId, canSeeCost }: { projectId: string; canSeeCost: boolean }) {
-  const cost = useProjectCost(projectId, canSeeCost);
+export function CostTab({
+  projectId,
+  engagementId,
+  canSeeCost,
+}: {
+  projectId: string;
+  engagementId?: string; // presente = custo do PROJETO; ausente = custo do cliente (roll-up)
+  canSeeCost: boolean;
+}) {
+  const clientCost = useProjectCost(projectId, canSeeCost && !engagementId);
+  const engCost = useEngagementCost(engagementId ?? "", canSeeCost && !!engagementId);
+  const cost = engagementId ? engCost : clientCost;
 
   if (cost.isLoading) return <CostSkeleton />;
   if (cost.isError) return <BoardError onRetry={() => cost.refetch()} />;

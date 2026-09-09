@@ -198,14 +198,16 @@ export function TaskDetailDialog({
 
   async function onDelete() {
     if (!task) return;
-    await del.mutateAsync(task.id);
+    await del.mutateAsync({ id: task.id, engagementId: task.engagementId });
     onOpenChange(false);
   }
 
   return (
     <Dialog open={taskId !== null} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] overflow-y-auto">
-        {detail.isLoading || !task || !form ? (
+        {detail.isError ? (
+          <div className="py-10 text-center text-sm text-muted-foreground">Tarefa não encontrada ou sem acesso.</div>
+        ) : detail.isLoading || !task || !form ? (
           <div className="flex items-center justify-center py-10 text-muted-foreground">
             <Loader2 className="size-5 animate-spin" />
           </div>

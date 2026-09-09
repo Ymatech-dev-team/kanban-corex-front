@@ -175,7 +175,8 @@ export function ClientDetail({ projectId }: { projectId: string }) {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 p-6">
+    <div className="flex-1 overflow-y-auto">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 p-6">
       <div>
         <button
           type="button"
@@ -206,6 +207,7 @@ export function ClientDetail({ projectId }: { projectId: string }) {
       <MembersSection projectId={projectId} />
 
       <ProjetosSection projectId={projectId} />
+      </div>
     </div>
   );
 }

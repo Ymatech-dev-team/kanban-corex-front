@@ -4,6 +4,8 @@ import { toast } from "sonner";
 import type { CreateTaskInput, UpdateTaskInput, TaskStatus } from "@sistema-tasks/contracts";
 import { api } from "@/lib/api";
 import { projectCostKey, taskCostKey } from "@/lib/hooks/use-cost";
+import { engTasksKey, engCostKey } from "@/lib/hooks/use-engagement-board";
+import { engagementsKey } from "@/lib/hooks/use-engagements";
 import type { Task } from "@/lib/types";
 
 type ApiError = AxiosError<{ error?: { code?: string; message?: string } }>;
@@ -37,9 +39,14 @@ export function useCreateTask(projectId: string) {
           headers: { "idempotency-key": idemKey() },
         })
       ).data,
-    onSuccess: () => {
+    onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: tasksKey(projectId) });
       qc.invalidateQueries({ queryKey: projectCostKey(projectId) }); // custo agregado muda
+      qc.invalidateQueries({ queryKey: engagementsKey(projectId) }); // taskCount dos cards de projeto
+      if (data?.engagementId) {
+        qc.invalidateQueries({ queryKey: engTasksKey(data.engagementId) });
+        qc.invalidateQueries({ queryKey: engCostKey(data.engagementId) });
+      }
       toast.success("Tarefa criada");
     },
     onError: () => toast.error("Não foi possível criar a tarefa"),
@@ -56,9 +63,10 @@ interface MoveVars {
  * Mover no Kanban com atualização otimista. O backend discrimina os erros:
  * TAREFA_REMOVIDA (some), PROJETO_SEM_ACESSO (ejeta o cliente), SEM_PERMISSAO. [JOR-1c]
  */
-export function useMoveTask(projectId: string) {
+export function useMoveTask(projectId: string, engagementId?: string) {
   const qc = useQueryClient();
-  const key = tasksKey(projectId);
+  // Chave da lista que o board REALMENTE renderiza: por projeto (engagement) ou por cliente. [review B2]
+  const key = engagementId ? engTasksKey(engagementId) : tasksKey(projectId);
   return useMutation({
     mutationFn: async ({ id, status, position }: MoveVars) =>
       (await api.patch<Task>(`/tasks/${id}/move`, { status, position })).data,
@@ -86,11 +94,17 @@ export function useMoveTask(projectId: string) {
         toast.error("Não foi possível mover a tarefa");
       }
     },
-    onSettled: (_d, _e, vars) => {
-      qc.invalidateQueries({ queryKey: key });
+    onSettled: (data, _e, vars) => {
+      qc.invalidateQueries({ queryKey: key }); // lista renderizada
+      if (engagementId) qc.invalidateQueries({ queryKey: tasksKey(projectId) }); // roll-up/metrics do cliente
       // mudar status (ex.: p/ DONE) troca realizado↔planejado do custo
       qc.invalidateQueries({ queryKey: taskCostKey(vars.id) });
       qc.invalidateQueries({ queryKey: projectCostKey(projectId) });
+      const engId = engagementId ?? data?.engagementId;
+      if (engId) {
+        qc.invalidateQueries({ queryKey: engTasksKey(engId) });
+        qc.invalidateQueries({ queryKey: engCostKey(engId) });
+      }
     },
   });
 }
@@ -104,12 +118,16 @@ export function useUpdateTask(projectId: string) {
           headers: updatedAt ? { "if-unmodified-since": updatedAt } : undefined,
         })
       ).data,
-    onSuccess: (_data, vars) => {
+    onSuccess: (data, vars) => {
       qc.invalidateQueries({ queryKey: tasksKey(projectId) });
       qc.invalidateQueries({ queryKey: taskKey(vars.id) });
       // custo deriva de horas/responsável/status: sem isso o painel de custo fica stale [review jornada]
       qc.invalidateQueries({ queryKey: taskCostKey(vars.id) });
       qc.invalidateQueries({ queryKey: projectCostKey(projectId) });
+      if (data?.engagementId) {
+        qc.invalidateQueries({ queryKey: engTasksKey(data.engagementId) });
+        qc.invalidateQueries({ queryKey: engCostKey(data.engagementId) });
+      }
       toast.success("Tarefa atualizada");
     },
     onError: (err) => {
@@ -125,10 +143,15 @@ export function useUpdateTask(projectId: string) {
 export function useDeleteTask(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => (await api.delete(`/tasks/${id}`)).data,
-    onSuccess: () => {
+    mutationFn: async ({ id }: { id: string; engagementId?: string }) => (await api.delete(`/tasks/${id}`)).data,
+    onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: tasksKey(projectId) });
       qc.invalidateQueries({ queryKey: projectCostKey(projectId) }); // custo agregado muda
+      qc.invalidateQueries({ queryKey: engagementsKey(projectId) }); // taskCount dos cards de projeto
+      if (vars.engagementId) {
+        qc.invalidateQueries({ queryKey: engTasksKey(vars.engagementId) });
+        qc.invalidateQueries({ queryKey: engCostKey(vars.engagementId) });
+      }
       toast.success("Tarefa excluída");
     },
     onError: (err) => {

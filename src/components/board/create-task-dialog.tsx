@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AssigneePicker } from "./assignee-picker";
 import { useCreateTask } from "@/lib/hooks/use-tasks";
+import { useCreateEngagementTask } from "@/lib/hooks/use-engagement-board";
 import { parseHoursToMinutes } from "@/lib/duration";
 import { cn } from "@/lib/utils";
 
@@ -22,13 +23,16 @@ const STATUS_LABEL: Record<TaskStatus, string> = { TODO: "A fazer", DOING: "Faze
 
 interface Props {
   projectId: string;
+  engagementId?: string; // quando presente, cria a tarefa NO PROJETO (endpoint por engagement) [B2]
   status: TaskStatus | null; // coluna de origem; null = fechado
   members: Member[];
   onOpenChange: (open: boolean) => void;
 }
 
-export function CreateTaskDialog({ projectId, status, members, onOpenChange }: Props) {
-  const create = useCreateTask(projectId);
+export function CreateTaskDialog({ projectId, engagementId, status, members, onOpenChange }: Props) {
+  const createClient = useCreateTask(projectId);
+  const createEng = useCreateEngagementTask(engagementId ?? "");
+  const create = engagementId ? createEng : createClient;
   const [title, setTitle] = useState("");
   const [priority, setPriority] = useState<TaskPriority>("MEDIUM");
   const [due, setDue] = useState("");
