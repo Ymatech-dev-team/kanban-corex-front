@@ -53,7 +53,12 @@ export function TaskList({
               const done = t.status === "DONE";
               const due = dueState(t.dueDate, t.status);
               const attention = due.state === "soon" || due.state === "overdue";
-              const name = t.assigneeId ? membersById[t.assigneeId] : null;
+              // união (principal primeiro, depois extras) — coerente com o card [review R1]
+              const ids = t.assigneeId
+                ? [t.assigneeId, ...(t.extraAssigneeIds ?? []).filter((id) => id !== t.assigneeId)]
+                : (t.extraAssigneeIds ?? []);
+              const firstName = ids[0] ? membersById[ids[0]] ?? null : null;
+              const moreCount = Math.max(0, ids.length - 1);
               const subs = t.subtasks ?? [];
               return (
                 <tr
@@ -80,19 +85,16 @@ export function TaskList({
                     {due.label || "—"}
                   </td>
                   <td className="px-4 py-2.5">
-                    {name ? (
+                    {ids.length === 0 ? (
+                      <span className="text-muted-foreground/50">—</span>
+                    ) : (
                       <span className="flex items-center gap-2">
                         <span className="flex size-[22px] shrink-0 items-center justify-center rounded-full border border-muted-foreground/40 bg-accent text-[10px] font-medium text-foreground">
-                          {initials(name)}
+                          {firstName ? initials(firstName) : <User className="size-3 text-muted-foreground" />}
                         </span>
-                        <span className="text-muted-foreground">{name}</span>
+                        <span className="text-muted-foreground">{firstName ?? "Sem acesso"}</span>
+                        {moreCount > 0 && <span className="text-[11px] text-muted-foreground/70">+{moreCount}</span>}
                       </span>
-                    ) : t.assigneeId ? (
-                      <span className="flex size-[22px] items-center justify-center rounded-full border border-muted-foreground/40 bg-accent text-muted-foreground">
-                        <User className="size-3" />
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground/50">—</span>
                     )}
                   </td>
                 </tr>

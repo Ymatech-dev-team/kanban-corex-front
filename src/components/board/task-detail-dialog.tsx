@@ -6,8 +6,9 @@ import { PERMISSIONS, type TaskPriority, type TaskStatus, type UpdateTaskInput }
 import type { Member } from "@/lib/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { AssigneePicker } from "./assignee-picker";
+import { AssigneesEditor } from "./assignees-editor";
 import {
   useTaskDetail,
   useUpdateTask,
@@ -47,7 +48,7 @@ function CostLine({ taskId, enabled }: { taskId: string; enabled: boolean }) {
           <span className="text-[15px] font-medium tabular-nums">{formatBRL(cost.data.cents ?? 0)}</span>
           <span className="ml-2 text-[12px] text-muted-foreground">a preço de hoje</span>
           <p className="mt-1 text-[12px] text-muted-foreground">
-            Calculado pelas horas estimadas. Salário mensal entra proporcional às horas.
+            Calculado pelo responsável principal e pelas horas estimadas. Salário mensal entra proporcional às horas.
           </p>
         </div>
       ) : (
@@ -104,10 +105,10 @@ function Segmented<T extends string>({
 
 interface Form {
   title: string;
+  description: string;
   status: TaskStatus;
   priority: TaskPriority;
   due: string;
-  assigneeId: string | null;
   estimated: string;
 }
 
@@ -139,6 +140,16 @@ export function TaskDetailDialog({
   const [form, setForm] = useState<Form | null>(null);
   const [newTitle, setNewTitle] = useState("");
   const seededFor = useRef<string | null>(null);
+  const descRef = useRef<HTMLTextAreaElement>(null);
+
+  // auto-resize da descrição (cresce com o conteúdo, sem barra interna)
+  useEffect(() => {
+    const el = descRef.current;
+    if (el) {
+      el.style.height = "auto";
+      el.style.height = `${el.scrollHeight}px`;
+    }
+  }, [form?.description, taskId]);
 
   useEffect(() => {
     if (taskId === null) {
@@ -149,10 +160,10 @@ export function TaskDetailDialog({
     if (task && seededFor.current !== task.id) {
       setForm({
         title: task.title,
+        description: task.description ?? "",
         status: task.status,
         priority: task.priority,
         due: task.dueDate ? task.dueDate.slice(0, 10) : "",
-        assigneeId: task.assigneeId,
         estimated: minutesToHoursInput(task.estimatedMinutes),
       });
       seededFor.current = task.id;
@@ -164,24 +175,25 @@ export function TaskDetailDialog({
 
   const dueBaseline = task?.dueDate ? task.dueDate.slice(0, 10) : "";
   const estimatedBaseline = minutesToHoursInput(task?.estimatedMinutes);
+  const descriptionBaseline = task?.description ?? "";
   const dirty =
     !!form &&
     !!task &&
     (form.title.trim() !== task.title ||
+      form.description !== descriptionBaseline ||
       form.status !== task.status ||
       form.priority !== task.priority ||
       form.due !== dueBaseline ||
-      form.assigneeId !== task.assigneeId ||
       form.estimated !== estimatedBaseline);
 
   async function save() {
     if (!form || !task || !form.title.trim()) return;
     const patch: UpdateTaskInput = {
       title: form.title.trim(),
+      description: form.description.trim() === "" ? null : form.description.trim(),
       status: form.status,
       priority: form.priority,
       dueDate: form.due ? new Date(`${form.due}T12:00:00`).toISOString() : null,
-      assigneeId: form.assigneeId,
       estimatedMinutes: parseHoursToMinutes(form.estimated),
     };
     await update.mutateAsync({ id: task.id, patch, updatedAt: task.updatedAt });
@@ -279,12 +291,28 @@ export function TaskDetailDialog({
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <span className="text-[11px] uppercase tracking-wide text-muted-foreground/70">Responsável</span>
-                <AssigneePicker
+                <span className="text-[11px] uppercase tracking-wide text-muted-foreground/70">Responsáveis</span>
+                <AssigneesEditor
+                  taskId={task.id}
+                  projectId={projectId}
+                  engagementId={task.engagementId}
+                  assigneeId={task.assigneeId}
+                  extraAssigneeIds={task.extraAssigneeIds ?? []}
                   members={members}
-                  value={form.assigneeId}
                   disabled={!canEdit}
-                  onChange={(id) => setForm({ ...form, assigneeId: id })}
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[11px] uppercase tracking-wide text-muted-foreground/70">Descrição</span>
+                <Textarea
+                  ref={descRef}
+                  value={form.description}
+                  disabled={!canEdit}
+                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  maxLength={5000}
+                  placeholder={canEdit ? "Adicione detalhes da tarefa" : undefined}
+                  className="min-h-[84px] resize-none overflow-hidden"
                 />
               </div>
 
@@ -299,10 +327,10 @@ export function TaskDetailDialog({
                   onClick={() =>
                     setForm({
                       title: task.title,
+                      description: descriptionBaseline,
                       status: task.status,
                       priority: task.priority,
                       due: dueBaseline,
-                      assigneeId: task.assigneeId,
                       estimated: estimatedBaseline,
                     })
                   }

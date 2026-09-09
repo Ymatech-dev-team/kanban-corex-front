@@ -8,14 +8,57 @@ import { cn } from "@/lib/utils";
 const BARS: Record<TaskPriority, number[]> = { LOW: [4, 4, 4], MEDIUM: [4, 8, 8], HIGH: [4, 8, 12] };
 const PRIO_LABEL: Record<TaskPriority, string> = { LOW: "Baixa", MEDIUM: "Média", HIGH: "Alta" };
 
+/** ids dos responsáveis (principal primeiro, depois extras), sem duplicar. */
+function assigneeIdsOf(task: Task): string[] {
+  const ids = task.assigneeId ? [task.assigneeId] : [];
+  for (const id of task.extraAssigneeIds ?? []) if (!ids.includes(id)) ids.push(id);
+  return ids;
+}
+
+function AvatarStack({ ids, membersById }: { ids: string[]; membersById: Record<string, string> }) {
+  if (ids.length === 0) {
+    return (
+      <span className="flex size-[22px] items-center justify-center rounded-full border border-dashed border-muted-foreground/50 text-[13px] text-muted-foreground/60">
+        +
+      </span>
+    );
+  }
+  const shown = ids.slice(0, 3);
+  const extra = ids.length - shown.length;
+  return (
+    <span className="flex items-center">
+      {shown.map((id, i) => {
+        const name = membersById[id];
+        return (
+          <span
+            key={id}
+            title={name ?? "Sem acesso ao cliente"}
+            className={cn(
+              "flex size-[22px] items-center justify-center rounded-full border border-background bg-accent text-[10px] font-medium text-foreground ring-1 ring-muted-foreground/30",
+              i > 0 && "-ml-2",
+            )}
+          >
+            {name ? initials(name) : <User className="size-3 text-muted-foreground" />}
+          </span>
+        );
+      })}
+      {extra > 0 && (
+        <span className="-ml-2 flex size-[22px] items-center justify-center rounded-full border border-background bg-card text-[10px] font-medium text-muted-foreground ring-1 ring-muted-foreground/30">
+          +{extra}
+        </span>
+      )}
+    </span>
+  );
+}
+
 export function TaskCard({
   task,
   onOpen,
-  assigneeName,
+  membersById,
 }: {
   task: Task;
   onOpen?: () => void;
-  assigneeName?: string | null;
+  membersById: Record<string, string>;
 }) {
   const done = task.status === "DONE";
   const due = dueState(task.dueDate, task.status);
@@ -57,18 +100,7 @@ export function TaskCard({
             </span>
           )}
         </div>
-        {task.assigneeId ? (
-          <span
-            title={assigneeName ?? undefined}
-            className="flex size-[22px] items-center justify-center rounded-full border border-muted-foreground/40 bg-accent text-[10px] font-medium text-foreground"
-          >
-            {assigneeName ? initials(assigneeName) : <User className="size-3 text-muted-foreground" />}
-          </span>
-        ) : (
-          <span className="flex size-[22px] items-center justify-center rounded-full border border-dashed border-muted-foreground/50 text-[13px] text-muted-foreground/60">
-            +
-          </span>
-        )}
+        <AvatarStack ids={assigneeIdsOf(task)} membersById={membersById} />
       </div>
       {subs.length > 0 && !done && (
         <div className="mt-2.5 h-1 overflow-hidden rounded-full bg-border">

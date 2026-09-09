@@ -162,6 +162,79 @@ export function useDeleteTask(projectId: string) {
   });
 }
 
+// ---- Responsáveis (principal + extras) [detalhe-tarefa A1] ----
+
+interface AssigneeVars {
+  taskId: string;
+  userId: string;
+  engagementId?: string;
+}
+
+/**
+ * Sucesso de mutação de responsável: escreve o Task fresco no detalhe (instantâneo, fecha a janela de
+ * duplo-clique) e invalida listas/custo. onError discrimina perda-de-acesso/tarefa-removida como o move. [review A]
+ */
+function useAssigneeMutation(
+  projectId: string,
+  fn: (v: AssigneeVars) => Promise<Task>,
+  genericMsg: string,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: (data, vars) => {
+      if (data) qc.setQueryData(taskKey(vars.taskId), data); // atualiza o detalhe na hora (sem esperar refetch)
+      qc.invalidateQueries({ queryKey: tasksKey(projectId) });
+      qc.invalidateQueries({ queryKey: taskCostKey(vars.taskId) });
+      qc.invalidateQueries({ queryKey: projectCostKey(projectId) });
+      if (vars.engagementId) {
+        qc.invalidateQueries({ queryKey: engTasksKey(vars.engagementId) });
+        qc.invalidateQueries({ queryKey: engCostKey(vars.engagementId) });
+      }
+    },
+    onError: (err) => {
+      const code = errorCode(err);
+      if (code === "PROJETO_SEM_ACESSO") {
+        toast.error("Seu acesso a este cliente foi removido");
+        qc.invalidateQueries({ queryKey: ["projects"] });
+        qc.invalidateQueries({ queryKey: ["me"] });
+      } else if (code === "NAO_ENCONTRADO") {
+        toast.error("Essa tarefa não existe mais");
+      } else if (code === "VALIDACAO") {
+        toast.error("Essa pessoa não pode ser adicionada");
+      } else if (code === "SEM_PERMISSAO") {
+        toast.error("Você não tem permissão para isso");
+      } else {
+        toast.error(genericMsg);
+      }
+    },
+  });
+}
+
+export function useAddAssignee(projectId: string) {
+  return useAssigneeMutation(
+    projectId,
+    async ({ taskId, userId }) => (await api.post<Task>(`/tasks/${taskId}/assignees`, { userId })).data,
+    "Não foi possível adicionar o responsável",
+  );
+}
+
+export function useRemoveAssignee(projectId: string) {
+  return useAssigneeMutation(
+    projectId,
+    async ({ taskId, userId }) => (await api.delete<Task>(`/tasks/${taskId}/assignees/${userId}`)).data,
+    "Não foi possível remover o responsável",
+  );
+}
+
+export function useSetPrimaryAssignee(projectId: string) {
+  return useAssigneeMutation(
+    projectId,
+    async ({ taskId, userId }) => (await api.post<Task>(`/tasks/${taskId}/assignees/${userId}/primary`)).data,
+    "Não foi possível definir o responsável principal",
+  );
+}
+
 // ---- Detalhe + subtarefas ----
 
 export function taskKey(taskId: string | null) {

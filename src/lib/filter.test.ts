@@ -28,6 +28,14 @@ describe("filterByAssignee", () => {
   it("none pega só sem responsável", () => {
     expect(filterByAssignee(tasks, { type: "none" }).map((t) => t.id)).toEqual(["c"]);
   });
+  it("casa também quem é responsável EXTRA", () => {
+    const withExtra = [{ ...task("e", "u9"), extraAssigneeIds: ["u1"] }];
+    expect(filterByAssignee(withExtra, { type: "user", id: "u1" }).map((t) => t.id)).toEqual(["e"]);
+  });
+  it("none exige sem principal E sem extras", () => {
+    const withExtra = [{ ...task("f", null), extraAssigneeIds: ["u1"] }];
+    expect(filterByAssignee(withExtra, { type: "none" })).toHaveLength(0);
+  });
 });
 
 describe("isFiltering", () => {

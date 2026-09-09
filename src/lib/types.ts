@@ -70,7 +70,8 @@ export interface Task {
   status: TaskStatus;
   priority: TaskPriority;
   dueDate: string | null;
-  assigneeId: string | null;
+  assigneeId: string | null; // responsável principal (custo/avatar do card) [detalhe-tarefa A1]
+  extraAssigneeIds?: string[]; // responsáveis extras (não inclui o principal)
   estimatedMinutes?: number | null;
   position: number;
   updatedAt?: string;

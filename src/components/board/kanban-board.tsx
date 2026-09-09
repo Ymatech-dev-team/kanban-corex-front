@@ -48,12 +48,12 @@ function Dot({ kind }: { kind: "todo" | "doing" | "done" }) {
 function SortableCard({
   task,
   onOpen,
-  assigneeName,
+  membersById,
   dragDisabled,
 }: {
   task: Task;
   onOpen: () => void;
-  assigneeName?: string | null;
+  membersById: Record<string, string>;
   dragDisabled?: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -68,7 +68,7 @@ function SortableCard({
       {...attributes}
       {...listeners}
     >
-      <TaskCard task={task} onOpen={onOpen} assigneeName={assigneeName} />
+      <TaskCard task={task} onOpen={onOpen} membersById={membersById} />
     </div>
   );
 }
@@ -167,9 +167,7 @@ export function KanbanBoard({
         ))}
       </div>
       <DragOverlay>
-        {activeTask ? (
-          <TaskCard task={activeTask} assigneeName={activeTask.assigneeId ? membersById[activeTask.assigneeId] : null} />
-        ) : null}
+        {activeTask ? <TaskCard task={activeTask} membersById={membersById} /> : null}
       </DragOverlay>
     </DndContext>
   );
@@ -224,7 +222,7 @@ function Column({
               key={t.id}
               task={t}
               onOpen={() => onOpenTask(t.id)}
-              assigneeName={t.assigneeId ? membersById[t.assigneeId] : null}
+              membersById={membersById}
               dragDisabled={dragDisabled}
             />
           ))}
