@@ -40,6 +40,20 @@ export const PERMISSION_GROUPS: PermGroup[] = [
     ],
   },
   {
+    title: "Projetos",
+    items: [
+      { perm: PERMISSIONS.engagements_criar, label: "Criar projetos", meta: false },
+      { perm: PERMISSIONS.engagements_editar, label: "Editar projetos", meta: false },
+      { perm: PERMISSIONS.engagements_excluir, label: "Excluir projetos", meta: false },
+      {
+        perm: PERMISSIONS.engagements_consultores,
+        label: "Gerenciar consultores",
+        hint: "Adiciona/remove consultores dos projetos (dentre quem já acessa o cliente)",
+        meta: false,
+      },
+    ],
+  },
+  {
     title: "Custos",
     items: [
       {

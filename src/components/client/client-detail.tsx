@@ -13,6 +13,7 @@ import { httpStatus } from "@/lib/http-error";
 import { initials } from "@/lib/initials";
 import { CostSummary } from "@/components/cost/cost-summary";
 import { ClientMetrics } from "./client-metrics";
+import { ProjetosSection } from "./projetos-section";
 import { Button } from "@/components/ui/button";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -204,19 +205,7 @@ export function ClientDetail({ projectId }: { projectId: string }) {
 
       <MembersSection projectId={projectId} />
 
-      <Section title="Projetos">
-        <div className="flex flex-col items-center gap-2.5 py-6 text-center">
-          <span className="flex size-12 items-center justify-center rounded-full border border-border bg-card text-muted-foreground">
-            <FolderTree className="size-5" />
-          </span>
-          <div>
-            <p className="text-sm font-medium tracking-tight">Projetos por cliente — em breve</p>
-            <p className="mt-1 max-w-sm text-[12.5px] text-muted-foreground">
-              Cada cliente vai poder ter vários projetos. A estrutura já está preparada para isso.
-            </p>
-          </div>
-        </div>
-      </Section>
+      <ProjetosSection projectId={projectId} />
     </div>
   );
 }

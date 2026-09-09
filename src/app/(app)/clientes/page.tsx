@@ -2,20 +2,15 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, ChevronRight, Building2, FolderTree, Loader2, AlertTriangle } from "lucide-react";
+import { Plus, ChevronRight, Building2, Loader2, AlertTriangle } from "lucide-react";
 import { useProjects } from "@/lib/hooks/use-projects";
 import { useBoardNav } from "@/lib/board-nav";
 import { CreateProjectDialog } from "@/components/board/create-project-dialog";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-
-type Tab = "clientes" | "projetos";
-
 export default function ClientesPage() {
   const router = useRouter();
   const nav = useBoardNav();
   const projects = useProjects();
-  const [tab, setTab] = useState<Tab>("clientes");
   const [createOpen, setCreateOpen] = useState(false);
 
   function openBoard(projectId: string) {
@@ -44,35 +39,7 @@ export default function ClientesPage() {
       </header>
 
       <div className="flex-1 overflow-auto p-6">
-        {/* Abas Clientes | Projetos (Projetos preparado pro futuro) */}
-        <div className="mb-5 flex w-fit gap-0.5 rounded-lg border border-border bg-card p-[3px] text-[12.5px]">
-          {([
-            { key: "clientes", label: "Clientes" },
-            { key: "projetos", label: "Projetos" },
-          ] as const).map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => setTab(t.key)}
-              className={cn(
-                "rounded-md px-3 py-1 transition-colors",
-                tab === t.key ? "bg-accent text-foreground" : "text-muted-foreground/60 hover:text-muted-foreground",
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
-        {tab === "clientes" ? (
-          <ClientesTab
-            state={projects}
-            onCreate={() => setCreateOpen(true)}
-            onOpen={openDetail}
-          />
-        ) : (
-          <ProjetosTab />
-        )}
+        <ClientesTab state={projects} onCreate={() => setCreateOpen(true)} onOpen={openDetail} />
       </div>
 
       <CreateProjectDialog open={createOpen} onOpenChange={setCreateOpen} onCreated={openBoard} />
@@ -147,23 +114,6 @@ function ClientesTab({
         </button>
       ))}
     </div>
-  );
-}
-
-function ProjetosTab() {
-  return (
-    <Centered>
-      <div className="flex size-12 items-center justify-center rounded-full border border-border bg-card text-muted-foreground">
-        <FolderTree className="size-5" />
-      </div>
-      <div>
-        <h2 className="text-base font-medium tracking-tight">Projetos por cliente — em breve</h2>
-        <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-          Aqui cada cliente vai poder ter vários projetos, e as tarefas ficarão organizadas por projeto dentro do
-          cliente. A estrutura já está preparada para isso.
-        </p>
-      </div>
-    </Centered>
   );
 }
 

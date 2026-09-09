@@ -8,6 +8,22 @@ export interface Project {
   canSeeCost?: boolean;
 }
 
+/** Projeto (Engagement) dentro de um Cliente. */
+export interface Engagement {
+  id: string;
+  projectId: string; // Cliente dono
+  name: string;
+  description: string | null;
+  taskCount: number;
+  consultorCount: number;
+  isGeneral: boolean; // "Projeto geral" — não pode ser excluído
+}
+
+export interface Consultor {
+  id: string;
+  name: string;
+}
+
 /** Estado do custo de uma tarefa (espelha o backend). Só OK tem valor. */
 export type CostState = "OK" | "SEM_RESPONSAVEL" | "RESPONSAVEL_SEM_ACESSO" | "SEM_HORAS" | "SEM_REMUNERACAO";
 
