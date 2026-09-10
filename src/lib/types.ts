@@ -56,14 +56,18 @@ export interface Subtask {
   done: boolean;
 }
 
-/** Evento da linha do tempo da tarefa (gerado pelo servidor). [detalhe-tarefa B] */
+/** Item do feed da tarefa: um evento automático OU um comentário. [detalhe-tarefa B/C] */
 export interface TaskActivity {
   id: string;
-  type: string;
+  type: string; // tipo do evento, ou "COMMENT"
   actorId: string;
-  actorName: string; // snapshot no momento do evento
+  actorName: string; // snapshot no momento do evento/comentário
   payload: Record<string, unknown>;
   createdAt: string;
+  // só quando type === "COMMENT":
+  body?: string | null; // null = comentário removido (tombstone)
+  editedAt?: string | null;
+  canManage?: boolean; // pode editar/excluir (autor ou moderador) — hint de UI
 }
 
 export interface Member {
