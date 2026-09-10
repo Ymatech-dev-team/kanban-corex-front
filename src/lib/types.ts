@@ -56,6 +56,16 @@ export interface Subtask {
   done: boolean;
 }
 
+/** Evento da linha do tempo da tarefa (gerado pelo servidor). [detalhe-tarefa B] */
+export interface TaskActivity {
+  id: string;
+  type: string;
+  actorId: string;
+  actorName: string; // snapshot no momento do evento
+  payload: Record<string, unknown>;
+  createdAt: string;
+}
+
 export interface Member {
   id: string;
   name: string;

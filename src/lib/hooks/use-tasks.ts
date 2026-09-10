@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { projectCostKey, taskCostKey } from "@/lib/hooks/use-cost";
 import { engTasksKey, engCostKey } from "@/lib/hooks/use-engagement-board";
 import { engagementsKey } from "@/lib/hooks/use-engagements";
+import { activityKey } from "@/lib/hooks/use-task-activity";
 import type { Task } from "@/lib/types";
 
 type ApiError = AxiosError<{ error?: { code?: string; message?: string } }>;
@@ -97,6 +98,7 @@ export function useMoveTask(projectId: string, engagementId?: string) {
     onSettled: (data, _e, vars) => {
       qc.invalidateQueries({ queryKey: key }); // lista renderizada
       if (engagementId) qc.invalidateQueries({ queryKey: tasksKey(projectId) }); // roll-up/metrics do cliente
+      qc.invalidateQueries({ queryKey: activityKey(vars.id) }); // move gera STATUS_CHANGED na timeline
       // mudar status (ex.: p/ DONE) troca realizado↔planejado do custo
       qc.invalidateQueries({ queryKey: taskCostKey(vars.id) });
       qc.invalidateQueries({ queryKey: projectCostKey(projectId) });
@@ -121,6 +123,7 @@ export function useUpdateTask(projectId: string) {
     onSuccess: (data, vars) => {
       qc.invalidateQueries({ queryKey: tasksKey(projectId) });
       qc.invalidateQueries({ queryKey: taskKey(vars.id) });
+      qc.invalidateQueries({ queryKey: activityKey(vars.id) }); // timeline reflete a edição
       // custo deriva de horas/responsável/status: sem isso o painel de custo fica stale [review jornada]
       qc.invalidateQueries({ queryKey: taskCostKey(vars.id) });
       qc.invalidateQueries({ queryKey: projectCostKey(projectId) });
@@ -184,6 +187,7 @@ function useAssigneeMutation(
     mutationFn: fn,
     onSuccess: (data, vars) => {
       if (data) qc.setQueryData(taskKey(vars.taskId), data); // atualiza o detalhe na hora (sem esperar refetch)
+      qc.invalidateQueries({ queryKey: activityKey(vars.taskId) }); // timeline reflete a mudança de responsável
       qc.invalidateQueries({ queryKey: tasksKey(projectId) });
       qc.invalidateQueries({ queryKey: taskCostKey(vars.taskId) });
       qc.invalidateQueries({ queryKey: projectCostKey(projectId) });
@@ -256,7 +260,10 @@ export function useAddSubtask(taskId: string) {
       (
         await api.post(`/tasks/${taskId}/subtasks`, { title }, { headers: { "idempotency-key": idemKey() } })
       ).data,
-    onSuccess: () => qc.invalidateQueries({ queryKey: taskKey(taskId) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: taskKey(taskId) });
+      qc.invalidateQueries({ queryKey: activityKey(taskId) });
+    },
     onError: () => toast.error("Não foi possível adicionar a subtarefa"),
   });
 }
@@ -279,7 +286,10 @@ export function useToggleSubtask(taskId: string) {
       if (ctx?.previous) qc.setQueryData(key, ctx.previous);
       toast.error("Não foi possível atualizar a subtarefa");
     },
-    onSettled: () => qc.invalidateQueries({ queryKey: key }),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: key });
+      qc.invalidateQueries({ queryKey: activityKey(taskId) });
+    },
   });
 }
 
@@ -287,7 +297,10 @@ export function useDeleteSubtask(taskId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => (await api.delete(`/subtasks/${id}`)).data,
-    onSuccess: () => qc.invalidateQueries({ queryKey: taskKey(taskId) }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: taskKey(taskId) });
+      qc.invalidateQueries({ queryKey: activityKey(taskId) });
+    },
     onError: () => toast.error("Não foi possível remover a subtarefa"),
   });
 }

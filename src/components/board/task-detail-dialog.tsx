@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Plus, Trash2, Loader2 } from "lucide-react";
 import { PERMISSIONS, type TaskPriority, type TaskStatus, type UpdateTaskInput } from "@sistema-tasks/contracts";
 import type { Member } from "@/lib/types";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { AssigneesEditor } from "./assignees-editor";
+import { ActivityTab } from "./activity-tab";
 import {
   useTaskDetail,
   useUpdateTask,
@@ -139,8 +140,11 @@ export function TaskDetailDialog({
 
   const [form, setForm] = useState<Form | null>(null);
   const [newTitle, setNewTitle] = useState("");
+  const [tab, setTab] = useState<"detalhes" | "atividade">("detalhes");
+  const [confirmClose, setConfirmClose] = useState(false);
   const seededFor = useRef<string | null>(null);
   const descRef = useRef<HTMLTextAreaElement>(null);
+  const membersById = useMemo(() => Object.fromEntries(members.map((m) => [m.id, m.name])), [members]);
 
   // auto-resize da descrição (cresce com o conteúdo, sem barra interna)
   useEffect(() => {
@@ -155,6 +159,7 @@ export function TaskDetailDialog({
     if (taskId === null) {
       seededFor.current = null;
       setForm(null);
+      setConfirmClose(false);
       return;
     }
     if (task && seededFor.current !== task.id) {
@@ -166,6 +171,7 @@ export function TaskDetailDialog({
         due: task.dueDate ? task.dueDate.slice(0, 10) : "",
         estimated: minutesToHoursInput(task.estimatedMinutes),
       });
+      setTab("detalhes");
       seededFor.current = task.id;
     }
   }, [task, taskId]);
@@ -214,8 +220,16 @@ export function TaskDetailDialog({
     onOpenChange(false);
   }
 
+  function requestClose(o: boolean) {
+    if (o) return onOpenChange(true);
+    // guarda só quando há edição pendente E não está salvando (durante o save, deixa fechar). [EC-03, review #1]
+    if (dirty && !update.isPending) return setConfirmClose(true);
+    onOpenChange(false);
+  }
+
   return (
-    <Dialog open={taskId !== null} onOpenChange={onOpenChange}>
+    <>
+    <Dialog open={taskId !== null} onOpenChange={requestClose}>
       <DialogContent className="max-h-[85vh] overflow-y-auto">
         {detail.isError ? (
           <div className="py-10 text-center text-sm text-muted-foreground">Tarefa não encontrada ou sem acesso.</div>
@@ -229,6 +243,29 @@ export function TaskDetailDialog({
               <DialogTitle className="sr-only">Detalhe da tarefa</DialogTitle>
             </DialogHeader>
 
+            <div className="-mx-1 mb-1 flex gap-4 border-b border-border">
+              {(["detalhes", "atividade"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTab(t)}
+                  aria-current={tab === t ? "page" : undefined}
+                  className={cn(
+                    "px-1 pb-2 pt-1 text-[13.5px] outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    tab === t
+                      ? "border-b-2 border-primary font-medium text-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {t === "detalhes" ? "Detalhes" : "Atividade"}
+                </button>
+              ))}
+            </div>
+
+            {tab === "atividade" ? (
+              <ActivityTab taskId={task.id} membersById={membersById} enabled={tab === "atividade"} />
+            ) : (
+            <>
             <div className="flex items-start gap-2">
               <Input
                 value={form.title}
@@ -405,9 +442,38 @@ export function TaskDetailDialog({
                 </button>
               </form>
             </div>
+            </>
+            )}
           </>
         )}
       </DialogContent>
     </Dialog>
+
+    <Dialog open={confirmClose} onOpenChange={(o) => !o && setConfirmClose(false)}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Descartar alterações?</DialogTitle>
+        </DialogHeader>
+        <p className="text-sm text-muted-foreground">
+          Você tem alterações não salvas nesta tarefa. Descartar?
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="secondary" onClick={() => setConfirmClose(false)}>
+            Continuar editando
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={() => {
+              setConfirmClose(false);
+              onOpenChange(false);
+            }}
+          >
+            Descartar
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
