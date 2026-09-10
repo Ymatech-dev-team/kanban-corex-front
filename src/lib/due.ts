@@ -35,3 +35,29 @@ export function needsAttention(task: Task, now?: number): boolean {
   const { state } = dueState(task.dueDate, task.status, now);
   return state === "soon" || state === "overdue";
 }
+
+export type DueTagState = "none" | "overdue" | "today" | "tomorrow" | "future";
+
+/**
+ * Prazo granular para a TAG dentro da tarefa (card/detalhe): separa hoje de amanhã.
+ * Âmbar (urgência) vale só para `overdue`+`today`; `tomorrow`/`future` são neutros. `now` injetável.
+ */
+export function dueTag(
+  dueDate: string | null,
+  status: TaskStatus,
+  now: number = Date.now(),
+): { state: DueTagState; label: string } {
+  if (!dueDate || status === "DONE") return { state: "none", label: "" };
+  const due = new Date(dueDate);
+  const diffDays = Math.round((startOfDay(due.getTime()) - startOfDay(now)) / 86_400_000);
+  const dateLabel = fmt.format(due).replace(".", "");
+  if (diffDays < 0) return { state: "overdue", label: `venceu ${dateLabel}` };
+  if (diffDays === 0) return { state: "today", label: "vence hoje" };
+  if (diffDays === 1) return { state: "tomorrow", label: "vence amanhã" };
+  return { state: "future", label: dateLabel };
+}
+
+/** A tag de prazo é âmbar (urgência) só quando vencida ou vence hoje. */
+export function isDueUrgent(state: DueTagState): boolean {
+  return state === "overdue" || state === "today";
+}

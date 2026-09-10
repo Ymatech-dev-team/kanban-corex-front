@@ -47,7 +47,9 @@
 
 /*
   Modo claro — ativado por `.light` no <html>. Mantém o amarelo do BOTÃO (lê bem no claro)
-  e o primary-foreground near-black (invariante). O amber de atenção fica igual (laranja).
+  e o primary-foreground near-black (invariante). O amber de atenção escurece: como #e8912a
+  (dark-first) reprova contraste como texto/ícone pequeno sobre branco, no claro vira um
+  âmbar mais escuro que passa AA (texto, dot e barra-left de urgência). [review UX 2026-09-10]
 */
 :root.light {
   /* primitivos claros */
@@ -57,8 +59,9 @@
   --yma-l-200: #e6e6e9;
   --yma-l-text: #18181b;
   --yma-l-muted: #6b6b74;
+  --yma-amber-500: #b45309; /* âmbar de atenção legível no claro (≥4.5:1 como texto pequeno) */
 
-  /* semânticos (só o que muda; primary/ring/amber/destructive herdam) */
+  /* semânticos (só o que muda; primary/ring/destructive herdam; amber escurece acima) */
   --background: var(--yma-l-bg);
   --foreground: var(--yma-l-text);
   --card: var(--yma-l-surface);

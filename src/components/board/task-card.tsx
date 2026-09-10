@@ -2,7 +2,7 @@ import { User } from "lucide-react";
 import type { Task } from "@/lib/types";
 import type { TaskPriority } from "@sistema-tasks/contracts";
 import { initials } from "@/lib/initials";
-import { dueState } from "@/lib/due";
+import { dueTag, isDueUrgent } from "@/lib/due";
 import { cn } from "@/lib/utils";
 
 const BARS: Record<TaskPriority, number[]> = { LOW: [4, 4, 4], MEDIUM: [4, 8, 8], HIGH: [4, 8, 12] };
@@ -61,8 +61,8 @@ export function TaskCard({
   membersById: Record<string, string>;
 }) {
   const done = task.status === "DONE";
-  const due = dueState(task.dueDate, task.status);
-  const attention = due.state === "soon" || due.state === "overdue";
+  const due = dueTag(task.dueDate, task.status);
+  const urgent = isDueUrgent(due.state); // âmbar só em vencida+hoje [cor contida]
   const bars = BARS[task.priority];
   const subs = task.subtasks ?? [];
   const subDone = subs.filter((s) => s.done).length;
@@ -73,7 +73,7 @@ export function TaskCard({
       className={cn(
         "rounded-xl border border-border bg-card p-3 transition-colors hover:border-muted-foreground/40",
         onOpen && "cursor-pointer",
-        attention && "rounded-l-none border-l-[3px] border-l-amber",
+        urgent && "rounded-l-none border-l-[3px] border-l-amber",
       )}
     >
       <div className={cn("mb-2.5 text-[13.5px] leading-snug", done && "text-muted-foreground line-through")}>
@@ -86,14 +86,23 @@ export function TaskCard({
               {bars.map((h, i) => (
                 <i
                   key={i}
-                  className={cn("block w-[3px] rounded-sm bg-muted-foreground", task.priority === "HIGH" && "bg-amber")}
+                  className={cn("block w-[3px] rounded-sm bg-muted-foreground", task.priority === "HIGH" && "bg-foreground")}
                   style={{ height: h }}
                 />
               ))}
             </span>
           )}
           {!done && <span>{PRIO_LABEL[task.priority]}</span>}
-          {due.label && <span className={cn(attention && "text-amber")}>{due.label}</span>}
+          {due.label &&
+            (urgent ? (
+              // Tag de prazo urgente: dot âmbar + label neutro (vencida ganha peso, não cor nova). [cor contida]
+              <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap">
+                <span className="size-1.5 shrink-0 rounded-full bg-amber" aria-hidden />
+                <span className={cn(due.state === "overdue" && "font-medium text-foreground")}>{due.label}</span>
+              </span>
+            ) : (
+              <span className="shrink-0 whitespace-nowrap">{due.label}</span>
+            ))}
           {subs.length > 0 && (
             <span>
               {subDone}/{subs.length}

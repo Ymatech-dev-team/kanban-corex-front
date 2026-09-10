@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, Plus, Trash2, Loader2 } from "lucide-react";
+import { CalendarClock, Check, Plus, Trash2, Loader2 } from "lucide-react";
 import { PERMISSIONS, type TaskPriority, type TaskStatus, type UpdateTaskInput } from "@sistema-tasks/contracts";
 import type { Member } from "@/lib/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { dueTag, isDueUrgent } from "@/lib/due";
 import { AssigneesEditor } from "./assignees-editor";
 import { ActivityTab } from "./activity-tab";
 import {
@@ -307,7 +308,19 @@ export function TaskDetailDialog({
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <span className="text-[11px] uppercase tracking-wide text-muted-foreground/70">Prazo</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] uppercase tracking-wide text-muted-foreground/70">Prazo</span>
+                  {(() => {
+                    // Pill de prazo urgente (só vencida/hoje) — reflete o prazo salvo da tarefa. [cor contida]
+                    const dt = dueTag(task.dueDate, task.status);
+                    return isDueUrgent(dt.state) ? (
+                      <span className="inline-flex items-center gap-1.5 rounded-md border border-amber/30 bg-amber/10 px-2 py-0.5 text-[11.5px] text-amber">
+                        <CalendarClock className="size-3.5" aria-hidden />
+                        {dt.label}
+                      </span>
+                    ) : null;
+                  })()}
+                </div>
                 <Input
                   type="date"
                   value={form.due}
