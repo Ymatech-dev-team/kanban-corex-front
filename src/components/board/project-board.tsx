@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ChevronDown, FolderX, Loader2 } from "lucide-react";
 import type { TaskStatus } from "@sistema-tasks/contracts";
-import { useProject } from "@/lib/hooks/use-projects";
+import { useProject, useProjects } from "@/lib/hooks/use-projects";
+import { generalEngagementId } from "@/lib/engagements";
 import { useEngagements } from "@/lib/hooks/use-engagements";
 import { useEngagementTasks } from "@/lib/hooks/use-engagement-board";
 import { useProjectMembers } from "@/lib/hooks/use-members";
@@ -40,6 +41,7 @@ export function ProjectBoard({
 }) {
   const router = useRouter();
   const project = useProject(clientId);
+  const clients = useProjects(); // clientes que o usuário acessa (o backend já filtra por permissão) [seletor de clientes]
   const engagements = useEngagements(clientId);
   const [addStatus, setAddStatus] = useState<TaskStatus | null>(null);
   const [openTaskId, setOpenTaskId] = useState<string | null>(initialTaskId ?? null);
@@ -99,16 +101,42 @@ export function ProjectBoard({
       <header className="flex flex-wrap items-center gap-3 border-b border-border px-6 py-3.5">
         <button
           type="button"
-          aria-label={`Voltar para ${project.data?.name ?? "o cliente"}`}
+          aria-label="Voltar para a página do cliente"
           onClick={() => router.push(`/clientes/${clientId}`)}
-          className="inline-flex items-center gap-1.5 rounded text-[12.5px] text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          className="inline-flex size-6 items-center justify-center rounded text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <ArrowLeft className="size-3.5" />
-          {project.data?.name ?? "Cliente"}
+          <ArrowLeft className="size-4" />
         </button>
 
+        {/* Seletor de CLIENTE — só os clientes que o usuário acessa; some se houver apenas um. */}
+        {(clients.data?.length ?? 0) > 1 ? (
+          <DropdownMenu>
+            <DropdownMenuTrigger className="flex max-w-[14rem] items-center gap-1.5 truncate text-base font-medium tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">
+              <span className="truncate">{project.data?.name ?? "Cliente"}</span>
+              <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="max-h-72 overflow-y-auto">
+              {(clients.data ?? []).map((c) => (
+                <DropdownMenuItem
+                  key={c.id}
+                  active={c.id === clientId}
+                  onSelect={() => router.push(`/clientes/${c.id}/projetos/${generalEngagementId(c.id)}`)}
+                >
+                  {c.name}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        ) : (
+          <span className="max-w-[14rem] truncate text-base font-medium tracking-tight">
+            {project.data?.name ?? "Cliente"}
+          </span>
+        )}
+
+        <span className="text-muted-foreground/60">›</span>
+
         <DropdownMenu>
-          <DropdownMenuTrigger className="flex max-w-[16rem] items-center gap-2 truncate text-base font-medium tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">
+          <DropdownMenuTrigger className="flex max-w-[14rem] items-center gap-1.5 truncate text-base font-medium tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-ring rounded">
             <span className="truncate">{current?.name ?? "Projeto"}</span>
             <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
           </DropdownMenuTrigger>
