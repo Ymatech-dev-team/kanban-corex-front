@@ -219,6 +219,7 @@ export function ProjectBoard({
         engagementId={engagementId}
         status={addStatus}
         members={members}
+        canSeeCost={canSeeCost}
         onOpenChange={(o) => !o && setAddStatus(null)}
       />
       <TaskDetailDialog taskId={openTaskId} members={members} onOpenChange={(o) => !o && setOpenTaskId(null)} />

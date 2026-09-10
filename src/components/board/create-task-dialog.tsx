@@ -26,10 +26,11 @@ interface Props {
   engagementId?: string; // quando presente, cria a tarefa NO PROJETO (endpoint por engagement) [B2]
   status: TaskStatus | null; // coluna de origem; null = fechado
   members: Member[];
+  canSeeCost?: boolean; // custos.ver no cliente — libera "Horas estimadas" (insumo do custo) [SEC-custo]
   onOpenChange: (open: boolean) => void;
 }
 
-export function CreateTaskDialog({ projectId, engagementId, status, members, onOpenChange }: Props) {
+export function CreateTaskDialog({ projectId, engagementId, status, members, canSeeCost = false, onOpenChange }: Props) {
   const createClient = useCreateTask(projectId);
   const createEng = useCreateEngagementTask(engagementId ?? "");
   const create = engagementId ? createEng : createClient;
@@ -59,6 +60,7 @@ export function CreateTaskDialog({ projectId, engagementId, status, members, onO
       ...(due ? { dueDate: new Date(`${due}T12:00:00`).toISOString() } : {}),
       ...(assigneeId ? { assigneeId } : {}),
       ...((): { estimatedMinutes?: number } => {
+        if (!canSeeCost) return {}; // sem custos.ver não manda insumo de custo [SEC-custo]
         const m = parseHoursToMinutes(estimated);
         return m != null ? { estimatedMinutes: m } : {};
       })(),
@@ -99,21 +101,24 @@ export function CreateTaskDialog({ projectId, engagementId, status, members, onO
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className={cn("grid gap-4", canSeeCost ? "grid-cols-2" : "grid-cols-1")}>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="tdue">Prazo (opcional)</Label>
               <Input id="tdue" type="date" value={due} onChange={(e) => setDue(e.target.value)} />
             </div>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="test">Horas estimadas</Label>
-              <Input
-                id="test"
-                inputMode="decimal"
-                placeholder="ex.: 8 ou 1,5"
-                value={estimated}
-                onChange={(e) => setEstimated(e.target.value)}
-              />
-            </div>
+            {/* Horas estimadas = insumo do custo → só quem tem custos.ver. [SEC-custo] */}
+            {canSeeCost && (
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="test">Horas estimadas</Label>
+                <Input
+                  id="test"
+                  inputMode="decimal"
+                  placeholder="ex.: 8 ou 1,5"
+                  value={estimated}
+                  onChange={(e) => setEstimated(e.target.value)}
+                />
+              </div>
+            )}
           </div>
 
           <div className="flex flex-col gap-1.5">

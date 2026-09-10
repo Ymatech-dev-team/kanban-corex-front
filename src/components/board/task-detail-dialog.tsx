@@ -201,7 +201,8 @@ export function TaskDetailDialog({
       status: form.status,
       priority: form.priority,
       dueDate: form.due ? new Date(`${form.due}T12:00:00`).toISOString() : null,
-      estimatedMinutes: parseHoursToMinutes(form.estimated),
+      // estimatedMinutes é insumo de custo: só vai no payload de quem tem custos.ver (senão nem seta nem apaga). [SEC-custo]
+      ...(canSeeCost ? { estimatedMinutes: parseHoursToMinutes(form.estimated) } : {}),
     };
     await update.mutateAsync({ id: task.id, patch, updatedAt: task.updatedAt });
     seededFor.current = null; // re-semeia com o dado fresco após invalidar
@@ -329,17 +330,20 @@ export function TaskDetailDialog({
                   className="h-9"
                 />
               </div>
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[11px] uppercase tracking-wide text-muted-foreground/70">Horas estimadas</span>
-                <Input
-                  inputMode="decimal"
-                  placeholder="ex.: 8 ou 1,5"
-                  value={form.estimated}
-                  disabled={!canEdit}
-                  onChange={(e) => setForm({ ...form, estimated: e.target.value })}
-                  className="h-9"
-                />
-              </div>
+              {/* Horas estimadas = insumo do custo → só quem tem custos.ver vê/edita. [SEC-custo] */}
+              {canSeeCost && (
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-[11px] uppercase tracking-wide text-muted-foreground/70">Horas estimadas</span>
+                  <Input
+                    inputMode="decimal"
+                    placeholder="ex.: 8 ou 1,5"
+                    value={form.estimated}
+                    disabled={!canEdit}
+                    onChange={(e) => setForm({ ...form, estimated: e.target.value })}
+                    className="h-9"
+                  />
+                </div>
+              )}
               <div className="flex flex-col gap-1.5">
                 <span className="text-[11px] uppercase tracking-wide text-muted-foreground/70">Responsáveis</span>
                 <AssigneesEditor
