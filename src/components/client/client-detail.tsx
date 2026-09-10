@@ -297,7 +297,7 @@ export function ClientDetail({ projectId }: { projectId: string }) {
       </div>
 
       <Section title="Visão geral">
-        <ClientMetrics projectId={projectId} />
+        <ClientMetrics projectId={projectId} canSeeCost={canSeeCost} />
       </Section>
 
       {canSeeCost && <CostSection projectId={projectId} />}

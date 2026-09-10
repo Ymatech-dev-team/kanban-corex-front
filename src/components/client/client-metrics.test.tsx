@@ -36,7 +36,7 @@ describe("ClientMetrics", () => {
         task({ status: "DONE", estimatedMinutes: 90 }),
       ]),
     );
-    render(<ClientMetrics projectId="p1" />);
+    render(<ClientMetrics projectId="p1" canSeeCost />);
     expect(screen.getByText("Total de tarefas").nextSibling?.textContent).toBe("3");
     // total = 60+30+90 = 180min = 3h; aberto = 60+30 = 90min = 1h 30min
     expect(screen.getByText("3h")).toBeInTheDocument();
@@ -47,7 +47,7 @@ describe("ClientMetrics", () => {
     mockTasks.mockReturnValue(
       state([task({ status: "TODO" }), task({ status: "DOING" })]),
     );
-    render(<ClientMetrics projectId="p1" />);
+    render(<ClientMetrics projectId="p1" canSeeCost />);
     expect(screen.getAllByText("—").length).toBe(2); // horas estimadas + em aberto
     expect(screen.getByText("2 tarefas sem horas estimadas")).toBeInTheDocument();
   });
@@ -56,10 +56,20 @@ describe("ClientMetrics", () => {
     mockTasks.mockReturnValue(
       state([task({ status: "TODO", estimatedMinutes: 120 }), task({ status: "TODO" })]),
     );
-    render(<ClientMetrics projectId="p1" />);
+    render(<ClientMetrics projectId="p1" canSeeCost />);
     // só a de 120min conta (2h) — total e em aberto, já que a tarefa está aberta
     expect(screen.getAllByText("2h").length).toBe(2);
     expect(screen.getByText("1 tarefa sem horas estimadas")).toBeInTheDocument();
+  });
+
+  it("sem custos.ver → esconde os cards de horas, mantém as contagens [SEC-custo]", () => {
+    mockTasks.mockReturnValue(
+      state([task({ status: "TODO", estimatedMinutes: 60 }), task({ status: "DONE", estimatedMinutes: 90 })]),
+    );
+    render(<ClientMetrics projectId="p1" />); // canSeeCost default false
+    expect(screen.getByText("Total de tarefas")).toBeInTheDocument();
+    expect(screen.queryByText("Horas estimadas")).not.toBeInTheDocument();
+    expect(screen.queryByText("Horas em aberto")).not.toBeInTheDocument();
   });
 
   it("sem tarefas → estado vazio", () => {

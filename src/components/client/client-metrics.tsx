@@ -24,7 +24,7 @@ function CardsSkeleton({ n }: { n: number }) {
   );
 }
 
-export function ClientMetrics({ projectId }: { projectId: string }) {
+export function ClientMetrics({ projectId, canSeeCost = false }: { projectId: string; canSeeCost?: boolean }) {
   const tasks = useTasks(projectId);
 
   if (tasks.isLoading) return <CardsSkeleton n={4} />;
@@ -56,6 +56,7 @@ export function ClientMetrics({ projectId }: { projectId: string }) {
   const doing = list.filter((t) => t.status === "DOING").length;
   const done = list.filter((t) => t.status === "DONE").length;
 
+  // Horas = insumo de custo → só quem tem custos.ver vê os cards. [SEC-custo]
   const withEst = list.filter((t) => t.estimatedMinutes != null);
   const semEst = list.length - withEst.length;
   const anyEst = withEst.length > 0;
@@ -72,18 +73,20 @@ export function ClientMetrics({ projectId }: { projectId: string }) {
         <MetricCard label="Fazendo" value={doing} />
         <MetricCard label="Feito" value={done} />
       </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <MetricCard
-          label="Horas estimadas"
-          value={anyEst ? formatMinutesAsHours(totalMin) : "—"}
-          hint={semEst > 0 ? `${semEst} ${semEst === 1 ? "tarefa" : "tarefas"} sem horas estimadas` : undefined}
-        />
-        <MetricCard
-          label="Horas em aberto"
-          value={anyEst ? formatMinutesAsHours(openMin) : "—"}
-          hint="tarefas não concluídas"
-        />
-      </div>
+      {canSeeCost && (
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <MetricCard
+            label="Horas estimadas"
+            value={anyEst ? formatMinutesAsHours(totalMin) : "—"}
+            hint={semEst > 0 ? `${semEst} ${semEst === 1 ? "tarefa" : "tarefas"} sem horas estimadas` : undefined}
+          />
+          <MetricCard
+            label="Horas em aberto"
+            value={anyEst ? formatMinutesAsHours(openMin) : "—"}
+            hint="tarefas não concluídas"
+          />
+        </div>
+      )}
     </div>
   );
 }
