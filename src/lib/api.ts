@@ -1,10 +1,14 @@
 import axios from "axios";
 import type { QueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 
 let queryClient: QueryClient | null = null;
 export function setApiQueryClient(client: QueryClient) {
   queryClient = client;
 }
+
+// Evita toast/redirect repetidos quando várias mutações falham juntas por CSRF.
+let sessionRecovering = false;
 
 function readCookie(name: string): string | undefined {
   if (typeof document === "undefined") return undefined;
@@ -36,7 +40,23 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (r) => r,
   (error) => {
-    if (error?.response?.status === 403) {
+    const status = error?.response?.status;
+    const code = error?.response?.data?.error?.code;
+
+    // CSRF 403: o cookie sdt_csrf sumiu/desalinhou → nenhuma escrita passa. Não é falta de permissão:
+    // avisa claro e manda relogar (o login regenera o token). Auto-cura em vez de toast genérico.
+    if (status === 403 && code === "CSRF") {
+      if (typeof window !== "undefined" && !sessionRecovering && !window.location.pathname.startsWith("/login")) {
+        sessionRecovering = true;
+        toast.error("Sua sessão expirou. Entre novamente.");
+        setTimeout(() => {
+          window.location.href = "/login";
+        }, 1200);
+      }
+      return Promise.reject(error);
+    }
+
+    if (status === 403) {
       queryClient?.invalidateQueries({ queryKey: ["me"] });
       // canSeeCost (permissão por cliente) vive em ["project", id]: marca stale SEM refetch imediato.
       // refetchType:"none" evita loop invalidate→refetch→403 quando /clientes/[id] é aberto sem acesso;

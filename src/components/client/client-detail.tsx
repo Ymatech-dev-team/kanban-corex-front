@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ArrowLeft, ChevronRight, FolderTree, Loader2, User, Wallet } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ChevronRight, FolderTree, Loader2, Plus, User, Wallet, X } from "lucide-react";
+import { PERMISSIONS } from "@sistema-tasks/contracts";
 import { useProject } from "@/lib/hooks/use-projects";
 import { tasksKey } from "@/lib/hooks/use-tasks";
-import { useProjectMembers } from "@/lib/hooks/use-members";
+import { useProjectMembers, useGrantAccess, useRevokeAccess } from "@/lib/hooks/use-members";
+import { useMembers } from "@/lib/hooks/use-admin";
+import { useCan } from "@/lib/hooks/use-can";
 import { useProjectCost, projectCostKey } from "@/lib/hooks/use-cost";
 import { useBoardNav } from "@/lib/board-nav";
 import { httpStatus } from "@/lib/http-error";
@@ -15,6 +18,13 @@ import { CostSummary } from "@/components/cost/cost-summary";
 import { ClientMetrics } from "./client-metrics";
 import { ProjetosSection } from "./projetos-section";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -66,7 +76,11 @@ function CostSection({ projectId }: { projectId: string }) {
 
 function MembersSection({ projectId }: { projectId: string }) {
   const members = useProjectMembers(projectId);
+  const canManage = useCan(PERMISSIONS.permissoes_conceder);
+  const revoke = useRevokeAccess(projectId);
+  const [revoking, setRevoking] = useState<{ id: string; name: string } | null>(null);
   const list = members.data ?? [];
+
   return (
     <Section title="Membros com acesso">
       {members.isLoading ? (
@@ -82,24 +96,108 @@ function MembersSection({ projectId }: { projectId: string }) {
             Tentar de novo
           </button>
         </div>
-      ) : list.length === 0 ? (
-        <p className="text-[13px] text-muted-foreground">Nenhum membro com acesso a este cliente ainda.</p>
       ) : (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {list.length === 0 && (
+            <p className="text-[13px] text-muted-foreground">Nenhum membro com acesso a este cliente ainda.</p>
+          )}
           {list.map((m) => (
             <span
               key={m.id}
-              className="flex items-center gap-2 rounded-full border border-border bg-card py-[3px] pl-[3px] pr-3 text-[13px]"
+              className="flex items-center gap-2 rounded-full border border-border bg-card py-[3px] pl-[3px] pr-2.5 text-[13px]"
             >
               <span className="flex size-6 items-center justify-center rounded-full border border-muted-foreground/40 bg-accent text-[10px] font-medium text-foreground">
                 {m.name ? initials(m.name) : <User className="size-3 text-muted-foreground" />}
               </span>
               {m.name}
+              {canManage && (
+                <button
+                  type="button"
+                  aria-label={`Remover acesso de ${m.name}`}
+                  onClick={() => setRevoking({ id: m.id, name: m.name })}
+                  className="text-muted-foreground/70 outline-none transition-colors hover:text-amber focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <X className="size-3.5" />
+                </button>
+              )}
             </span>
           ))}
+          {canManage && <AddAccessControl projectId={projectId} currentIds={list.map((m) => m.id)} />}
         </div>
       )}
+
+      {revoking && (
+        <Dialog open onOpenChange={(o) => !o && setRevoking(null)}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Remover acesso</DialogTitle>
+            </DialogHeader>
+            <p className="text-sm text-muted-foreground">
+              Remover o acesso de <span className="text-foreground">{revoking.name}</span> a este cliente? A pessoa
+              sai como responsável das tarefas do cliente (o responsável principal é reatribuído automaticamente).
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="secondary" onClick={() => setRevoking(null)}>
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={revoke.isPending}
+                onClick={async () => {
+                  try {
+                    await revoke.mutateAsync(revoking.id);
+                    setRevoking(null);
+                  } catch {
+                    /* toast no hook */
+                  }
+                }}
+              >
+                {revoke.isPending ? "Removendo…" : "Remover acesso"}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </Section>
+  );
+}
+
+/** Dropdown pra conceder acesso ao cliente — lista usuários da org que ainda não são membros. */
+function AddAccessControl({ projectId, currentIds }: { projectId: string; currentIds: string[] }) {
+  const orgUsers = useMembers(); // exige membros_ver; quem tem permissoes_conceder normalmente também tem
+  const grant = useGrantAccess(projectId);
+  const current = new Set(currentIds);
+  const candidates = (orgUsers.data ?? []).filter((u) => !current.has(u.id));
+
+  if (orgUsers.isError) return null;
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        disabled={grant.isPending}
+        className="flex items-center gap-1 rounded-full border border-dashed border-muted-foreground/50 px-3 py-[5px] text-[13px] text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+      >
+        {grant.isPending ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
+        Dar acesso
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="max-h-64 overflow-y-auto">
+        {orgUsers.isLoading ? (
+          <DropdownMenuItem disabled>Carregando…</DropdownMenuItem>
+        ) : candidates.length === 0 ? (
+          <DropdownMenuItem disabled>Todos os usuários já têm acesso</DropdownMenuItem>
+        ) : (
+          candidates.map((u) => (
+            <DropdownMenuItem key={u.id} onSelect={() => grant.mutate(u.id)}>
+              <span className="flex size-[22px] shrink-0 items-center justify-center rounded-full border border-muted-foreground/40 bg-accent text-[10px] font-medium text-foreground">
+                {initials(u.name)}
+              </span>
+              {u.name}
+            </DropdownMenuItem>
+          ))
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
