@@ -8,6 +8,7 @@ import { useMyTasks } from "@/lib/hooks/use-my-tasks";
 import { useProjects } from "@/lib/hooks/use-projects";
 import { useBoardNav } from "@/lib/board-nav";
 import { dueState } from "@/lib/due";
+import { nextTasks, PRIORITY_LABEL } from "@/lib/focus";
 import { weekDaysMonday } from "@/lib/week";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -52,6 +53,9 @@ export default function HomePage() {
   const noDue = open.filter((t) => !t.dueDate);
 
   const focus = [...overdue.sort((a, b) => a.dueDate!.localeCompare(b.dueDate!)), ...today];
+
+  // Sem nada urgente hoje → sugere as 3 próximas a atacar (fallback do Foco de hoje). [foco-proxima-tarefa]
+  const nextUp = focus.length === 0 ? nextTasks(open) : [];
 
   const byDay = useMemo(() => {
     const map: Record<string, Task[]> = {};
@@ -129,11 +133,7 @@ export default function HomePage() {
             {/* Foco de hoje */}
             <section className="flex flex-col gap-2">
               <h2 className="text-[13px] font-medium tracking-tight">Foco de hoje</h2>
-              {focus.length === 0 ? (
-                <p className="rounded-xl border border-border bg-card px-4 py-6 text-center text-[13px] text-muted-foreground">
-                  Nada com prazo pra hoje. Respira.
-                </p>
-              ) : (
+              {focus.length > 0 ? (
                 <ul className="flex flex-col gap-1.5">
                   {focus.map((t) => {
                     const due = dueState(t.dueDate, t.status, now);
@@ -158,6 +158,33 @@ export default function HomePage() {
                     );
                   })}
                 </ul>
+              ) : (
+                <>
+                  {/* Fallback neutro (sem âmbar — âmbar é urgência). Com open>0 e focus vazio, nextUp tem ≥1. [foco-proxima-tarefa] */}
+                  <p className="text-[13px] text-muted-foreground">Nada urgente pra hoje — comece por:</p>
+                  <ul className="flex flex-col gap-1.5">
+                    {nextUp.map((t) => (
+                      <li key={t.id}>
+                        <button
+                          type="button"
+                          onClick={() => openTask(t)}
+                          className="flex w-full items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-left transition-colors hover:border-muted-foreground/40"
+                        >
+                          <span className="min-w-0 flex-1">
+                            <span className="line-clamp-1 text-[13.5px]">{t.title}</span>
+                            <span className="text-[11.5px] text-muted-foreground">
+                              {projectsById[t.projectId] ?? "Cliente"} · {PRIORITY_LABEL[t.priority] ?? "—"}
+                            </span>
+                          </span>
+                          <span className="shrink-0 text-[11.5px] text-muted-foreground">
+                            {t.dueDate ? dueState(t.dueDate, t.status, now).label : "sem prazo"}
+                          </span>
+                          <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
               )}
             </section>
 
