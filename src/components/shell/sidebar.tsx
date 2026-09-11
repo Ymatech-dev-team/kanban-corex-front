@@ -13,12 +13,6 @@ import { NotificationsBell } from "./notifications-bell";
 import { ThemeToggle } from "./theme-toggle";
 import { cn } from "@/lib/utils";
 
-const MAIN = [
-  { href: "/", label: "Início", icon: Home },
-  { href: "/tarefas", label: "Tarefas", icon: ListChecks },
-  { href: "/clientes", label: "Clientes", icon: Building2 },
-];
-
 const STORAGE_KEY = "sdt_sidebar_collapsed";
 
 export function Sidebar() {
@@ -26,6 +20,13 @@ export function Sidebar() {
   const router = useRouter();
   const canMembers = useCan(PERMISSIONS.membros_gerenciar);
   const canRoles = useCan(PERMISSIONS.perfis_gerenciar);
+  const canTarefasGlobais = useCan(PERMISSIONS.tarefas_ver_globais); // a aba Tarefas (global) é gated [tarefas-visao-global]
+  // "Tarefas" só aparece pra quem tem a permissão da visão global.
+  const main = [
+    { href: "/", label: "Início", icon: Home },
+    ...(canTarefasGlobais ? [{ href: "/tarefas", label: "Tarefas", icon: ListChecks }] : []),
+    { href: "/clientes", label: "Clientes", icon: Building2 },
+  ];
   const me = useMe();
   const accountName = me.data?.name?.trim() || "Minha conta";
   const [collapsed, setCollapsed] = useState(false);
@@ -118,7 +119,7 @@ export function Sidebar() {
       </div>
 
       <nav className="flex flex-col gap-0.5">
-        {MAIN.map((n) => item(n.href, n.label, n.icon))}
+        {main.map((n) => item(n.href, n.label, n.icon))}
 
         {(canMembers || canRoles) && (
           <>

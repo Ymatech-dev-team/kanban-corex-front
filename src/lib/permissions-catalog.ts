@@ -37,6 +37,12 @@ export const PERMISSION_GROUPS: PermGroup[] = [
       { perm: PERMISSIONS.tarefas_mover, label: "Mover tarefas no Kanban", meta: false },
       { perm: PERMISSIONS.tarefas_excluir, label: "Excluir tarefas", meta: false },
       { perm: PERMISSIONS.subtarefas_gerenciar, label: "Gerenciar subtarefas", meta: false },
+      {
+        perm: PERMISSIONS.tarefas_ver_globais,
+        label: "Ver todas as tarefas (aba Tarefas)",
+        hint: "Abre a aba Tarefas com todas as tarefas dos clientes que a pessoa acessa (Kanban/Lista/Calendário)",
+        meta: false,
+      },
     ],
   },
   {

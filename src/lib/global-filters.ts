@@ -15,6 +15,13 @@ export interface GlobalFilters {
 
 export const DEFAULT_FILTERS: GlobalFilters = { status: "ATIVAS" };
 
+/** Visualização da aba Tarefas (igual ao board). [tarefas-visao-global] */
+export type TaskView = "kanban" | "lista" | "calendario";
+export const TASK_VIEWS: TaskView[] = ["kanban", "lista", "calendario"];
+export function parseView(v: string | null): TaskView | null {
+  return v && (TASK_VIEWS as string[]).includes(v) ? (v as TaskView) : null;
+}
+
 const STATUS_VALUES: StatusFilter[] = ["ATIVAS", "TODO", "DOING", "DONE", "TODAS"];
 const PRIO_VALUES: TaskPriority[] = ["HIGH", "MEDIUM", "LOW"];
 const PRAZO_VALUES: PrazoPreset[] = ["atrasadas", "hoje", "semana"];

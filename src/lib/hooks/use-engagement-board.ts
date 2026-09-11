@@ -44,6 +44,7 @@ export function useCreateEngagementTask(engagementId: string) {
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: engTasksKey(engagementId) });
       qc.invalidateQueries({ queryKey: engCostKey(engagementId) });
+      qc.invalidateQueries({ queryKey: ["tasks", "all"] }); // visão global reflete a criação [tarefas-visao-global RF-E5]
       // Mantém o cliente consistente: lista/metrics, custo roll-up e a contagem dos cards de projeto.
       // Literais p/ evitar import circular com use-tasks/use-cost/use-engagements. [review B2]
       if (data?.projectId) {

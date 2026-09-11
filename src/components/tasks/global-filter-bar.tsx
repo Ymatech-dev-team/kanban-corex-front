@@ -7,6 +7,7 @@ import {
   type GlobalFilters,
   type StatusFilter,
   type PrazoPreset,
+  type TaskView,
   activeFacetCount,
   hasAnyFilter,
   DEFAULT_FILTERS,
@@ -104,9 +105,17 @@ function Chip({ k, v, onRemove }: { k: string; v: string; onRemove: () => void }
   );
 }
 
+const VIEW_OPTS: { v: TaskView; label: string }[] = [
+  { v: "kanban", label: "Kanban" },
+  { v: "lista", label: "Lista" },
+  { v: "calendario", label: "Calendário" },
+];
+
 export function GlobalFilterBar({
   filters,
   onChange,
+  view,
+  onView,
   clients,
   engagements,
   members,
@@ -118,6 +127,8 @@ export function GlobalFilterBar({
 }: {
   filters: GlobalFilters;
   onChange: (f: GlobalFilters) => void;
+  view: TaskView;
+  onView: (v: TaskView) => void;
   clients: Project[];
   engagements: Engagement[];
   members: Member[];
@@ -137,6 +148,23 @@ export function GlobalFilterBar({
   return (
     <div className="flex flex-col gap-2 border-b border-border px-6 py-3">
       <div className="flex flex-wrap items-center gap-2">
+        {/* Seletor de visualização — extrema-esquerda, igual às tabs do board. [design] */}
+        <div className="flex gap-0.5 rounded-lg border border-border bg-card p-[3px] text-[12.5px]">
+          {VIEW_OPTS.map((o) => (
+            <button
+              key={o.v}
+              type="button"
+              onClick={() => onView(o.v)}
+              aria-current={view === o.v ? "page" : undefined}
+              className={cn(
+                "rounded-md px-3 py-1 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                view === o.v ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
         <h1 className="mr-1 text-base font-medium tracking-tight">Tarefas</h1>
 
         {/* Cliente — trocar zera Projeto (que pertence ao cliente); Responsável é global, permanece. [RF-C7] */}
@@ -239,7 +267,7 @@ export function GlobalFilterBar({
               onClick={onOpenBoard}
               className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-[12px] text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
             >
-              Abrir no board
+              Abrir projeto
               <ChevronRight className="size-3.5" aria-hidden />
             </button>
           )}

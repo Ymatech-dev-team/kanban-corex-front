@@ -55,10 +55,12 @@ export function TaskCard({
   task,
   onOpen,
   membersById,
+  clientName,
 }: {
   task: Task;
   onOpen?: () => void;
   membersById: Record<string, string>;
+  clientName?: string; // "kicker" de cliente no topo — só na visão global que cruza clientes [tarefas-visao-global]
 }) {
   const done = task.status === "DONE";
   const due = dueTag(task.dueDate, task.status);
@@ -76,6 +78,11 @@ export function TaskCard({
         urgent && "rounded-l-none border-l-[3px] border-l-amber",
       )}
     >
+      {clientName && (
+        <div className="mb-1 truncate text-[11px] text-muted-foreground" title={clientName}>
+          {clientName}
+        </div>
+      )}
       <div className={cn("mb-2.5 text-[13.5px] leading-snug", done && "text-muted-foreground line-through")}>
         {task.title}
       </div>

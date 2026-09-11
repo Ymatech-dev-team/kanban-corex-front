@@ -50,11 +50,13 @@ function SortableCard({
   onOpen,
   membersById,
   dragDisabled,
+  clientName,
 }: {
   task: Task;
   onOpen: () => void;
   membersById: Record<string, string>;
   dragDisabled?: boolean;
+  clientName?: string;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
@@ -68,7 +70,7 @@ function SortableCard({
       {...attributes}
       {...listeners}
     >
-      <TaskCard task={task} onOpen={onOpen} membersById={membersById} />
+      <TaskCard task={task} onOpen={onOpen} membersById={membersById} clientName={clientName} />
     </div>
   );
 }
@@ -81,6 +83,10 @@ interface Props {
   dragDisabled?: boolean;
   onOpenTask: (id: string) => void;
   onAddTask: (status: TaskStatus) => void;
+  // Visão GLOBAL: move próprio (otimista na lista agregada) + kicker de cliente no card. [tarefas-visao-global]
+  onMove?: (vars: { id: string; status: TaskStatus; position: number }) => void;
+  clientNameById?: Record<string, string>;
+  showClient?: boolean;
 }
 
 export function KanbanBoard({
@@ -91,8 +97,12 @@ export function KanbanBoard({
   dragDisabled,
   onOpenTask,
   onAddTask,
+  onMove,
+  clientNameById,
+  showClient,
 }: Props) {
   const move = useMoveTask(projectId, engagementId);
+  const applyMove = onMove ?? move.mutate; // global injeta o próprio move; board usa o por-projeto
   const [activeId, setActiveId] = useState<string | null>(null);
 
   const sensors = useSensors(
@@ -140,7 +150,7 @@ export function KanbanBoard({
       dest.map((t) => t.position),
       index,
     );
-    move.mutate({ id: dragged.id, status: destStatus, position });
+    applyMove({ id: dragged.id, status: destStatus, position });
   }
 
   return (
@@ -163,11 +173,19 @@ export function KanbanBoard({
             dragDisabled={dragDisabled}
             onOpenTask={onOpenTask}
             onAddTask={onAddTask}
+            clientNameById={clientNameById}
+            showClient={showClient}
           />
         ))}
       </div>
       <DragOverlay>
-        {activeTask ? <TaskCard task={activeTask} membersById={membersById} /> : null}
+        {activeTask ? (
+          <TaskCard
+            task={activeTask}
+            membersById={membersById}
+            clientName={showClient ? clientNameById?.[activeTask.projectId] : undefined}
+          />
+        ) : null}
       </DragOverlay>
     </DndContext>
   );
@@ -182,6 +200,8 @@ function Column({
   dragDisabled,
   onOpenTask,
   onAddTask,
+  clientNameById,
+  showClient,
 }: {
   status: TaskStatus;
   label: string;
@@ -191,6 +211,8 @@ function Column({
   dragDisabled?: boolean;
   onOpenTask: (id: string) => void;
   onAddTask: (status: TaskStatus) => void;
+  clientNameById?: Record<string, string>;
+  showClient?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `col:${status}` });
   return (
@@ -224,6 +246,7 @@ function Column({
               onOpen={() => onOpenTask(t.id)}
               membersById={membersById}
               dragDisabled={dragDisabled}
+              clientName={showClient ? clientNameById?.[t.projectId] : undefined}
             />
           ))}
         </SortableContext>
