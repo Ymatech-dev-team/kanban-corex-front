@@ -4,18 +4,17 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, ChevronRight, Building2, Loader2, AlertTriangle } from "lucide-react";
 import { useProjects } from "@/lib/hooks/use-projects";
-import { useBoardNav } from "@/lib/board-nav";
+import { generalEngagementId } from "@/lib/engagements";
 import { CreateProjectDialog } from "@/components/board/create-project-dialog";
 import { Button } from "@/components/ui/button";
 export default function ClientesPage() {
   const router = useRouter();
-  const nav = useBoardNav();
   const projects = useProjects();
   const [createOpen, setCreateOpen] = useState(false);
 
+  // Cliente recém-criado → abre o board do Projeto geral dele (direto, refresh-safe).
   function openBoard(projectId: string) {
-    nav.request(projectId);
-    router.push("/tarefas");
+    router.push(`/clientes/${projectId}/projetos/${generalEngagementId(projectId)}`);
   }
 
   // Clicar no card abre o DETALHE do cliente (não o quadro). [detalhe-do-cliente RF-01]

@@ -11,7 +11,7 @@ import { useProjectMembers, useGrantAccess, useRevokeAccess } from "@/lib/hooks/
 import { useMembers } from "@/lib/hooks/use-admin";
 import { useCan } from "@/lib/hooks/use-can";
 import { useProjectCost, projectCostKey } from "@/lib/hooks/use-cost";
-import { useBoardNav } from "@/lib/board-nav";
+import { generalEngagementId } from "@/lib/engagements";
 import { httpStatus } from "@/lib/http-error";
 import { initials } from "@/lib/initials";
 import { CostSummary } from "@/components/cost/cost-summary";
@@ -223,7 +223,6 @@ function NotFound() {
 
 export function ClientDetail({ projectId }: { projectId: string }) {
   const router = useRouter();
-  const nav = useBoardNav();
   const qc = useQueryClient();
   const project = useProject(projectId);
 
@@ -268,8 +267,7 @@ export function ClientDetail({ projectId }: { projectId: string }) {
   const canSeeCost = p?.canSeeCost === true;
 
   function openBoard() {
-    nav.request(projectId);
-    router.push("/tarefas");
+    router.push(`/clientes/${projectId}/projetos/${generalEngagementId(projectId)}`);
   }
 
   return (

@@ -3,6 +3,15 @@ import { toast } from "sonner";
 import { api } from "@/lib/api";
 import type { Member } from "@/lib/types";
 
+/** Pessoas dos clientes que o usuário acessa (id+nome) — filtro de Responsável + nomes na visão global. [tarefas-visao-global] */
+export function useAccessibleMembers() {
+  return useQuery<Member[]>({
+    queryKey: ["members", "accessible"],
+    staleTime: 60_000,
+    queryFn: async () => (await api.get<{ members: Member[] }>("/members/accessible")).data.members,
+  });
+}
+
 /** Quem tem acesso ao cliente — a lista de possíveis responsáveis. [SEC-107] */
 export function useProjectMembers(projectId: string | null) {
   return useQuery<Member[]>({

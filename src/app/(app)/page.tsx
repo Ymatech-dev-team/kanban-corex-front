@@ -6,7 +6,7 @@ import { AlertTriangle, CalendarClock, CalendarDays, CircleDashed, ChevronRight,
 import type { Task } from "@/lib/types";
 import { useMyTasks } from "@/lib/hooks/use-my-tasks";
 import { useProjects } from "@/lib/hooks/use-projects";
-import { useBoardNav } from "@/lib/board-nav";
+import { generalEngagementId } from "@/lib/engagements";
 import { dueState } from "@/lib/due";
 import { nextTasks, PRIORITY_LABEL } from "@/lib/focus";
 import { weekDaysMonday } from "@/lib/week";
@@ -31,7 +31,6 @@ const rangeFmt = new Intl.DateTimeFormat("pt-BR", { day: "numeric", month: "long
 
 export default function HomePage() {
   const router = useRouter();
-  const nav = useBoardNav();
   const mine = useMyTasks();
   const projects = useProjects();
 
@@ -74,13 +73,13 @@ export default function HomePage() {
       .sort((a, b) => b.count - a.count);
   }, [open, projectsById]);
 
+  // Navega DIRETO pro board (URL completa, refresh-safe) — sem ponte em memória. [tarefas-visao-global RF-B2]
   function openTask(t: Task) {
-    nav.request(t.projectId, t.id);
-    router.push("/tarefas");
+    const eng = t.engagementId ?? generalEngagementId(t.projectId);
+    router.push(`/clientes/${t.projectId}/projetos/${eng}?task=${t.id}`);
   }
   function openClient(projectId: string) {
-    nav.request(projectId);
-    router.push("/tarefas");
+    router.push(`/clientes/${projectId}/projetos/${generalEngagementId(projectId)}`);
   }
 
   const todayKey = dayKey(new Date(now));

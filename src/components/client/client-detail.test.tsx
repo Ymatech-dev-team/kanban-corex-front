@@ -2,7 +2,6 @@ import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ClientDetail } from "./client-detail";
-import { BoardNavProvider } from "@/lib/board-nav";
 import { useProject } from "@/lib/hooks/use-projects";
 
 vi.mock("@/lib/hooks/use-projects", () => ({ useProject: vi.fn() }));
@@ -23,9 +22,7 @@ function errState(status: number) {
 function renderWith(qc: QueryClient) {
   return render(
     <QueryClientProvider client={qc}>
-      <BoardNavProvider>
-        <ClientDetail projectId="p1" />
-      </BoardNavProvider>
+      <ClientDetail projectId="p1" />
     </QueryClientProvider>,
   );
 }

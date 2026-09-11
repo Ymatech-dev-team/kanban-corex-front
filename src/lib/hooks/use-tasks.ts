@@ -42,6 +42,7 @@ export function useCreateTask(projectId: string) {
       ).data,
     onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: tasksKey(projectId) });
+      qc.invalidateQueries({ queryKey: ["tasks", "all"] }); // visão global reflete a mudança [tarefas-visao-global RF-E5]
       qc.invalidateQueries({ queryKey: projectCostKey(projectId) }); // custo agregado muda
       qc.invalidateQueries({ queryKey: engagementsKey(projectId) }); // taskCount dos cards de projeto
       if (data?.engagementId) {
@@ -97,6 +98,7 @@ export function useMoveTask(projectId: string, engagementId?: string) {
     },
     onSettled: (data, _e, vars) => {
       qc.invalidateQueries({ queryKey: key }); // lista renderizada
+      qc.invalidateQueries({ queryKey: ["tasks", "all"] }); // visão global [tarefas-visao-global RF-E5]
       if (engagementId) qc.invalidateQueries({ queryKey: tasksKey(projectId) }); // roll-up/metrics do cliente
       qc.invalidateQueries({ queryKey: activityKey(vars.id) }); // move gera STATUS_CHANGED na timeline
       // mudar status (ex.: p/ DONE) troca realizado↔planejado do custo
@@ -122,6 +124,7 @@ export function useUpdateTask(projectId: string) {
       ).data,
     onSuccess: (data, vars) => {
       qc.invalidateQueries({ queryKey: tasksKey(projectId) });
+      qc.invalidateQueries({ queryKey: ["tasks", "all"] }); // visão global reflete a mudança [tarefas-visao-global RF-E5]
       qc.invalidateQueries({ queryKey: taskKey(vars.id) });
       qc.invalidateQueries({ queryKey: activityKey(vars.id) }); // timeline reflete a edição
       // custo deriva de horas/responsável/status: sem isso o painel de custo fica stale [review jornada]
@@ -149,6 +152,7 @@ export function useDeleteTask(projectId: string) {
     mutationFn: async ({ id }: { id: string; engagementId?: string }) => (await api.delete(`/tasks/${id}`)).data,
     onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: tasksKey(projectId) });
+      qc.invalidateQueries({ queryKey: ["tasks", "all"] }); // visão global reflete a mudança [tarefas-visao-global RF-E5]
       qc.invalidateQueries({ queryKey: projectCostKey(projectId) }); // custo agregado muda
       qc.invalidateQueries({ queryKey: engagementsKey(projectId) }); // taskCount dos cards de projeto
       if (vars.engagementId) {
@@ -189,6 +193,7 @@ function useAssigneeMutation(
       if (data) qc.setQueryData(taskKey(vars.taskId), data); // atualiza o detalhe na hora (sem esperar refetch)
       qc.invalidateQueries({ queryKey: activityKey(vars.taskId) }); // timeline reflete a mudança de responsável
       qc.invalidateQueries({ queryKey: tasksKey(projectId) });
+      qc.invalidateQueries({ queryKey: ["tasks", "all"] }); // visão global reflete a mudança [tarefas-visao-global RF-E5]
       qc.invalidateQueries({ queryKey: taskCostKey(vars.taskId) });
       qc.invalidateQueries({ queryKey: projectCostKey(projectId) });
       if (vars.engagementId) {
