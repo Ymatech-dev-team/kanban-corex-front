@@ -91,6 +91,33 @@
   color: #a16207;
 }
 
+/*
+  Login SEMPRE escuro (momento de marca; a logo e o hero são dark-first). Redeclara os tokens dark
+  independentemente do tema escolhido, então logo/contraste/foco funcionam mesmo se o usuário usa o app no claro.
+  [login-redesign / review UX]
+*/
+.login-dark {
+  color-scheme: dark;
+  --background: var(--yma-neutral-950);
+  --foreground: var(--yma-neutral-50);
+  --card: var(--yma-neutral-900);
+  --card-foreground: var(--yma-neutral-50);
+  --popover: var(--yma-neutral-800);
+  --popover-foreground: var(--yma-neutral-50);
+  --secondary: var(--yma-neutral-800);
+  --secondary-foreground: var(--yma-neutral-50);
+  --muted: var(--yma-neutral-800);
+  --muted-foreground: var(--yma-neutral-400);
+  --accent: var(--yma-neutral-800);
+  --accent-foreground: var(--yma-neutral-50);
+  --border: var(--yma-neutral-700);
+  --input: var(--yma-neutral-700);
+}
+/* neutraliza o override dourado-do-claro dentro do login forçado-escuro (dot/ícone voltam ao amarelo) */
+:root .login-dark .text-primary {
+  color: var(--primary);
+}
+
 /* Tailwind v4: mapeia os tokens semânticos para utilitários (bg-primary, text-muted-foreground…) */
 @theme inline {
   --color-background: var(--background);

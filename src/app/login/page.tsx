@@ -41,53 +41,43 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-6">
-      {/* Aurora de fundo: brilhos da marca flutuando devagar, baixa opacidade. */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div
-          className="sdt-aurora absolute -top-32 left-[15%] size-[420px] rounded-full blur-[100px]"
-          style={{
-            background: "radial-gradient(circle, rgba(255,198,0,0.18), transparent 70%)",
-            animation: "sdt-drift-a 17s ease-in-out infinite",
-          }}
-        />
-        <div
-          className="sdt-aurora absolute -bottom-40 right-[10%] size-[460px] rounded-full blur-[110px]"
-          style={{
-            background: "radial-gradient(circle, rgba(255,176,0,0.12), transparent 70%)",
-            animation: "sdt-drift-b 23s ease-in-out infinite",
-          }}
-        />
-        <div
-          className="sdt-aurora absolute left-1/2 top-1/3 size-[320px] -translate-x-1/2 rounded-full blur-[90px]"
-          style={{
-            background: "radial-gradient(circle, rgba(255,198,0,0.08), transparent 70%)",
-            animation: "sdt-drift-c 19s ease-in-out infinite",
-          }}
-        />
-      </div>
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-border to-transparent"
-      />
+    <main className="login-dark grid min-h-screen grid-cols-1 bg-background text-foreground lg:grid-cols-[42fr_58fr]">
+      {/* PAINEL DO FORM (esquerda no desktop, abaixo no mobile) — tema-aware por tokens. */}
+      <section className="relative order-2 flex items-center justify-center px-6 py-12 lg:order-1">
+        <div className="w-full max-w-[384px]">
+          {/* marca — logo YMALOG (public/logo-ymalog.png) — centrada e um pouco mais acima */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-ymalog.png" alt="YMALOG" className="mx-auto mb-12 block h-9 w-auto" />
 
-      <div className="relative w-full max-w-[400px]">
-        <div className="rounded-2xl border border-border bg-card/70 p-8 shadow-2xl shadow-black/40">
-          <div className="mb-7 flex flex-col items-center text-center">
-            <div className="mb-4 grid size-12 place-items-center rounded-xl bg-primary text-xl font-bold text-primary-foreground shadow-lg shadow-primary/20">
-              Y
-            </div>
-            <h1 className="text-lg font-medium tracking-tight">Entrar no Sistema de Tasks</h1>
-            <p className="mt-1 text-[13px] text-muted-foreground">Acesse sua conta para continuar</p>
-          </div>
+          <h1 className="text-[26px] font-semibold leading-tight tracking-tight">
+            Faça seu login<span className="text-primary">.</span>
+          </h1>
+          <p className="mt-1.5 mb-7 text-[13px] text-muted-foreground">Acesse sua conta para continuar</p>
 
           <LoginForm onSubmit={onSubmit} pending={pending} error={error} />
         </div>
+      </section>
 
-        <p className="mt-5 text-center text-[11px] tracking-wide text-muted-foreground/50">
-          YMALOG · Sistema de Tasks
-        </p>
-      </div>
+      {/* HERO com imagem — SÓ no desktop; no mobile some e o form ocupa a tela inteira. */}
+      <aside
+        aria-hidden
+        className="relative hidden overflow-hidden bg-background lg:order-2 lg:block lg:h-auto"
+      >
+        {/* imagem de fundo — public/login-hero.webp */}
+        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: "url(/login-hero.webp)" }} />
+        {/* leve escurecimento geral pra dar profundidade e não brigar com o form */}
+        <div className="absolute inset-0 bg-black/20" />
+        {/* DESKTOP — costura da borda esquerda: dissolve a imagem EXATAMENTE na cor do painel (var(--background)),
+            opaca o suficiente pra cobrir o brilho do pôr do sol na borda, + desfoque; some pra direita. */}
+        <div
+          className="absolute inset-y-0 left-0 hidden w-2/3 backdrop-blur-2xl lg:block"
+          style={{
+            maskImage: "linear-gradient(to right, black 0%, black 22%, transparent 78%)",
+            WebkitMaskImage: "linear-gradient(to right, black 0%, black 22%, transparent 78%)",
+            background: "linear-gradient(to right, var(--background) 0%, var(--background) 18%, transparent 72%)",
+          }}
+        />
+      </aside>
     </main>
   );
 }
