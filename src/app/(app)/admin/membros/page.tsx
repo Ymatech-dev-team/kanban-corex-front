@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { MoreHorizontal, Plus, ShieldCheck, KeyRound, Wallet, Trash2, Loader2, AlertTriangle } from "lucide-react";
+import { Plus, Pencil, Loader2, AlertTriangle } from "lucide-react";
 import type { AxiosError } from "axios";
 import { PERMISSIONS } from "@sistema-tasks/contracts";
 import { toast } from "sonner";
@@ -9,18 +9,11 @@ import { useMe } from "@/lib/hooks/use-me";
 import { useCan } from "@/lib/hooks/use-can";
 import { useMembers, useRoles, useResetPassword, useDeleteMember, type AdminMember } from "@/lib/hooks/use-admin";
 import { initials } from "@/lib/initials";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { CreateMemberDialog } from "@/components/admin/create-member-dialog";
-import { ChangeRoleDialog } from "@/components/admin/change-role-dialog";
+import { EditMemberDialog } from "@/components/admin/edit-member-dialog";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { TempPasswordDialog } from "@/components/admin/temp-password-dialog";
-import { CompensationDialog } from "@/components/admin/compensation-dialog";
 import { compensationLabel } from "@/lib/money";
 
 function apiMessage(e: unknown, fallback: string): string {
@@ -38,10 +31,9 @@ export default function MembrosPage() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [reveal, setReveal] = useState<{ password: string; name: string } | null>(null);
-  const [roleMember, setRoleMember] = useState<AdminMember | null>(null);
+  const [editMember, setEditMember] = useState<AdminMember | null>(null);
   const [resetMember, setResetMember] = useState<AdminMember | null>(null);
   const [deleteMember, setDeleteMember] = useState<AdminMember | null>(null);
-  const [compMember, setCompMember] = useState<AdminMember | null>(null);
 
   const rolesById = useMemo(
     () => Object.fromEntries((roles.data ?? []).map((r) => [r.id, r.name])),
@@ -168,36 +160,15 @@ export default function MembrosPage() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         {canManage && (
-                          <DropdownMenu>
-                            <DropdownMenuTrigger
-                              aria-label="Ações"
-                              className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-card hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                            >
-                              <MoreHorizontal className="size-4" />
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onSelect={() => setCompMember(m)}>
-                                <Wallet className="size-4 text-muted-foreground" />
-                                Remuneração
-                              </DropdownMenuItem>
-                              {!isSelf && (
-                                <DropdownMenuItem onSelect={() => setRoleMember(m)}>
-                                  <ShieldCheck className="size-4 text-muted-foreground" />
-                                  Alterar perfil
-                                </DropdownMenuItem>
-                              )}
-                              <DropdownMenuItem onSelect={() => setResetMember(m)}>
-                                <KeyRound className="size-4 text-muted-foreground" />
-                                Redefinir senha
-                              </DropdownMenuItem>
-                              {!isSelf && (
-                                <DropdownMenuItem onSelect={() => setDeleteMember(m)}>
-                                  <Trash2 className="size-4 text-muted-foreground" />
-                                  Remover
-                                </DropdownMenuItem>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <button
+                            type="button"
+                            onClick={() => setEditMember(m)}
+                            aria-label={`Editar ${m.name}`}
+                            title="Editar"
+                            className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            <Pencil className="size-4" />
+                          </button>
                         )}
                       </td>
                     </tr>
@@ -215,12 +186,21 @@ export default function MembrosPage() {
         onOpenChange={setCreateOpen}
         onCreated={(pw, name) => setReveal({ password: pw, name })}
       />
-      <ChangeRoleDialog
-        member={roleMember}
+      <EditMemberDialog
+        member={editMember}
         roles={roles.data ?? []}
-        onOpenChange={(o) => !o && setRoleMember(null)}
+        isSelf={!!editMember && editMember.id === me.data?.userId}
+        canManage={canManage}
+        onOpenChange={(o) => !o && setEditMember(null)}
+        onResetPassword={(m) => {
+          setEditMember(null);
+          setResetMember(m);
+        }}
+        onDelete={(m) => {
+          setEditMember(null);
+          setDeleteMember(m);
+        }}
       />
-      <CompensationDialog member={compMember} onOpenChange={(o) => !o && setCompMember(null)} />
       <ConfirmDialog
         open={resetMember !== null}
         title={`Redefinir senha de ${resetMember?.name ?? ""}?`}

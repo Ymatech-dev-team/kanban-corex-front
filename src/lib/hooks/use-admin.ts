@@ -55,10 +55,8 @@ export function useUpdateMember() {
   return useMutation({
     mutationFn: async ({ id, patch }: { id: string; patch: UpdateMemberInput }) =>
       (await api.patch(`/members/${id}`, patch)).data,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["members"] });
-      toast.success("Membro atualizado");
-    },
+    // Sem toast aqui: o EditMemberDialog salva em etapas e emite UM toast ao final. [rev-fase4]
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["members"] }),
   });
 }
 
@@ -101,10 +99,8 @@ export function useSetCompensation() {
   return useMutation({
     mutationFn: async ({ id, input }: { id: string; input: SetCompensationInput }) =>
       (await api.patch(`/members/${id}/compensation`, input)).data,
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["members"] });
-      toast.success("Remuneração atualizada");
-    },
+    // Sem toast aqui: o EditMemberDialog emite UM toast ao final do save. [rev-fase4]
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["members"] }),
   });
 }
 
