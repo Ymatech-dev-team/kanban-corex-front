@@ -42,7 +42,7 @@ const PRIO_LABEL = (p: TaskPriority) => PRIO_OPTS.find((o) => o.v === p)?.label 
 const PRAZO_LABEL = (p: PrazoPreset) => PRAZO_OPTS.find((o) => o.v === p)?.label ?? p;
 
 const trigBase =
-  "flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12.5px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50";
+  "flex h-9 items-center gap-1.5 rounded-lg border px-2.5 text-[12.5px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50";
 const trigIdle = "border-border bg-card text-muted-foreground hover:text-foreground";
 const trigActive = "border-muted-foreground/40 bg-accent text-foreground";
 
@@ -79,7 +79,7 @@ function Facet({
           type="button"
           aria-label={`Limpar ${label}`}
           onClick={onClear}
-          className="flex items-center rounded-r-lg border border-l-0 border-muted-foreground/40 bg-accent py-1.5 pl-1 pr-2 text-muted-foreground transition-colors hover:text-foreground"
+          className="flex h-9 items-center rounded-r-lg border border-l-0 border-muted-foreground/40 bg-accent pl-1 pr-2 text-muted-foreground transition-colors hover:text-foreground"
         >
           <X className="size-3.5" />
         </button>
@@ -149,7 +149,7 @@ export function GlobalFilterBar({
     <div className="flex flex-col gap-2 border-b border-border px-6 py-3">
       <div className="flex flex-wrap items-center gap-2">
         {/* Seletor de visualização — extrema-esquerda, igual às tabs do board. [design] */}
-        <div className="flex gap-0.5 rounded-lg border border-border bg-card p-[3px] text-[12.5px]">
+        <div className="flex h-9 items-center gap-0.5 rounded-lg border border-border bg-card p-1 text-[12.5px]">
           {VIEW_OPTS.map((o) => (
             <button
               key={o.v}
@@ -157,7 +157,7 @@ export function GlobalFilterBar({
               onClick={() => onView(o.v)}
               aria-current={view === o.v ? "page" : undefined}
               className={cn(
-                "rounded-md px-3 py-1 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                "flex h-full items-center rounded-md px-3 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
                 view === o.v ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground",
               )}
             >
