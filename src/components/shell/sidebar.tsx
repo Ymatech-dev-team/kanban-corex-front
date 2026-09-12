@@ -65,7 +65,7 @@ export function Sidebar() {
         href={href}
         title={collapsed ? label : undefined}
         className={cn(
-          "flex items-center gap-3 rounded-lg text-[13.5px] text-muted-foreground transition-colors hover:bg-card hover:text-foreground",
+          "flex items-center gap-3 rounded-lg text-[13.5px] text-muted-foreground outline-none transition-colors hover:bg-card hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
           collapsed ? "justify-center px-0 py-2" : "px-2.5 py-2",
           on && "bg-accent text-foreground [&_svg]:text-primary",
         )}
@@ -83,39 +83,22 @@ export function Sidebar() {
         collapsed ? "w-[60px]" : "w-[236px]",
       )}
     >
-      {/* Marca + sino + toggle */}
-      <div
-        className={cn(
-          "pb-4 pt-1.5",
-          collapsed ? "flex flex-col items-center gap-2" : "flex items-center gap-2.5 px-2",
-        )}
-      >
-        <div className="flex size-7 shrink-0 items-center justify-center rounded-md bg-primary text-[15px] font-bold text-primary-foreground">
-          Y
-        </div>
-        {!collapsed && (
-          <div className="leading-tight">
-            <div className="text-sm font-medium tracking-tight">Sistema de Tasks</div>
-            <div className="text-[11px] text-muted-foreground">YMALOG</div>
+      {/* Marca — logo YMALOG (expandida) / "Y" (recolhida) */}
+      <div className={cn("pb-4 pt-4", collapsed ? "flex justify-center" : "px-2")}>
+        {collapsed ? (
+          <div
+            role="img"
+            aria-label="YMALOG"
+            className="flex size-7 items-center justify-center rounded-md bg-primary text-[15px] font-bold text-primary-foreground"
+          >
+            Y
+          </div>
+        ) : (
+          <div className="brand-plaque inline-flex items-center rounded-lg px-2.5 py-1.5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-ymalog.png" alt="YMALOG" className="h-5 w-auto" />
           </div>
         )}
-        <div className={cn("flex items-center gap-1", collapsed ? "flex-col" : "ml-auto")}>
-          <NotificationsBell />
-          <ThemeToggle />
-          <button
-            type="button"
-            onClick={toggle}
-            aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
-            title={collapsed ? "Expandir menu" : "Recolher menu"}
-            className="flex size-8 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-card hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            {collapsed ? (
-              <PanelLeftOpen className="size-[18px]" strokeWidth={1.8} />
-            ) : (
-              <PanelLeftClose className="size-[18px]" strokeWidth={1.8} />
-            )}
-          </button>
-        </div>
       </div>
 
       <nav className="flex flex-col gap-0.5">
@@ -136,17 +119,33 @@ export function Sidebar() {
         )}
       </nav>
 
-      <div
-        className={cn(
-          "mt-auto border-t border-border pt-3",
-          collapsed ? "flex flex-col items-center gap-2" : "flex items-center gap-2",
-        )}
-      >
+      <div className="mt-auto flex flex-col gap-2.5 border-t border-border pt-3">
+        {/* Ações: notificações, tema, recolher/expandir — acima do perfil. */}
+        <div className={cn("flex items-center justify-center gap-1", collapsed && "flex-col")}>
+          <NotificationsBell />
+          <ThemeToggle />
+          <button
+            type="button"
+            onClick={toggle}
+            aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
+            title={collapsed ? "Expandir menu" : "Recolher menu"}
+            className="flex size-8 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-card hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {collapsed ? (
+              <PanelLeftOpen className="size-[18px]" strokeWidth={1.8} />
+            ) : (
+              <PanelLeftClose className="size-[18px]" strokeWidth={1.8} />
+            )}
+          </button>
+        </div>
+
+        {/* Perfil + sair */}
+        <div className={cn("flex items-center gap-2", collapsed && "flex-col")}>
         <Link
           href="/conta"
           title={collapsed ? accountName : undefined}
           className={cn(
-            "flex min-w-0 items-center gap-2.5 rounded-lg transition-colors hover:bg-card",
+            "flex min-w-0 items-center gap-2.5 rounded-lg outline-none transition-colors hover:bg-card focus-visible:ring-2 focus-visible:ring-ring",
             collapsed ? "p-1" : "flex-1 p-1.5",
             pathname.startsWith("/conta") && "bg-accent",
           )}
@@ -172,10 +171,11 @@ export function Sidebar() {
           onClick={logout}
           title="Sair"
           aria-label="Sair"
-          className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
+          className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-card hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         >
           <LogOut className="size-[17px]" strokeWidth={1.8} />
         </button>
+        </div>
       </div>
     </aside>
   );

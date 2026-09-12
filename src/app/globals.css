@@ -92,6 +92,13 @@
 }
 
 /*
+  Plaque escuro atrás da logo da sidebar. A logo é dark-first (branco+amarelo); a placa escura
+  garante a leitura da marca nos dois temas (no claro, sem ela o branco sumiria). [review sidebar 2026-09-11]
+*/
+.brand-plaque {
+  background: var(--yma-neutral-900);
+}
+/*
   Login SEMPRE escuro (momento de marca; a logo e o hero são dark-first). Redeclara os tokens dark
   independentemente do tema escolhido, então logo/contraste/foco funcionam mesmo se o usuário usa o app no claro.
   [login-redesign / review UX]
