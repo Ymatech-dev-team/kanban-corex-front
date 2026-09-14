@@ -201,11 +201,11 @@ export function ActivityTab({
         ) : items.length === 0 ? (
           <p className="py-6 text-center text-[13px] text-muted-foreground">Sem atividade ainda. Comente abaixo.</p>
         ) : (
-          <div className="relative pl-6">
+          <div role="feed" aria-label="Atividade da tarefa" className="relative pl-6">
             <div className="absolute bottom-1 left-[8px] top-1 w-px bg-border" />
             {items.map((e) =>
               e.type === "COMMENT" ? (
-                <div key={e.id} className="relative mb-3.5 last:mb-0">
+                <div key={e.id} role="article" className="relative mb-3.5 last:mb-0">
                   <span className="absolute -left-[26px] flex size-[22px] items-center justify-center rounded-full bg-accent text-[10px] font-medium text-foreground">
                     {initials(e.actorName)}
                   </span>
@@ -245,6 +245,7 @@ export function ActivityTab({
                       <div className="flex flex-col gap-2">
                         <Textarea
                           value={editing.body}
+                          aria-label="Editar comentário"
                           onChange={(ev) => setEditing({ id: e.id, body: ev.target.value })}
                           maxLength={5000}
                           className="min-h-[60px]"
@@ -289,7 +290,7 @@ export function ActivityTab({
                   </div>
                 </div>
               ) : (
-                <div key={e.id} className="relative mb-3.5 last:mb-0">
+                <div key={e.id} role="article" className="relative mb-3.5 last:mb-0">
                   <span className="absolute -left-6 flex size-[18px] items-center justify-center rounded-full border border-border bg-card">
                     {icon(e.type)}
                   </span>
@@ -325,6 +326,7 @@ export function ActivityTab({
       <div className="mt-3 border-t border-border pt-3">
         <Textarea
           value={draft}
+          aria-label="Novo comentário"
           onChange={(e) => {
             setDraft(e.target.value);
             if (failed) setFailed(false);

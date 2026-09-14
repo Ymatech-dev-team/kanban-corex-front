@@ -16,7 +16,6 @@ import { TaskList } from "@/components/board/task-list";
 import { TaskCalendar } from "@/components/board/task-calendar";
 import { AssigneeFilter as AssigneeFilterControl } from "@/components/board/assignee-filter";
 import { CreateTaskDialog } from "@/components/board/create-task-dialog";
-import { TaskDetailDialog } from "@/components/board/task-detail-dialog";
 import { CostTab } from "@/components/board/cost-tab";
 import { BoardSkeleton, BoardError, EmptyTasks } from "@/components/board/board-states";
 import { Button } from "@/components/ui/button";
@@ -44,9 +43,16 @@ export function ProjectBoard({
   const clients = useProjects(); // clientes que o usuário acessa (o backend já filtra por permissão) [seletor de clientes]
   const engagements = useEngagements(clientId);
   const [addStatus, setAddStatus] = useState<TaskStatus | null>(null);
-  const [openTaskId, setOpenTaskId] = useState<string | null>(initialTaskId ?? null);
   const [assigneeFilter, setAssigneeFilter] = useState<AssigneeFilter>({ type: "all" });
   const [view, setView] = useState<ViewKey>("kanban");
+
+  // Abrir tarefa = navegar pra tela dedicada (o `from` faz o "voltar" retornar a este board). [tela-detalhe-tarefa]
+  const boardPath = `/clientes/${clientId}/projetos/${engagementId}`;
+  const openTask = (id: string) => router.push(`/tarefas/${id}?from=${encodeURIComponent(boardPath)}`);
+  // Deep-links legados `?task=` (initialTaskId) redirecionam pra nova rota, preservando o board de origem.
+  useEffect(() => {
+    if (initialTaskId) router.replace(`/tarefas/${initialTaskId}?from=${encodeURIComponent(boardPath)}`);
+  }, [initialTaskId, boardPath, router]);
 
   const canSeeCost = project.data?.canSeeCost === true;
   const effectiveView: ViewKey = view === "custo" && !canSeeCost ? "kanban" : view;
@@ -199,9 +205,9 @@ export function ProjectBoard({
       ) : (tasks.data?.length ?? 0) === 0 ? (
         <EmptyTasks onAdd={() => setAddStatus("TODO")} />
       ) : effectiveView === "lista" ? (
-        <TaskList tasks={visibleTasks} membersById={membersById} onOpenTask={setOpenTaskId} />
+        <TaskList tasks={visibleTasks} membersById={membersById} onOpenTask={openTask} />
       ) : effectiveView === "calendario" ? (
-        <TaskCalendar tasks={visibleTasks} onOpenTask={setOpenTaskId} />
+        <TaskCalendar tasks={visibleTasks} onOpenTask={openTask} />
       ) : (
         <KanbanBoard
           tasks={visibleTasks}
@@ -209,7 +215,7 @@ export function ProjectBoard({
           engagementId={engagementId}
           membersById={membersById}
           dragDisabled={assigneeFilter.type !== "all"}
-          onOpenTask={setOpenTaskId}
+          onOpenTask={openTask}
           onAddTask={setAddStatus}
         />
       )}
@@ -222,7 +228,6 @@ export function ProjectBoard({
         canSeeCost={canSeeCost}
         onOpenChange={(o) => !o && setAddStatus(null)}
       />
-      <TaskDetailDialog taskId={openTaskId} members={members} onOpenChange={(o) => !o && setOpenTaskId(null)} />
     </>
   );
 }

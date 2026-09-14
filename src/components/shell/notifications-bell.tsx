@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Bell, Check } from "lucide-react";
 import type { Task } from "@/lib/types";
 import { useMyTasks } from "@/lib/hooks/use-my-tasks";
-import { generalEngagementId } from "@/lib/engagements";
 import { dueState } from "@/lib/due";
 import { notifKey, markSeen, pruneToTaskIds, useSeenNotifications } from "@/lib/notifications-store";
 import {
@@ -44,8 +43,7 @@ export function NotificationsBell() {
   // Deep-link: navega DIRETO pro board do projeto da tarefa (id na URL, refresh-safe). [tarefas-visao-global RF-B2]
   function open(task: Task, key: string) {
     markSeen([key]);
-    const eng = task.engagementId ?? generalEngagementId(task.projectId);
-    router.push(`/clientes/${task.projectId}/projetos/${eng}?task=${task.id}`);
+    router.push(`/tarefas/${task.id}`);
   }
 
   return (

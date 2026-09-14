@@ -1,0 +1,643 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { ArrowLeft, CalendarClock, Check, Plus, Trash2, Loader2, AlertTriangle, RefreshCw } from "lucide-react";
+import { PERMISSIONS, type TaskPriority, type TaskStatus, type UpdateTaskInput } from "@sistema-tasks/contracts";
+import type { CostState, Task } from "@/lib/types";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { dueTag, isDueUrgent } from "@/lib/due";
+import { AssigneesEditor } from "@/components/board/assignees-editor";
+import { ActivityTab } from "@/components/board/activity-tab";
+import {
+  useTaskDetail,
+  useUpdateTask,
+  useDeleteTask,
+  useAddSubtask,
+  useToggleSubtask,
+  useDeleteSubtask,
+  errorCode,
+} from "@/lib/hooks/use-tasks";
+import { useCan } from "@/lib/hooks/use-can";
+import { useProject } from "@/lib/hooks/use-projects";
+import { useProjectMembers } from "@/lib/hooks/use-members";
+import { useEngagements } from "@/lib/hooks/use-engagements";
+import { useTaskCost } from "@/lib/hooks/use-cost";
+import { httpStatus } from "@/lib/http-error";
+import { parseHoursToMinutes, minutesToHoursInput } from "@/lib/duration";
+import { formatBRL } from "@/lib/money";
+import { cn } from "@/lib/utils";
+
+const COST_MSG: Record<Exclude<CostState, "OK">, string> = {
+  SEM_HORAS: "Defina as horas estimadas para calcular.",
+  SEM_RESPONSAVEL: "Defina um responsável para calcular.",
+  SEM_REMUNERACAO: "O responsável não tem remuneração cadastrada.",
+  RESPONSAVEL_SEM_ACESSO: "Custo indisponível para o responsável atual.",
+};
+
+const PRIOS: { value: TaskPriority; label: string }[] = [
+  { value: "LOW", label: "Baixa" },
+  { value: "MEDIUM", label: "Média" },
+  { value: "HIGH", label: "Alta" },
+];
+const STATUSES: { value: TaskStatus; label: string }[] = [
+  { value: "TODO", label: "A fazer" },
+  { value: "DOING", label: "Fazendo" },
+  { value: "DONE", label: "Feito" },
+];
+
+interface Form {
+  title: string;
+  description: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  due: string;
+  estimated: string;
+}
+
+function baselineFrom(task: Task): Form {
+  return {
+    title: task.title,
+    description: task.description ?? "",
+    status: task.status,
+    priority: task.priority,
+    due: task.dueDate ? task.dueDate.slice(0, 10) : "",
+    estimated: minutesToHoursInput(task.estimatedMinutes),
+  };
+}
+
+function isForm(v: unknown): v is Form {
+  return !!v && typeof v === "object" && typeof (v as Form).title === "string";
+}
+
+/** Só aceita caminho interno absoluto — evita open redirect via `?from` forjado. [rev-fase4 sec] */
+function safeInternalPath(p: string | null): string | null {
+  if (!p || !p.startsWith("/") || p.startsWith("//") || p.startsWith("/\\")) return null;
+  return p;
+}
+
+export function TaskDetailView({ taskId }: { taskId: string }) {
+  const router = useRouter();
+  const sp = useSearchParams();
+  const fromParam = safeInternalPath(sp.get("from"));
+
+  const detail = useTaskDetail(taskId);
+  const task = detail.data;
+  const projectId = task?.projectId ?? "";
+
+  const project = useProject(projectId || null);
+  const canSeeCost = project.data?.canSeeCost === true;
+  const membersQuery = useProjectMembers(projectId || null);
+  const members = membersQuery.data ?? [];
+  const membersById = useMemo(() => Object.fromEntries(members.map((m) => [m.id, m.name])), [members]);
+  const engagements = useEngagements(projectId || null);
+  const clientName = project.data?.name;
+  const engagementName = engagements.data?.find((e) => e.id === task?.engagementId)?.name;
+
+  const canEdit = useCan(PERMISSIONS.tarefas_editar);
+  const canDelete = useCan(PERMISSIONS.tarefas_excluir);
+
+  const update = useUpdateTask(projectId);
+  const del = useDeleteTask(projectId);
+  const add = useAddSubtask(taskId);
+  const toggle = useToggleSubtask(taskId);
+  const removeSub = useDeleteSubtask(taskId);
+
+  const [form, setForm] = useState<Form | null>(null);
+  // Token de concorrência FIXO no seed — se usasse o updatedAt "ao vivo", o refetch-no-foco o avançaria
+  // e o if-unmodified-since deixaria de proteger contra sobrescrever edição alheia. [rev-painel]
+  const [seededUpdatedAt, setSeededUpdatedAt] = useState<string | undefined>();
+  const [newTitle, setNewTitle] = useState("");
+  const [tab, setTab] = useState<"detalhes" | "atividade">("detalhes");
+  const [isLg, setIsLg] = useState(false);
+  const [conflict, setConflict] = useState(false);
+  const [confirmLeave, setConfirmLeave] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const seededFor = useRef<string | null>(null);
+  const descRef = useRef<HTMLTextAreaElement>(null);
+
+  const draftKey = `sdt_taskdraft_${taskId}`;
+  function clearDraft() {
+    try {
+      localStorage.removeItem(draftKey);
+    } catch {
+      /* sem persistência, tudo bem */
+    }
+  }
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const on = () => setIsLg(mq.matches);
+    on();
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+
+  // auto-resize da descrição
+  useEffect(() => {
+    const el = descRef.current;
+    if (el) {
+      el.style.height = "auto";
+      el.style.height = `${el.scrollHeight}px`;
+    }
+  }, [form?.description]);
+
+  // Seed do form: restaura rascunho do localStorage (rede de segurança contra saída sem guarda),
+  // senão parte do dado salvo. Fixa o token de concorrência do momento do carregamento. [rev-painel]
+  useEffect(() => {
+    if (task && seededFor.current !== task.id) {
+      let draft: Form | null = null;
+      try {
+        const raw = localStorage.getItem(`sdt_taskdraft_${task.id}`);
+        const parsed: unknown = raw ? JSON.parse(raw) : null;
+        if (isForm(parsed)) draft = parsed;
+      } catch {
+        draft = null;
+      }
+      setForm(draft ?? baselineFrom(task));
+      setSeededUpdatedAt(task.updatedAt);
+      setTab("detalhes");
+      seededFor.current = task.id;
+    }
+  }, [task]);
+
+  const subs = task?.subtasks ?? [];
+  const doneCount = subs.filter((s) => s.done).length;
+
+  const baseline = task ? baselineFrom(task) : null;
+  const dirty =
+    !!form &&
+    !!baseline &&
+    (form.title.trim() !== baseline.title ||
+      form.description !== baseline.description ||
+      form.status !== baseline.status ||
+      form.priority !== baseline.priority ||
+      form.due !== baseline.due ||
+      form.estimated !== baseline.estimated);
+
+  // Persiste/limpa o rascunho conforme o dirty (mesmo padrão do rascunho de comentário).
+  useEffect(() => {
+    if (!form) return;
+    try {
+      if (dirty) localStorage.setItem(draftKey, JSON.stringify(form));
+      else localStorage.removeItem(draftKey);
+    } catch {
+      /* sem persistência */
+    }
+  }, [form, dirty, draftKey]);
+
+  // Aviso nativo ao dar F5 / fechar aba / navegar pra fora com edição não salva.
+  useEffect(() => {
+    if (!dirty) return;
+    const h = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", h);
+    return () => window.removeEventListener("beforeunload", h);
+  }, [dirty]);
+
+  const backPath = fromParam || (task ? `/clientes/${task.projectId}/projetos/${task.engagementId}` : "/tarefas");
+
+  function goBack() {
+    if (dirty) {
+      setConfirmLeave(true);
+      return;
+    }
+    router.push(backPath);
+  }
+
+  async function save() {
+    if (!form || !task || !form.title.trim()) return;
+    const patch: UpdateTaskInput = {
+      title: form.title.trim(),
+      description: form.description.trim() === "" ? null : form.description.trim(),
+      status: form.status,
+      priority: form.priority,
+      dueDate: form.due ? new Date(`${form.due}T12:00:00`).toISOString() : null,
+      // horas = insumo de custo: só entra no payload de quem tem custos.ver. [SEC-custo]
+      ...(canSeeCost ? { estimatedMinutes: parseHoursToMinutes(form.estimated) } : {}),
+    };
+    try {
+      const updated = await update.mutateAsync({ id: task.id, patch, updatedAt: seededUpdatedAt });
+      if (updated?.updatedAt) setSeededUpdatedAt(updated.updatedAt); // avança o token pro próximo save
+      clearDraft();
+      // NÃO anula seededFor: o baseline recomputa do cache fresco e o dirty zera sozinho — re-semear
+      // aqui descartaria uma edição feita logo após o save (e o token velho geraria CONFLITO falso). [rev-fase4]
+    } catch (e) {
+      if (errorCode(e) === "CONFLITO") setConflict(true);
+      // demais erros já viram toast no hook
+    }
+  }
+
+  function discard() {
+    if (!baseline) return;
+    setForm(baseline);
+    clearDraft();
+  }
+
+  function reloadFromServer() {
+    setConflict(false);
+    clearDraft();
+    seededFor.current = null; // força re-seed com o dado fresco
+    detail.refetch();
+  }
+
+  async function addSub(e: React.FormEvent) {
+    e.preventDefault();
+    const t = newTitle.trim();
+    if (!t) return;
+    setNewTitle("");
+    await add.mutateAsync(t);
+  }
+
+  async function onDelete() {
+    if (!task) return;
+    setConfirmDelete(false);
+    await del.mutateAsync({ id: task.id, engagementId: task.engagementId });
+    clearDraft();
+    router.push(backPath);
+  }
+
+  // ---- estados de topo ----
+  const status = httpStatus(detail.error);
+  if (detail.isError && (status === 404 || status === 403)) {
+    return (
+      <FullState
+        title="Tarefa não encontrada"
+        desc="Ela não existe ou você não tem acesso a ela."
+        action={<Button variant="secondary" onClick={() => router.push(fromParam || "/tarefas")}>Voltar</Button>}
+      />
+    );
+  }
+  if (detail.isError) {
+    return (
+      <FullState
+        title="Não foi possível carregar a tarefa"
+        desc="Tente de novo em instantes."
+        action={<Button variant="secondary" onClick={() => detail.refetch()}>Tentar de novo</Button>}
+      />
+    );
+  }
+  if (detail.isLoading || !task || !form) {
+    return (
+      <div className="flex flex-1 items-center justify-center py-16 text-muted-foreground">
+        <Loader2 className="size-5 animate-spin" />
+      </div>
+    );
+  }
+
+  const detailsPane = (
+    <div className={cn("flex flex-col gap-4", tab === "detalhes" ? "" : "hidden", "lg:flex")}>
+      <div className="sr-only">
+        <h1>{form.title || "Detalhe da tarefa"}</h1>
+      </div>
+      <Input
+        value={form.title}
+        aria-label="Título da tarefa"
+        disabled={!canEdit}
+        onChange={(e) => setForm({ ...form, title: e.target.value })}
+        maxLength={200}
+        className="h-auto border-0 bg-transparent px-0 text-xl font-medium tracking-tight focus-visible:ring-0"
+      />
+
+      <div className="flex flex-wrap gap-x-8 gap-y-3">
+        <Field label="Status">
+          <Segmented label="Status" value={form.status} options={STATUSES} disabled={!canEdit} onChange={(v) => setForm({ ...form, status: v })} />
+        </Field>
+        <Field label="Prioridade">
+          <Segmented label="Prioridade" value={form.priority} options={PRIOS} disabled={!canEdit} onChange={(v) => setForm({ ...form, priority: v })} />
+        </Field>
+        <Field
+          label="Prazo"
+          extra={(() => {
+            const dt = dueTag(task.dueDate, task.status);
+            return isDueUrgent(dt.state) ? (
+              <span className="inline-flex items-center gap-1.5 rounded-md border border-amber/30 bg-amber/10 px-2 py-0.5 text-[11.5px] text-amber">
+                <CalendarClock className="size-3.5" aria-hidden />
+                {dt.label}
+              </span>
+            ) : null;
+          })()}
+        >
+          <Input type="date" aria-label="Prazo" value={form.due} disabled={!canEdit} onChange={(e) => setForm({ ...form, due: e.target.value })} className="h-9" />
+        </Field>
+        {canSeeCost && (
+          <Field label="Horas estimadas">
+            <Input
+              inputMode="decimal"
+              aria-label="Horas estimadas"
+              placeholder="ex.: 8 ou 1,5"
+              value={form.estimated}
+              disabled={!canEdit}
+              onChange={(e) => setForm({ ...form, estimated: e.target.value })}
+              className="h-9"
+            />
+          </Field>
+        )}
+      </div>
+
+      <Field label="Responsáveis">
+        <AssigneesEditor
+          taskId={task.id}
+          projectId={projectId}
+          engagementId={task.engagementId}
+          assigneeId={task.assigneeId}
+          extraAssigneeIds={task.extraAssigneeIds ?? []}
+          members={members}
+          disabled={!canEdit}
+        />
+      </Field>
+
+      <Field label="Descrição">
+        <Textarea
+          ref={descRef}
+          aria-label="Descrição"
+          value={form.description}
+          disabled={!canEdit}
+          onChange={(e) => setForm({ ...form, description: e.target.value })}
+          maxLength={5000}
+          placeholder={canEdit ? "Adicione detalhes da tarefa" : undefined}
+          className="min-h-[84px] resize-none overflow-hidden"
+        />
+      </Field>
+
+      {/* Subtarefas */}
+      <div className="flex flex-col gap-2 border-t border-border pt-3">
+        <div className="flex items-center justify-between text-[13px]">
+          <span className="font-medium">Subtarefas</span>
+          {subs.length > 0 && (
+            <span className="text-muted-foreground">
+              {doneCount}/{subs.length}
+            </span>
+          )}
+        </div>
+        <ul className="flex flex-col gap-1">
+          {subs.map((s) => (
+            <li key={s.id} className="group flex items-center gap-2.5 rounded-lg px-1 py-1">
+              <button
+                type="button"
+                aria-label={s.done ? "Desmarcar" : "Marcar como feita"}
+                onClick={() => toggle.mutate({ id: s.id, done: !s.done })}
+                className={cn(
+                  "flex size-[18px] shrink-0 items-center justify-center rounded-[6px] border transition-colors",
+                  s.done ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/50 text-transparent hover:border-foreground",
+                )}
+              >
+                <Check className="size-3" strokeWidth={3} />
+              </button>
+              <span className={cn("flex-1 text-[13px]", s.done && "text-muted-foreground line-through")}>{s.title}</span>
+              <button
+                type="button"
+                aria-label="Remover subtarefa"
+                onClick={() => removeSub.mutate(s.id)}
+                className="text-muted-foreground/0 transition-colors group-hover:text-muted-foreground hover:!text-amber"
+              >
+                <Trash2 className="size-3.5" />
+              </button>
+            </li>
+          ))}
+          {subs.length === 0 && <li className="px-1 py-1 text-[12.5px] text-muted-foreground">Nenhuma subtarefa ainda.</li>}
+        </ul>
+        <form onSubmit={addSub} className="mt-1 flex items-center gap-2">
+          <Input value={newTitle} aria-label="Nova subtarefa" onChange={(e) => setNewTitle(e.target.value)} placeholder="Adicionar subtarefa" maxLength={200} className="h-9" />
+          <button
+            type="submit"
+            aria-label="Adicionar"
+            disabled={!newTitle.trim() || add.isPending}
+            className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+          >
+            <Plus className="size-4" />
+          </button>
+        </form>
+      </div>
+
+      <CostLine taskId={task.id} enabled={canSeeCost} />
+
+      {canEdit && dirty && (
+        <div className="sticky bottom-0 z-10 -mx-1 mt-1 flex justify-end gap-2 border-t border-border bg-background/95 px-1 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+          <Button type="button" variant="secondary" onClick={discard}>
+            Descartar
+          </Button>
+          <Button type="button" onClick={save} disabled={!form.title.trim() || update.isPending}>
+            {update.isPending ? "Salvando…" : "Salvar alterações"}
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+
+  const activityPane = (
+    <div className={cn(tab === "atividade" ? "" : "hidden", "lg:block")}>
+      <span className="mb-3 hidden text-[11px] uppercase tracking-wide text-muted-foreground/80 lg:block">Atividade</span>
+      <ActivityTab taskId={task.id} membersById={membersById} enabled={isLg || tab === "atividade"} />
+    </div>
+  );
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* Header */}
+      <header className="flex items-center gap-3 border-b border-border px-6 py-3.5">
+        <button
+          type="button"
+          aria-label="Voltar"
+          onClick={goBack}
+          className="inline-flex size-6 items-center justify-center rounded text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <ArrowLeft className="size-4" />
+        </button>
+        <nav aria-label="Trilha" className="flex min-w-0 items-center gap-1.5 text-[12.5px] text-muted-foreground">
+          {clientName ? <span className="truncate">{clientName}</span> : <span className="h-3 w-16 animate-pulse rounded bg-muted" />}
+          <span className="text-muted-foreground/50">›</span>
+          {engagementName ? <span className="truncate">{engagementName}</span> : <span className="h-3 w-16 animate-pulse rounded bg-muted" />}
+        </nav>
+        {canDelete && (
+          <button
+            type="button"
+            onClick={() => setConfirmDelete(true)}
+            className="ml-auto inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[12.5px] text-muted-foreground outline-none transition-colors hover:text-amber focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <Trash2 className="size-4" />
+            Excluir
+          </button>
+        )}
+      </header>
+
+      <div className="flex-1 overflow-auto">
+        <div className="mx-auto max-w-5xl px-6 py-6">
+          {conflict && (
+            <div className="sticky top-0 z-20 mb-4 flex items-center gap-3 rounded-lg border border-amber/40 bg-card px-3.5 py-2.5">
+              <AlertTriangle className="size-4 shrink-0 text-amber" aria-hidden />
+              <span className="flex-1 text-[12.5px] text-muted-foreground">
+                Esta tarefa foi alterada por outra pessoa. Recarregue para ver a versão atual (suas edições não salvas serão descartadas).
+              </span>
+              <Button type="button" variant="secondary" onClick={reloadFromServer} className="shrink-0">
+                <RefreshCw className="size-3.5" />
+                Recarregar
+              </Button>
+            </div>
+          )}
+
+          {/* Abas só no mobile */}
+          <div className="mb-4 flex gap-4 border-b border-border lg:hidden">
+            {(["detalhes", "atividade"] as const).map((t) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTab(t)}
+                aria-current={tab === t ? "page" : undefined}
+                className={cn(
+                  "px-1 pb-2 pt-1 text-[13.5px] outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  tab === t ? "border-b-2 border-primary font-medium text-foreground" : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {t === "detalhes" ? "Detalhes" : "Atividade"}
+              </button>
+            ))}
+          </div>
+
+          <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-8">
+            {detailsPane}
+            {activityPane}
+          </div>
+        </div>
+      </div>
+
+      {/* Confirmar descarte ao sair */}
+      <Dialog open={confirmLeave} onOpenChange={(o) => !o && setConfirmLeave(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Descartar alterações?</DialogTitle>
+            <DialogDescription>Você tem alterações não salvas nesta tarefa.</DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setConfirmLeave(false)}>
+              Continuar editando
+            </Button>
+            <Button
+              type="button"
+              className="bg-amber text-primary-foreground hover:bg-amber/90"
+              onClick={() => {
+                setConfirmLeave(false);
+                clearDraft();
+                router.push(backPath);
+              }}
+            >
+              Descartar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmar exclusão */}
+      <Dialog open={confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Excluir esta tarefa?</DialogTitle>
+            <DialogDescription>A tarefa e suas subtarefas serão removidas. Esta ação não pode ser desfeita.</DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setConfirmDelete(false)}>
+              Cancelar
+            </Button>
+            <Button type="button" className="bg-amber text-primary-foreground hover:bg-amber/90" disabled={del.isPending} onClick={onDelete}>
+              {del.isPending ? "Excluindo…" : "Excluir"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function Field({ label, extra, children }: { label: string; extra?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center gap-2">
+        <span className="text-[11px] uppercase tracking-wide text-muted-foreground/80">{label}</span>
+        {extra}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function Segmented<T extends string>({
+  value,
+  options,
+  onChange,
+  disabled,
+  label,
+}: {
+  value: T;
+  options: { value: T; label: string }[];
+  onChange: (v: T) => void;
+  disabled?: boolean;
+  label?: string;
+}) {
+  return (
+    <div role="group" aria-label={label} className="flex gap-0.5 rounded-lg border border-border bg-card p-[3px]">
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          disabled={disabled}
+          aria-pressed={value === o.value}
+          onClick={() => onChange(o.value)}
+          className={cn(
+            "flex-1 rounded-md px-2.5 py-1.5 text-[12.5px] transition-colors disabled:opacity-60",
+            value === o.value ? "bg-accent text-foreground" : "text-muted-foreground enabled:hover:text-foreground",
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function CostLine({ taskId, enabled }: { taskId: string; enabled: boolean }) {
+  const cost = useTaskCost(taskId, enabled);
+  if (!enabled) return null;
+  return (
+    <div className="flex flex-col gap-1.5 border-t border-border pt-3">
+      <span className="text-[11px] uppercase tracking-wide text-muted-foreground/80">Custo estimado</span>
+      {cost.isLoading ? (
+        <span className="h-3.5 w-24 animate-pulse rounded bg-muted" />
+      ) : cost.isError || !cost.data ? (
+        <span className="text-[13px] text-muted-foreground">Não foi possível calcular agora.</span>
+      ) : cost.data.state === "OK" ? (
+        <div>
+          <span className="text-[15px] font-medium tabular-nums">{formatBRL(cost.data.cents ?? 0)}</span>
+          <span className="ml-2 text-[12px] text-muted-foreground">a preço de hoje</span>
+          <p className="mt-1 text-[12px] text-muted-foreground">
+            Calculado pelo responsável principal e pelas horas estimadas. Salário mensal entra proporcional às horas.
+          </p>
+        </div>
+      ) : (
+        <div className="flex items-baseline gap-2">
+          <span className="text-[15px] text-muted-foreground">—</span>
+          <span className="text-[13px] text-muted-foreground">{COST_MSG[cost.data.state]}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FullState({ title, desc, action }: { title: string; desc: string; action: React.ReactNode }) {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+      <div className="flex size-12 items-center justify-center rounded-full border border-border bg-card text-muted-foreground">
+        <AlertTriangle className="size-5" />
+      </div>
+      <div>
+        <h1 className="text-base font-medium tracking-tight">{title}</h1>
+        <p className="mt-1 max-w-xs text-sm text-muted-foreground">{desc}</p>
+      </div>
+      {action}
+    </div>
+  );
+}

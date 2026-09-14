@@ -88,8 +88,7 @@ export default function HomePage() {
   }, [open, projectsById]);
 
   function openTask(t: Task) {
-    const eng = t.engagementId ?? generalEngagementId(t.projectId);
-    router.push(`/clientes/${t.projectId}/projetos/${eng}?task=${t.id}`);
+    router.push(`/tarefas/${t.id}?from=${encodeURIComponent("/")}`);
   }
   function openClient(projectId: string) {
     router.push(`/clientes/${projectId}/projetos/${generalEngagementId(projectId)}`);

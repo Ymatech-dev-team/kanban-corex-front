@@ -8,8 +8,7 @@ import { useMe } from "@/lib/hooks/use-me";
 import { hasPermission } from "@/lib/hooks/use-can";
 import { useProjects } from "@/lib/hooks/use-projects";
 import { useEngagements } from "@/lib/hooks/use-engagements";
-import { useProjectMembers, useAccessibleMembers } from "@/lib/hooks/use-members";
-import { useTaskDetail } from "@/lib/hooks/use-tasks";
+import { useAccessibleMembers } from "@/lib/hooks/use-members";
 import { useAllTasks, useGlobalMoveTask } from "@/lib/hooks/use-all-tasks";
 import {
   parseFilters,
@@ -25,7 +24,6 @@ import {
 import { BoardSkeleton, BoardError, EmptyClients } from "@/components/board/board-states";
 import { KanbanBoard } from "@/components/board/kanban-board";
 import { TaskCalendar } from "@/components/board/task-calendar";
-import { TaskDetailDialog } from "@/components/board/task-detail-dialog";
 import { GlobalFilterBar } from "./global-filter-bar";
 import { GlobalTaskTable, type EngagementLite } from "./global-task-table";
 import { GlobalCreateTaskDialog } from "./global-create-task-dialog";
@@ -37,7 +35,6 @@ export function GlobalTasksView() {
   const router = useRouter();
   const sp = useSearchParams();
   const filters = useMemo(() => parseFilters(new URLSearchParams(sp.toString())), [sp]);
-  const taskParam = sp.get("task");
 
   // Gate da aba global: sem tarefas.ver_globais, não entra (redireciona quando o /me resolve). [tarefas-visao-global]
   const me = useMe();
@@ -76,21 +73,13 @@ export function GlobalTasksView() {
   const all = useAllTasks(query);
   const move = useGlobalMoveTask(query);
 
-  // Detalhe in-place: resolve o cliente da tarefa aberta p/ passar os membros DELE ao dialog. [RF-E7]
-  const openedDetail = useTaskDetail(taskParam);
-  const openedMembers = useProjectMembers(openedDetail.data?.projectId ?? null);
-
-  // Navega mantendo/limpando params. filtro → replace; abrir tarefa → push; view preservada. [RF-C1/E1]
-  function navigate(next: GlobalFilters, opts?: { task?: string | null; push?: boolean; view?: TaskView }) {
+  // Navega mantendo/limpando os params de filtro/view (sempre replace — filtro não é entrada de histórico). [RF-C1/E1]
+  function navigate(next: GlobalFilters, opts?: { view?: TaskView }) {
     const params = filtersToSearchParams(next);
     const nextView = opts?.view ?? parseView(sp.get("view")) ?? undefined;
-    const task = opts?.task === undefined ? taskParam : opts.task;
     if (nextView) params.set("view", nextView);
-    if (task) params.set("task", task);
     const qs = params.toString();
-    const url = qs ? `/tarefas?${qs}` : "/tarefas";
-    if (opts?.push) router.push(url);
-    else router.replace(url);
+    router.replace(qs ? `/tarefas?${qs}` : "/tarefas");
   }
 
   function switchView(v: TaskView) {
@@ -146,7 +135,14 @@ export function GlobalTasksView() {
   const showContext = !(filters.cliente && filters.projeto);
   const showClient = !filters.cliente; // kicker de cliente só quando cruza clientes
 
-  const openTask = (id: string) => navigate(filters, { task: id, push: true });
+  // Abrir tarefa = navegar pra tela dedicada; `from` faz o "voltar" retornar à visão global filtrada.
+  const openTask = (id: string) => {
+    const qs = filtersToSearchParams(filters);
+    const v = parseView(sp.get("view"));
+    if (v) qs.set("view", v);
+    const from = qs.toString() ? `/tarefas?${qs.toString()}` : "/tarefas";
+    router.push(`/tarefas/${id}?from=${encodeURIComponent(from)}`);
+  };
 
   // ----- estados de topo (antes da barra) -----
   if (me.isError) return <BoardError onRetry={() => me.refetch()} />; // não trava no spinner se o /me falhar [review]
@@ -232,11 +228,6 @@ export function GlobalTasksView() {
 
       <div className="flex min-h-0 flex-1 flex-col">{body}</div>
 
-      <TaskDetailDialog
-        taskId={taskParam}
-        members={openedMembers.data ?? []}
-        onOpenChange={(o) => !o && navigate(filters, { task: null })}
-      />
       <GlobalCreateTaskDialog status={addStatus} onOpenChange={(o) => !o && setAddStatus(null)} />
     </div>
   );
