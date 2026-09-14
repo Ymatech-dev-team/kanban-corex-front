@@ -118,6 +118,7 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const seededFor = useRef<string | null>(null);
   const descRef = useRef<HTMLTextAreaElement>(null);
+  const titleRef = useRef<HTMLTextAreaElement>(null);
 
   const draftKey = `sdt_taskdraft_${taskId}`;
   function clearDraft() {
@@ -144,6 +145,15 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
       el.style.height = `${el.scrollHeight}px`;
     }
   }, [form?.description]);
+
+  // auto-resize do título — quebra em várias linhas em vez de clipar títulos longos. [fix impeccable]
+  useEffect(() => {
+    const el = titleRef.current;
+    if (el) {
+      el.style.height = "auto";
+      el.style.height = `${el.scrollHeight}px`;
+    }
+  }, [form?.title]);
 
   // Seed do form: restaura rascunho do localStorage (rede de segurança contra saída sem guarda),
   // senão parte do dado salvo. Fixa o token de concorrência do momento do carregamento. [rev-painel]
@@ -295,13 +305,18 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
       <div className="sr-only">
         <h1>{form.title || "Detalhe da tarefa"}</h1>
       </div>
-      <Input
+      <Textarea
+        ref={titleRef}
         value={form.title}
         aria-label="Título da tarefa"
         disabled={!canEdit}
+        rows={1}
         onChange={(e) => setForm({ ...form, title: e.target.value })}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.preventDefault(); // título é uma linha lógica; não insere quebra
+        }}
         maxLength={200}
-        className="h-auto border-0 bg-transparent px-0 text-xl font-medium tracking-tight focus-visible:ring-0"
+        className="min-h-0 resize-none overflow-hidden border-0 bg-transparent px-0 py-0 text-xl font-medium leading-tight tracking-tight focus-visible:ring-0"
       />
 
       <div className="flex flex-wrap gap-x-8 gap-y-3">
