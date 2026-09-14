@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import {
   parseFilters,
   filtersToSearchParams,
@@ -6,6 +6,8 @@ import {
   activeFacetCount,
   hasAnyFilter,
   prazoRange,
+  readStoredClientProject,
+  writeStoredClientProject,
   type GlobalFilters,
 } from "./global-filters";
 
@@ -80,5 +82,41 @@ describe("prazoRange", () => {
     const r = prazoRange("semana", NOW);
     expect(new Date(r.dueFrom!).getDate()).toBe(10);
     expect(new Date(r.dueTo!).getDate()).toBe(16);
+  });
+});
+
+describe("readStoredClientProject / writeStoredClientProject", () => {
+  const KEY = "sdt_tarefas_filtros";
+  beforeEach(() => localStorage.clear());
+
+  it("round-trip cliente+projeto", () => {
+    writeStoredClientProject("c1", "e1");
+    expect(readStoredClientProject()).toEqual({ cliente: "c1", projeto: "e1" });
+  });
+  it("cliente sem projeto", () => {
+    writeStoredClientProject("c1");
+    expect(readStoredClientProject()).toEqual({ cliente: "c1", projeto: undefined });
+  });
+  it("sem cliente limpa o storage", () => {
+    writeStoredClientProject("c1", "e1");
+    writeStoredClientProject(undefined, "e1"); // ex.: "Limpar filtros"
+    expect(localStorage.getItem(KEY)).toBeNull();
+    expect(readStoredClientProject()).toEqual({});
+  });
+  it("trocar de cliente não gruda o projeto antigo", () => {
+    writeStoredClientProject("c1", "e1");
+    writeStoredClientProject("c2"); // trocou de cliente, sem projeto
+    expect(readStoredClientProject()).toEqual({ cliente: "c2", projeto: undefined });
+  });
+  it("descarta projeto órfão (sem cliente)", () => {
+    localStorage.setItem(KEY, JSON.stringify({ projeto: "e1" }));
+    expect(readStoredClientProject()).toEqual({ cliente: undefined, projeto: undefined });
+  });
+  it("JSON corrompido → vazio (não quebra)", () => {
+    localStorage.setItem(KEY, "{lixo");
+    expect(readStoredClientProject()).toEqual({});
+  });
+  it("ausente → vazio", () => {
+    expect(readStoredClientProject()).toEqual({});
   });
 });

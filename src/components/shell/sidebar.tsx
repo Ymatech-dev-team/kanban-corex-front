@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Home, ListChecks, Building2, Users, ShieldCheck, LogOut, User, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { PERMISSIONS } from "@sistema-tasks/contracts";
 import { useCan } from "@/lib/hooks/use-can";
@@ -11,20 +11,41 @@ import { api } from "@/lib/api";
 import { initials } from "@/lib/initials";
 import { NotificationsBell } from "./notifications-bell";
 import { ThemeToggle } from "./theme-toggle";
+import { readStoredClientProject } from "@/lib/global-filters";
 import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "sdt_sidebar_collapsed";
 
 export function Sidebar() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const canMembers = useCan(PERMISSIONS.membros_gerenciar);
   const canRoles = useCan(PERMISSIONS.perfis_gerenciar);
   const canTarefasGlobais = useCan(PERMISSIONS.tarefas_ver_globais); // a aba Tarefas (global) é gated [tarefas-visao-global]
+
+  // O link "Tarefas" carrega o Cliente/Projeto pra voltar pra aba já filtrado. Dentro da própria
+  // aba reflete o filtro VIVO da URL (senão clicar no item ativo reverteria a troca recém-feita);
+  // fora dela usa o último lembrado no localStorage. [tarefas-persistir-filtro]
+  const [tarefasHref, setTarefasHref] = useState("/tarefas");
+  useEffect(() => {
+    const src =
+      pathname === "/tarefas"
+        ? { cliente: searchParams.get("cliente") || undefined, projeto: searchParams.get("projeto") || undefined }
+        : readStoredClientProject();
+    if (!src.cliente) {
+      setTarefasHref("/tarefas");
+      return;
+    }
+    const p = new URLSearchParams({ cliente: src.cliente });
+    if (src.projeto) p.set("projeto", src.projeto);
+    setTarefasHref(`/tarefas?${p.toString()}`);
+  }, [pathname, searchParams]);
+
   // "Tarefas" só aparece pra quem tem a permissão da visão global.
   const main = [
     { href: "/", label: "Início", icon: Home },
-    ...(canTarefasGlobais ? [{ href: "/tarefas", label: "Tarefas", icon: ListChecks }] : []),
+    ...(canTarefasGlobais ? [{ href: tarefasHref, label: "Tarefas", icon: ListChecks }] : []),
     { href: "/clientes", label: "Clientes", icon: Building2 },
   ];
   const me = useMe();
@@ -58,10 +79,11 @@ export function Sidebar() {
   }
 
   const item = (href: string, label: string, Icon: typeof Home) => {
-    const on = href === "/" ? pathname === "/" : pathname.startsWith(href);
+    const path = href.split("?")[0]; // href pode ter query (?cliente=…); o "ativo" casa pelo path
+    const on = path === "/" ? pathname === "/" : pathname.startsWith(path);
     return (
       <Link
-        key={href}
+        key={label}
         href={href}
         title={collapsed ? label : undefined}
         className={cn(

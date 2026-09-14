@@ -17,6 +17,7 @@ import {
   filtersToQuery,
   parseView,
   hasAnyFilter,
+  writeStoredClientProject,
   DEFAULT_FILTERS,
   type GlobalFilters,
   type TaskView,
@@ -117,6 +118,12 @@ export function GlobalTasksView() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projects.isSuccess, engagements.isSuccess, accessibleMembers.isSuccess, sp]);
+
+  // Lembra Cliente+Projeto pra sidebar recarregar o filtro ao voltar pra aba. Captura de brinde
+  // o "Limpar filtros" (grava vazio) e o drop de id morto do saneador. [tarefas-persistir-filtro]
+  useEffect(() => {
+    writeStoredClientProject(filters.cliente, filters.projeto);
+  }, [filters.cliente, filters.projeto]);
 
   const clientsById = useMemo(() => Object.fromEntries(clients.map((c) => [c.id, c.name])), [clients]);
   const engagementsById = useMemo<Record<string, EngagementLite>>(

@@ -15,6 +15,46 @@ export interface GlobalFilters {
 
 export const DEFAULT_FILTERS: GlobalFilters = { status: "ATIVAS" };
 
+/**
+ * Persistência do Cliente+Projeto da aba Tarefas (por navegador, igual à "view").
+ * A sidebar lê isto pra recarregar o filtro ao voltar pra aba. [tarefas-persistir-filtro]
+ */
+const FILTERS_STORAGE_KEY = "sdt_tarefas_filtros";
+export interface StoredClientProject {
+  cliente?: string;
+  projeto?: string;
+}
+
+/** Lê o Cliente+Projeto lembrado. Tolera storage ausente/corrompido e descarta projeto órfão (sem cliente). */
+export function readStoredClientProject(): StoredClientProject {
+  try {
+    const raw = localStorage.getItem(FILTERS_STORAGE_KEY);
+    if (!raw) return {};
+    const v: unknown = JSON.parse(raw);
+    if (typeof v !== "object" || v === null) return {};
+    const obj = v as Record<string, unknown>;
+    const cliente = typeof obj.cliente === "string" && obj.cliente ? obj.cliente : undefined;
+    // projeto só vale acompanhado de cliente (senão é lixo/edição manual)
+    const projeto = cliente && typeof obj.projeto === "string" && obj.projeto ? obj.projeto : undefined;
+    return { cliente, projeto };
+  } catch {
+    return {};
+  }
+}
+
+/** Grava (ou limpa) o Cliente+Projeto lembrado. Sem cliente = limpa (o "Limpar filtros" cai aqui). */
+export function writeStoredClientProject(cliente?: string, projeto?: string): void {
+  try {
+    if (!cliente) {
+      localStorage.removeItem(FILTERS_STORAGE_KEY);
+      return;
+    }
+    localStorage.setItem(FILTERS_STORAGE_KEY, JSON.stringify({ cliente, ...(projeto ? { projeto } : {}) }));
+  } catch {
+    /* localStorage indisponível — degrada pro comportamento atual (sem persistência) */
+  }
+}
+
 /** Visualização da aba Tarefas (igual ao board). [tarefas-visao-global] */
 export type TaskView = "kanban" | "lista" | "calendario";
 export const TASK_VIEWS: TaskView[] = ["kanban", "lista", "calendario"];
