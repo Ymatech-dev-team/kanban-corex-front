@@ -50,7 +50,7 @@ export function NotificationsBell() {
     <DropdownMenu>
       <DropdownMenuTrigger
         aria-label={count > 0 ? `${count} tarefas com prazo` : "Prazos"}
-        className="relative flex size-8 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-card hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        className="relative flex size-8 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-card hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring max-lg:size-11"
       >
         <Bell className="size-[18px]" strokeWidth={1.8} />
         {count > 0 && (
@@ -61,7 +61,7 @@ export function NotificationsBell() {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-[300px]">
         <div className="flex items-center justify-between px-2.5 py-2">
-          <span className="text-[11px] uppercase tracking-wide text-muted-foreground/70">Prazos</span>
+          <span className="text-[11px] uppercase tracking-wide text-muted-foreground">Prazos</span>
           {count > 0 && (
             <button
               type="button"

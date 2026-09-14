@@ -5,6 +5,7 @@ import type { Task } from "@/lib/types";
 import type { TaskPriority, TaskStatus } from "@sistema-tasks/contracts";
 import { initials } from "@/lib/initials";
 import { dueTag, isDueUrgent } from "@/lib/due";
+import { TaskCard } from "@/components/board/task-card";
 import { cn } from "@/lib/utils";
 
 const STATUS_LABEL: Record<TaskStatus, string> = { TODO: "A fazer", DOING: "Fazendo", DONE: "Feito" };
@@ -46,7 +47,29 @@ export function GlobalTaskTable({
   onOpenTask: (id: string) => void;
 }) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-border bg-card">
+    <>
+    {/* Mobile: lista de cards (um por tarefa). Reusa o TaskCard do board. [shell-mobile] */}
+    <ul className="flex flex-col gap-2.5 lg:hidden">
+      {tasks.map((t) => {
+        const eng = t.engagementId ? engagementsById[t.engagementId] : undefined;
+        const projectName = eng && !eng.isGeneral ? eng.name : undefined;
+        return (
+          <li key={t.id}>
+            <TaskCard
+              task={t}
+              onOpen={() => onOpenTask(t.id)}
+              membersById={membersById}
+              clientName={showContext ? (clientsById[t.projectId] ?? "Cliente") : undefined}
+              projectName={showContext ? projectName : undefined}
+              asButton
+            />
+          </li>
+        );
+      })}
+    </ul>
+
+    {/* Desktop: tabela */}
+    <div className="hidden overflow-x-auto rounded-xl border border-border bg-card lg:block">
       <table className="w-full min-w-[720px] border-collapse text-[13px]">
         <thead>
           <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground/70">
@@ -125,5 +148,6 @@ export function GlobalTaskTable({
         </tbody>
       </table>
     </div>
+    </>
   );
 }

@@ -101,7 +101,7 @@ export function CreateTaskDialog({ projectId, engagementId, status, members, can
             </div>
           </div>
 
-          <div className={cn("grid gap-4", canSeeCost ? "grid-cols-2" : "grid-cols-1")}>
+          <div className={cn("grid gap-4", canSeeCost ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1")}>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="tdue">Prazo (opcional)</Label>
               <Input id="tdue" type="date" value={due} onChange={(e) => setDue(e.target.value)} />

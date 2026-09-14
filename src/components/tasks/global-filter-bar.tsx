@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import * as Dialog from "@radix-ui/react-dialog";
 import { ChevronDown, ChevronRight, ListFilter, X } from "lucide-react";
 import type { TaskPriority } from "@sistema-tasks/contracts";
 import type { Member, Engagement, Project } from "@/lib/types";
@@ -46,7 +48,34 @@ const trigBase =
 const trigIdle = "border-border bg-card text-muted-foreground hover:text-foreground";
 const trigActive = "border-muted-foreground/40 bg-accent text-foreground";
 
-/** Facet inline (Cliente/Projeto/Responsável): dropdown-botão + X pra limpar. Estado ativo por rótulo+X, não só cor. */
+const VIEW_OPTS: { v: TaskView; label: string }[] = [
+  { v: "kanban", label: "Kanban" },
+  { v: "lista", label: "Lista" },
+  { v: "calendario", label: "Calendário" },
+];
+
+function ViewSwitcher({ view, onView }: { view: TaskView; onView: (v: TaskView) => void }) {
+  return (
+    <div className="flex h-9 items-center gap-0.5 rounded-lg border border-border bg-card p-1 text-[12.5px]">
+      {VIEW_OPTS.map((o) => (
+        <button
+          key={o.v}
+          type="button"
+          onClick={() => onView(o.v)}
+          aria-pressed={view === o.v}
+          className={cn(
+            "flex h-full items-center rounded-md px-3 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+            view === o.v ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground",
+          )}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** Facet inline do DESKTOP (Cliente/Projeto/Responsável): dropdown-botão + X pra limpar. */
 function Facet({
   label,
   valueLabel,
@@ -105,11 +134,101 @@ function Chip({ k, v, onRemove }: { k: string; v: string; onRemove: () => void }
   );
 }
 
-const VIEW_OPTS: { v: TaskView; label: string }[] = [
-  { v: "kanban", label: "Kanban" },
-  { v: "lista", label: "Lista" },
-  { v: "calendario", label: "Calendário" },
-];
+/** Select inline do bottom sheet (mobile) — expande a lista NO PRÓPRIO sheet (sem dropdown/portal
+ *  aninhado dentro do Dialog, que brigaria por foco/z-index). [shell-mobile] */
+function SheetSelect<T extends string>({
+  label,
+  selected,
+  options,
+  onSelect,
+  disabled,
+  hint,
+}: {
+  label: string;
+  selected: T | undefined;
+  options: { value: T | undefined; label: string }[];
+  onSelect: (v: T | undefined) => void;
+  disabled?: boolean;
+  hint?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const currentLabel = options.find((o) => o.value === selected)?.label ?? options[0]?.label ?? "";
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-[11px] text-muted-foreground">{label}</span>
+      <button
+        type="button"
+        disabled={disabled}
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className="flex h-10 items-center justify-between gap-2 rounded-lg border border-input bg-card px-3 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <span className="truncate">{currentLabel}</span>
+        <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} aria-hidden />
+      </button>
+      {disabled && hint && <span className="text-[11px] text-muted-foreground">{hint}</span>}
+      {open && !disabled && (
+        <div className="max-h-52 overflow-y-auto rounded-lg border border-border bg-card">
+          {options.map((o) => (
+            <button
+              key={o.value ?? "_all"}
+              type="button"
+              onClick={() => {
+                onSelect(o.value);
+                setOpen(false);
+              }}
+              className={cn(
+                "flex w-full items-center px-3 py-2.5 text-left text-[13px] outline-none transition-colors",
+                o.value === selected ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:bg-accent",
+              )}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Grupo de pills de escolha única (Status/Prioridade/Prazo) no sheet. Ativo = neutro (bg-accent). */
+function PillGroup<T extends string>({
+  label,
+  selected,
+  options,
+  onSelect,
+}: {
+  label: string;
+  selected: T | undefined;
+  options: { value: T | undefined; label: string }[];
+  onSelect: (v: T | undefined) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-[11px] text-muted-foreground">{label}</span>
+      <div role="radiogroup" aria-label={label} className="flex flex-wrap gap-2">
+        {options.map((o) => {
+          const active = o.value === selected;
+          return (
+            <button
+              key={o.value ?? "_any"}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              onClick={() => onSelect(o.value)}
+              className={cn(
+                "flex h-10 items-center rounded-lg border px-3.5 text-[12.5px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                active ? "border-muted-foreground/40 bg-accent text-foreground" : "border-border bg-card text-muted-foreground",
+              )}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 export function GlobalFilterBar({
   filters,
@@ -140,157 +259,277 @@ export function GlobalFilterBar({
 }) {
   const set = (patch: Partial<GlobalFilters>) => onChange({ ...filters, ...patch });
   const facets = activeFacetCount(filters);
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   const clientName = clients.find((c) => c.id === filters.cliente)?.name;
   const projName = engagements.find((e) => e.id === filters.projeto)?.name;
   const respName = members.find((m) => m.id === filters.resp)?.name;
 
+  // No mobile TODOS os filtros vivem no sheet, então o contador conta tudo (status não conta no
+  // Kanban, que ignora status de propósito). Senão um filtro de Cliente "sumiria" sem aviso. [rev-painel]
+  const statusCounts = filters.status !== "ATIVAS" && view !== "kanban";
+  const mobileCount =
+    (filters.cliente ? 1 : 0) +
+    (filters.projeto ? 1 : 0) +
+    (filters.resp ? 1 : 0) +
+    (statusCounts ? 1 : 0) +
+    (filters.prio ? 1 : 0) +
+    (filters.prazo ? 1 : 0);
+
+  const clientOpts = [{ value: undefined, label: "Todos" }, ...clients.map((c) => ({ value: c.id, label: c.name }))];
+  const projOpts = [{ value: undefined, label: "Todos" }, ...engagements.map((e) => ({ value: e.id, label: e.name }))];
+  const respOpts = [{ value: undefined, label: "Todos" }, ...members.map((m) => ({ value: m.id, label: m.name }))];
+
   return (
-    <div className="flex flex-col gap-2 border-b border-border px-6 py-3">
-      <div className="flex flex-wrap items-center gap-2">
-        {/* Seletor de visualização — extrema-esquerda, igual às tabs do board. [design] */}
-        <div className="flex h-9 items-center gap-0.5 rounded-lg border border-border bg-card p-1 text-[12.5px]">
-          {VIEW_OPTS.map((o) => (
-            <button
-              key={o.v}
-              type="button"
-              onClick={() => onView(o.v)}
-              aria-current={view === o.v ? "page" : undefined}
-              className={cn(
-                "flex h-full items-center rounded-md px-3 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-                view === o.v ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground",
+    <div className="border-b border-border">
+      {/* ---------- MOBILE (< lg): view switcher + botão Filtros → bottom sheet ---------- */}
+      <div className="flex items-center gap-2 px-4 py-2.5 lg:hidden">
+        <ViewSwitcher view={view} onView={onView} />
+        <Dialog.Root open={sheetOpen} onOpenChange={setSheetOpen}>
+          <Dialog.Trigger asChild>
+            <button type="button" className={cn(trigBase, "ml-auto", mobileCount > 0 ? trigActive : trigIdle)}>
+              <ListFilter className="size-3.5" aria-hidden />
+              Filtros
+              {mobileCount > 0 && (
+                <span className="flex min-w-[15px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
+                  {mobileCount}
+                </span>
               )}
-            >
-              {o.label}
             </button>
-          ))}
-        </div>
-        <h1 className="mr-1 text-base font-medium tracking-tight">Tarefas</h1>
+          </Dialog.Trigger>
+          <Dialog.Portal>
+            <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
+            <Dialog.Content className="fixed inset-x-0 bottom-0 z-50 flex max-h-[82dvh] flex-col rounded-t-2xl border-t border-border bg-card pb-[env(safe-area-inset-bottom)] shadow-xl duration-200 data-[state=open]:animate-in data-[state=open]:slide-in-from-bottom data-[state=closed]:animate-out data-[state=closed]:slide-out-to-bottom">
+              <div className="flex justify-center pb-1 pt-2.5">
+                <span className="h-1 w-9 rounded-full bg-muted-foreground/30" aria-hidden />
+              </div>
+              <div className="flex items-center justify-between px-4 pb-2">
+                <Dialog.Title className="text-[15px] font-medium tracking-tight">Filtros</Dialog.Title>
+                <Dialog.Close asChild>
+                  <button
+                    type="button"
+                    aria-label="Fechar filtros"
+                    className="flex size-9 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <X className="size-5" />
+                  </button>
+                </Dialog.Close>
+              </div>
+              <Dialog.Description className="sr-only">Filtros das tarefas</Dialog.Description>
 
-        {/* Cliente — trocar zera Projeto (que pertence ao cliente); Responsável é global, permanece. [RF-C7] */}
-        <Facet
-          label="Cliente"
-          valueLabel={clientName ?? "Todos"}
-          active={!!filters.cliente}
-          onClear={() => set({ cliente: undefined, projeto: undefined })}
-        >
-          <DropdownMenuItem active={!filters.cliente} onSelect={() => set({ cliente: undefined, projeto: undefined })}>
-            Todos
-          </DropdownMenuItem>
-          {clients.map((c) => (
-            <DropdownMenuItem
-              key={c.id}
-              active={c.id === filters.cliente}
-              onSelect={() => set({ cliente: c.id, projeto: undefined })}
-            >
-              {c.name}
-            </DropdownMenuItem>
-          ))}
-        </Facet>
+              <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4">
+                <SheetSelect
+                  label="Cliente"
+                  selected={filters.cliente}
+                  options={clientOpts}
+                  onSelect={(v) => set({ cliente: v, projeto: undefined })}
+                />
+                <SheetSelect
+                  label="Projeto"
+                  selected={filters.projeto}
+                  options={projOpts}
+                  onSelect={(v) => set({ projeto: v })}
+                  disabled={projectoDisabled}
+                  hint={!filters.cliente ? "Selecione um cliente primeiro" : "Carregando…"}
+                />
+                <SheetSelect
+                  label="Responsável"
+                  selected={filters.resp}
+                  options={respOpts}
+                  onSelect={(v) => set({ resp: v })}
+                  disabled={respDisabled}
+                  hint="Carregando…"
+                />
+                {view !== "kanban" && (
+                  <PillGroup
+                    label="Status"
+                    selected={filters.status}
+                    options={STATUS_OPTS.map((o) => ({ value: o.v, label: o.label }))}
+                    onSelect={(v) => set({ status: (v as StatusFilter) ?? "ATIVAS" })}
+                  />
+                )}
+                <PillGroup
+                  label="Prioridade"
+                  selected={filters.prio}
+                  options={[{ value: undefined, label: "Todas" }, ...PRIO_OPTS.map((o) => ({ value: o.v, label: o.label }))]}
+                  onSelect={(v) => set({ prio: v as TaskPriority | undefined })}
+                />
+                <PillGroup
+                  label="Prazo"
+                  selected={filters.prazo}
+                  options={[{ value: undefined, label: "Qualquer" }, ...PRAZO_OPTS.map((o) => ({ value: o.v, label: o.label }))]}
+                  onSelect={(v) => set({ prazo: v as PrazoPreset | undefined })}
+                />
+              </div>
 
-        <ChevronRight className="size-4 shrink-0 text-muted-foreground/40" aria-hidden />
-
-        <Facet
-          label="Projeto"
-          valueLabel={projName ?? "Todos"}
-          active={!!filters.projeto}
-          disabled={projectoDisabled}
-          onClear={() => set({ projeto: undefined })}
-        >
-          <DropdownMenuItem active={!filters.projeto} onSelect={() => set({ projeto: undefined })}>
-            Todos
-          </DropdownMenuItem>
-          {engagements.map((e) => (
-            <DropdownMenuItem key={e.id} active={e.id === filters.projeto} onSelect={() => set({ projeto: e.id })}>
-              {e.name}
-            </DropdownMenuItem>
-          ))}
-        </Facet>
-
-        <Facet
-          label="Responsável"
-          valueLabel={respName ?? "Todos"}
-          active={!!filters.resp}
-          disabled={respDisabled}
-          onClear={() => set({ resp: undefined })}
-        >
-          <DropdownMenuItem active={!filters.resp} onSelect={() => set({ resp: undefined })}>
-            Todos
-          </DropdownMenuItem>
-          {members.map((m) => (
-            <DropdownMenuItem key={m.id} active={m.id === filters.resp} onSelect={() => set({ resp: m.id })}>
-              {m.name}
-            </DropdownMenuItem>
-          ))}
-        </Facet>
-
-        {/* Filtros (Status/Prioridade/Prazo) — mantém o menu aberto ao escolher (preventDefault). */}
-        <DropdownMenu>
-          <DropdownMenuTrigger className={cn(trigBase, facets > 0 ? trigActive : trigIdle)}>
-            <ListFilter className="size-3.5" aria-hidden />
-            Filtros
-            {facets > 0 && (
-              <span className="flex min-w-[15px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
-                {facets}
-              </span>
-            )}
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-[220px]">
-            <div className="px-2.5 pb-1 pt-1.5 text-[10.5px] uppercase tracking-wide text-muted-foreground/70">Status</div>
-            {STATUS_OPTS.map((o) => (
-              <DropdownMenuItem key={o.v} active={filters.status === o.v} onSelect={(e) => { e.preventDefault(); set({ status: o.v }); }}>
-                {o.label}
-              </DropdownMenuItem>
-            ))}
-            <div className="mt-1 border-t border-border px-2.5 pb-1 pt-2 text-[10.5px] uppercase tracking-wide text-muted-foreground/70">Prioridade</div>
-            <DropdownMenuItem active={!filters.prio} onSelect={(e) => { e.preventDefault(); set({ prio: undefined }); }}>Todas</DropdownMenuItem>
-            {PRIO_OPTS.map((o) => (
-              <DropdownMenuItem key={o.v} active={filters.prio === o.v} onSelect={(e) => { e.preventDefault(); set({ prio: o.v }); }}>
-                {o.label}
-              </DropdownMenuItem>
-            ))}
-            <div className="mt-1 border-t border-border px-2.5 pb-1 pt-2 text-[10.5px] uppercase tracking-wide text-muted-foreground/70">Prazo</div>
-            <DropdownMenuItem active={!filters.prazo} onSelect={(e) => { e.preventDefault(); set({ prazo: undefined }); }}>Qualquer</DropdownMenuItem>
-            {PRAZO_OPTS.map((o) => (
-              <DropdownMenuItem key={o.v} active={filters.prazo === o.v} onSelect={(e) => { e.preventDefault(); set({ prazo: o.v }); }}>
-                {o.label}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <div className="ml-auto flex items-center gap-3">
-          <span className="text-[11.5px] text-muted-foreground" aria-live="polite">{countLabel}</span>
-          {showOpenBoard && (
-            <button
-              type="button"
-              onClick={onOpenBoard}
-              className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-[12px] text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              Abrir projeto
-              <ChevronRight className="size-3.5" aria-hidden />
-            </button>
-          )}
-        </div>
+              <div className="flex items-center gap-3 border-t border-border px-4 py-3">
+                {hasAnyFilter(filters) && (
+                  <button
+                    type="button"
+                    onClick={() => onChange({ ...DEFAULT_FILTERS })}
+                    className="text-[12.5px] text-muted-foreground underline decoration-muted-foreground/40 underline-offset-2 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    Limpar filtros
+                  </button>
+                )}
+                {showOpenBoard && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSheetOpen(false);
+                      onOpenBoard();
+                    }}
+                    className="inline-flex items-center gap-1 text-[12.5px] text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    Abrir projeto
+                    <ChevronRight className="size-3.5" aria-hidden />
+                  </button>
+                )}
+                <Dialog.Close asChild>
+                  <button
+                    type="button"
+                    className="ml-auto inline-flex h-9 items-center rounded-lg bg-secondary px-4 text-[13px] font-medium text-secondary-foreground outline-none transition-colors hover:bg-secondary/80 focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {countLabel ? `Ver ${countLabel}` : "Fechar"}
+                  </button>
+                </Dialog.Close>
+              </div>
+            </Dialog.Content>
+          </Dialog.Portal>
+        </Dialog.Root>
       </div>
 
-      {/* Chips dos facets do popover + limpar tudo (só quando há filtro) */}
-      {(facets > 0 || hasAnyFilter(filters)) && (
+      {/* ---------- DESKTOP (≥ lg): barra completa atual ---------- */}
+      <div className="hidden flex-col gap-2 px-6 py-3 lg:flex">
         <div className="flex flex-wrap items-center gap-2">
-          {filters.status !== "ATIVAS" && <Chip k="Status" v={STATUS_LABEL(filters.status)} onRemove={() => set({ status: "ATIVAS" })} />}
-          {filters.prio && <Chip k="Prioridade" v={PRIO_LABEL(filters.prio)} onRemove={() => set({ prio: undefined })} />}
-          {filters.prazo && <Chip k="Prazo" v={PRAZO_LABEL(filters.prazo)} onRemove={() => set({ prazo: undefined })} />}
-          {hasAnyFilter(filters) && (
-            <button
-              type="button"
-              onClick={() => onChange({ ...DEFAULT_FILTERS })}
-              className="text-[11.5px] text-muted-foreground underline decoration-muted-foreground/40 underline-offset-2 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              Limpar filtros
-            </button>
-          )}
+          <ViewSwitcher view={view} onView={onView} />
+          <h1 className="mr-1 text-base font-medium tracking-tight">Tarefas</h1>
+
+          {/* Cliente — trocar zera Projeto; Responsável é global, permanece. [RF-C7] */}
+          <Facet
+            label="Cliente"
+            valueLabel={clientName ?? "Todos"}
+            active={!!filters.cliente}
+            onClear={() => set({ cliente: undefined, projeto: undefined })}
+          >
+            <DropdownMenuItem active={!filters.cliente} onSelect={() => set({ cliente: undefined, projeto: undefined })}>
+              Todos
+            </DropdownMenuItem>
+            {clients.map((c) => (
+              <DropdownMenuItem
+                key={c.id}
+                active={c.id === filters.cliente}
+                onSelect={() => set({ cliente: c.id, projeto: undefined })}
+              >
+                {c.name}
+              </DropdownMenuItem>
+            ))}
+          </Facet>
+
+          <ChevronRight className="size-4 shrink-0 text-muted-foreground/40" aria-hidden />
+
+          <Facet
+            label="Projeto"
+            valueLabel={projName ?? "Todos"}
+            active={!!filters.projeto}
+            disabled={projectoDisabled}
+            onClear={() => set({ projeto: undefined })}
+          >
+            <DropdownMenuItem active={!filters.projeto} onSelect={() => set({ projeto: undefined })}>
+              Todos
+            </DropdownMenuItem>
+            {engagements.map((e) => (
+              <DropdownMenuItem key={e.id} active={e.id === filters.projeto} onSelect={() => set({ projeto: e.id })}>
+                {e.name}
+              </DropdownMenuItem>
+            ))}
+          </Facet>
+
+          <Facet
+            label="Responsável"
+            valueLabel={respName ?? "Todos"}
+            active={!!filters.resp}
+            disabled={respDisabled}
+            onClear={() => set({ resp: undefined })}
+          >
+            <DropdownMenuItem active={!filters.resp} onSelect={() => set({ resp: undefined })}>
+              Todos
+            </DropdownMenuItem>
+            {members.map((m) => (
+              <DropdownMenuItem key={m.id} active={m.id === filters.resp} onSelect={() => set({ resp: m.id })}>
+                {m.name}
+              </DropdownMenuItem>
+            ))}
+          </Facet>
+
+          {/* Filtros (Status/Prioridade/Prazo) — mantém o menu aberto ao escolher. */}
+          <DropdownMenu>
+            <DropdownMenuTrigger className={cn(trigBase, facets > 0 ? trigActive : trigIdle)}>
+              <ListFilter className="size-3.5" aria-hidden />
+              Filtros
+              {facets > 0 && (
+                <span className="flex min-w-[15px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
+                  {facets}
+                </span>
+              )}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-[220px]">
+              <div className="px-2.5 pb-1 pt-1.5 text-[10.5px] uppercase tracking-wide text-muted-foreground/70">Status</div>
+              {STATUS_OPTS.map((o) => (
+                <DropdownMenuItem key={o.v} active={filters.status === o.v} onSelect={(e) => { e.preventDefault(); set({ status: o.v }); }}>
+                  {o.label}
+                </DropdownMenuItem>
+              ))}
+              <div className="mt-1 border-t border-border px-2.5 pb-1 pt-2 text-[10.5px] uppercase tracking-wide text-muted-foreground/70">Prioridade</div>
+              <DropdownMenuItem active={!filters.prio} onSelect={(e) => { e.preventDefault(); set({ prio: undefined }); }}>Todas</DropdownMenuItem>
+              {PRIO_OPTS.map((o) => (
+                <DropdownMenuItem key={o.v} active={filters.prio === o.v} onSelect={(e) => { e.preventDefault(); set({ prio: o.v }); }}>
+                  {o.label}
+                </DropdownMenuItem>
+              ))}
+              <div className="mt-1 border-t border-border px-2.5 pb-1 pt-2 text-[10.5px] uppercase tracking-wide text-muted-foreground/70">Prazo</div>
+              <DropdownMenuItem active={!filters.prazo} onSelect={(e) => { e.preventDefault(); set({ prazo: undefined }); }}>Qualquer</DropdownMenuItem>
+              {PRAZO_OPTS.map((o) => (
+                <DropdownMenuItem key={o.v} active={filters.prazo === o.v} onSelect={(e) => { e.preventDefault(); set({ prazo: o.v }); }}>
+                  {o.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <div className="ml-auto flex items-center gap-3">
+            <span className="text-[11.5px] text-muted-foreground" aria-live="polite">{countLabel}</span>
+            {showOpenBoard && (
+              <button
+                type="button"
+                onClick={onOpenBoard}
+                className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-[12px] text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                Abrir projeto
+                <ChevronRight className="size-3.5" aria-hidden />
+              </button>
+            )}
+          </div>
         </div>
-      )}
+
+        {/* Chips dos facets do popover + limpar tudo (só quando há filtro) */}
+        {(facets > 0 || hasAnyFilter(filters)) && (
+          <div className="flex flex-wrap items-center gap-2">
+            {filters.status !== "ATIVAS" && <Chip k="Status" v={STATUS_LABEL(filters.status)} onRemove={() => set({ status: "ATIVAS" })} />}
+            {filters.prio && <Chip k="Prioridade" v={PRIO_LABEL(filters.prio)} onRemove={() => set({ prio: undefined })} />}
+            {filters.prazo && <Chip k="Prazo" v={PRAZO_LABEL(filters.prazo)} onRemove={() => set({ prazo: undefined })} />}
+            {hasAnyFilter(filters) && (
+              <button
+                type="button"
+                onClick={() => onChange({ ...DEFAULT_FILTERS })}
+                className="text-[11.5px] text-muted-foreground underline decoration-muted-foreground/40 underline-offset-2 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                Limpar filtros
+              </button>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

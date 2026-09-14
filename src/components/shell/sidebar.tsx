@@ -2,52 +2,23 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Home, ListChecks, Building2, Users, ShieldCheck, LogOut, User, PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { PERMISSIONS } from "@sistema-tasks/contracts";
-import { useCan } from "@/lib/hooks/use-can";
+import { usePathname, useRouter } from "next/navigation";
+import { LogOut, User, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useMe } from "@/lib/hooks/use-me";
 import { api } from "@/lib/api";
 import { initials } from "@/lib/initials";
 import { NotificationsBell } from "./notifications-bell";
 import { ThemeToggle } from "./theme-toggle";
-import { readStoredClientProject } from "@/lib/global-filters";
+import { useNavItems, isNavActive, type NavItem } from "./use-nav-items";
 import { cn } from "@/lib/utils";
 
 const STORAGE_KEY = "sdt_sidebar_collapsed";
 
+/** Sidebar do DESKTOP (≥ lg). No mobile o shell é a top bar + bottom-nav + drawer. */
 export function Sidebar() {
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const router = useRouter();
-  const canMembers = useCan(PERMISSIONS.membros_gerenciar);
-  const canRoles = useCan(PERMISSIONS.perfis_gerenciar);
-  const canTarefasGlobais = useCan(PERMISSIONS.tarefas_ver_globais); // a aba Tarefas (global) é gated [tarefas-visao-global]
-
-  // O link "Tarefas" carrega o Cliente/Projeto pra voltar pra aba já filtrado. Dentro da própria
-  // aba reflete o filtro VIVO da URL (senão clicar no item ativo reverteria a troca recém-feita);
-  // fora dela usa o último lembrado no localStorage. [tarefas-persistir-filtro]
-  const [tarefasHref, setTarefasHref] = useState("/tarefas");
-  useEffect(() => {
-    const src =
-      pathname === "/tarefas"
-        ? { cliente: searchParams.get("cliente") || undefined, projeto: searchParams.get("projeto") || undefined }
-        : readStoredClientProject();
-    if (!src.cliente) {
-      setTarefasHref("/tarefas");
-      return;
-    }
-    const p = new URLSearchParams({ cliente: src.cliente });
-    if (src.projeto) p.set("projeto", src.projeto);
-    setTarefasHref(`/tarefas?${p.toString()}`);
-  }, [pathname, searchParams]);
-
-  // "Tarefas" só aparece pra quem tem a permissão da visão global.
-  const main = [
-    { href: "/", label: "Início", icon: Home },
-    ...(canTarefasGlobais ? [{ href: tarefasHref, label: "Tarefas", icon: ListChecks }] : []),
-    { href: "/clientes", label: "Clientes", icon: Building2 },
-  ];
+  const { primary, admin } = useNavItems();
   const me = useMe();
   const accountName = me.data?.name?.trim() || "Minha conta";
   const [collapsed, setCollapsed] = useState(false);
@@ -78,14 +49,14 @@ export function Sidebar() {
     router.push("/login");
   }
 
-  const item = (href: string, label: string, Icon: typeof Home) => {
-    const path = href.split("?")[0]; // href pode ter query (?cliente=…); o "ativo" casa pelo path
-    const on = path === "/" ? pathname === "/" : pathname.startsWith(path);
+  const item = (n: NavItem) => {
+    const on = isNavActive(pathname, n.href);
+    const Icon = n.icon;
     return (
       <Link
-        key={label}
-        href={href}
-        title={collapsed ? label : undefined}
+        key={n.label}
+        href={n.href}
+        title={collapsed ? n.label : undefined}
         className={cn(
           "flex items-center gap-3 rounded-lg text-[13.5px] text-muted-foreground outline-none transition-colors hover:bg-card hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
           collapsed ? "justify-center px-0 py-2" : "px-2.5 py-2",
@@ -93,7 +64,7 @@ export function Sidebar() {
         )}
       >
         <Icon className="size-[17px] shrink-0" strokeWidth={1.8} />
-        {!collapsed && label}
+        {!collapsed && n.label}
       </Link>
     );
   };
@@ -101,7 +72,7 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        "flex flex-none flex-col border-r border-border bg-card/40 p-3 transition-[width] duration-200",
+        "hidden flex-none flex-col border-r border-border bg-card/40 p-3 transition-[width] duration-200 lg:flex",
         collapsed ? "w-[60px]" : "w-[236px]",
       )}
     >
@@ -124,9 +95,9 @@ export function Sidebar() {
       </div>
 
       <nav className="flex flex-col gap-0.5">
-        {main.map((n) => item(n.href, n.label, n.icon))}
+        {primary.map((n) => item(n))}
 
-        {(canMembers || canRoles) && (
+        {admin.length > 0 && (
           <>
             {collapsed ? (
               <div className="my-1.5 border-t border-border" />
@@ -135,8 +106,7 @@ export function Sidebar() {
                 Administração
               </div>
             )}
-            {canMembers && item("/admin/membros", "Membros", Users)}
-            {canRoles && item("/admin/perfis", "Perfis e permissões", ShieldCheck)}
+            {admin.map((n) => item(n))}
           </>
         )}
       </nav>
@@ -163,40 +133,40 @@ export function Sidebar() {
 
         {/* Perfil + sair */}
         <div className={cn("flex items-center gap-2", collapsed && "flex-col")}>
-        <Link
-          href="/conta"
-          title={collapsed ? accountName : undefined}
-          className={cn(
-            "flex min-w-0 items-center gap-2.5 rounded-lg outline-none transition-colors hover:bg-card focus-visible:ring-2 focus-visible:ring-ring",
-            collapsed ? "p-1" : "flex-1 p-1.5",
-            pathname.startsWith("/conta") && "bg-accent",
-          )}
-        >
-          <span
+          <Link
+            href="/conta"
+            title={collapsed ? accountName : undefined}
             className={cn(
-              "flex size-8 shrink-0 items-center justify-center rounded-full border text-[11px] font-medium",
-              pathname.startsWith("/conta")
-                ? "border-muted-foreground/40 bg-accent text-foreground"
-                : "border-border bg-card text-muted-foreground",
+              "flex min-w-0 items-center gap-2.5 rounded-lg outline-none transition-colors hover:bg-card focus-visible:ring-2 focus-visible:ring-ring",
+              collapsed ? "p-1" : "flex-1 p-1.5",
+              pathname.startsWith("/conta") && "bg-accent",
             )}
           >
-            {me.data?.name ? initials(me.data.name) : <User className="size-4" />}
-          </span>
-          {!collapsed && (
-            <div className="min-w-0 leading-tight">
-              <div className="truncate text-[12.5px] font-medium">{accountName}</div>
-              <div className="text-[11px] text-muted-foreground">Ver conta</div>
-            </div>
-          )}
-        </Link>
-        <button
-          onClick={logout}
-          title="Sair"
-          aria-label="Sair"
-          className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-card hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <LogOut className="size-[17px]" strokeWidth={1.8} />
-        </button>
+            <span
+              className={cn(
+                "flex size-8 shrink-0 items-center justify-center rounded-full border text-[11px] font-medium",
+                pathname.startsWith("/conta")
+                  ? "border-muted-foreground/40 bg-accent text-foreground"
+                  : "border-border bg-card text-muted-foreground",
+              )}
+            >
+              {me.data?.name ? initials(me.data.name) : <User className="size-4" />}
+            </span>
+            {!collapsed && (
+              <div className="min-w-0 leading-tight">
+                <div className="truncate text-[12.5px] font-medium">{accountName}</div>
+                <div className="text-[11px] text-muted-foreground">Ver conta</div>
+              </div>
+            )}
+          </Link>
+          <button
+            onClick={logout}
+            title="Sair"
+            aria-label="Sair"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-card hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <LogOut className="size-[17px]" strokeWidth={1.8} />
+          </button>
         </div>
       </div>
     </aside>

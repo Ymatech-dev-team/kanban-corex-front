@@ -56,11 +56,15 @@ export function TaskCard({
   onOpen,
   membersById,
   clientName,
+  projectName,
+  asButton,
 }: {
   task: Task;
   onOpen?: () => void;
   membersById: Record<string, string>;
   clientName?: string; // "kicker" de cliente no topo — só na visão global que cruza clientes [tarefas-visao-global]
+  projectName?: string; // segundo segmento do kicker (cliente · projeto) — usado na Lista mobile [shell-mobile]
+  asButton?: boolean; // torna o card acionável por teclado (Enter/Espaço) + foco visível [shell-mobile a11y]
 }) {
   const done = task.status === "DONE";
   const due = dueTag(task.dueDate, task.status);
@@ -68,19 +72,34 @@ export function TaskCard({
   const bars = BARS[task.priority];
   const subs = task.subtasks ?? [];
   const subDone = subs.filter((s) => s.done).length;
+  const kicker = clientName ? (projectName ? `${clientName} · ${projectName}` : clientName) : undefined;
 
   return (
     <article
       onClick={onOpen}
+      role={asButton ? "button" : undefined}
+      tabIndex={asButton ? 0 : undefined}
+      aria-label={asButton ? task.title : undefined}
+      onKeyDown={
+        asButton
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onOpen?.();
+              }
+            }
+          : undefined
+      }
       className={cn(
         "rounded-xl border border-border bg-card p-3 transition-colors hover:border-muted-foreground/40",
         onOpen && "cursor-pointer",
+        asButton && "outline-none focus-visible:ring-2 focus-visible:ring-ring",
         urgent && "rounded-l-none border-l-[3px] border-l-amber",
       )}
     >
-      {clientName && (
-        <div className="mb-1 truncate text-[11px] text-muted-foreground" title={clientName}>
-          {clientName}
+      {kicker && (
+        <div className="mb-1 truncate text-[11px] text-muted-foreground" title={kicker}>
+          {kicker}
         </div>
       )}
       <div className={cn("mb-2.5 text-[13.5px] leading-snug", done && "text-muted-foreground line-through")}>
@@ -89,7 +108,7 @@ export function TaskCard({
       <div className="flex items-center justify-between gap-2.5">
         <div className="flex items-center gap-2.5 text-[11.5px] text-muted-foreground">
           {!done && (
-            <span className="inline-flex h-3 items-end gap-[2px]" aria-label={`Prioridade ${PRIO_LABEL[task.priority]}`}>
+            <span className="inline-flex h-3 items-end gap-[2px]" aria-hidden>
               {bars.map((h, i) => (
                 <i
                   key={i}

@@ -127,7 +127,7 @@ export function GlobalCreateTaskDialog({
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <SelectRow
               label="Cliente"
               value={cliente}
@@ -169,7 +169,7 @@ export function GlobalCreateTaskDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="gt-due">Prazo (opcional)</Label>
               <Input id="gt-due" type="date" value={due} onChange={(e) => setDue(e.target.value)} />

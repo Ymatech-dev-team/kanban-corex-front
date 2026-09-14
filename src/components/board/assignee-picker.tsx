@@ -34,23 +34,23 @@ export function AssigneePicker({ members, value, onChange, disabled }: Props) {
       <DropdownMenuTrigger
         disabled={disabled}
         className={cn(
-          "flex items-center gap-2 rounded-lg border border-border bg-card px-2.5 py-1.5 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 enabled:hover:border-muted-foreground/40",
+          "flex h-9 w-full items-center gap-2 rounded-lg border border-border bg-card px-2.5 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 enabled:hover:border-muted-foreground/40",
         )}
       >
         {current ? (
           <>
             <Avatar name={current.name} />
-            <span>{current.name}</span>
+            <span className="min-w-0 truncate">{current.name}</span>
           </>
         ) : (
           <>
             <span className="flex size-[22px] shrink-0 items-center justify-center rounded-full border border-dashed border-muted-foreground/50 text-muted-foreground/60">
               <User className="size-3" />
             </span>
-            <span className="text-muted-foreground">Sem responsável</span>
+            <span className="min-w-0 truncate text-muted-foreground">Sem responsável</span>
           </>
         )}
-        <ChevronDown className="ml-1 size-3.5 text-muted-foreground" />
+        <ChevronDown className="ml-auto size-3.5 shrink-0 text-muted-foreground" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="max-h-64 overflow-y-auto">
         <DropdownMenuItem active={value === null} onSelect={() => onChange(null)}>
