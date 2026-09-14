@@ -5,6 +5,7 @@ import type { Task } from "@/lib/types";
 import type { TaskPriority, TaskStatus } from "@sistema-tasks/contracts";
 import { initials } from "@/lib/initials";
 import { dueState } from "@/lib/due";
+import { TaskCard } from "@/components/board/task-card";
 import { cn } from "@/lib/utils";
 
 const STATUS_LABEL: Record<TaskStatus, string> = { TODO: "A fazer", DOING: "Fazendo", DONE: "Feito" };
@@ -37,7 +38,17 @@ export function TaskList({
 
   return (
     <div className="flex-1 overflow-auto p-6">
-      <div className="overflow-x-auto rounded-xl border border-border bg-card">
+      {/* Mobile: cards (um por tarefa, mesma ordem da tabela). Reusa o TaskCard. [shell-mobile] */}
+      <ul className="flex flex-col gap-2.5 lg:hidden">
+        {rows.map((t) => (
+          <li key={t.id}>
+            <TaskCard task={t} onOpen={() => onOpenTask(t.id)} membersById={membersById} asButton />
+          </li>
+        ))}
+      </ul>
+
+      {/* Desktop: tabela */}
+      <div className="hidden overflow-x-auto rounded-xl border border-border bg-card lg:block">
         <table className="w-full min-w-[640px] border-collapse text-[13px]">
           <thead>
             <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground/70">

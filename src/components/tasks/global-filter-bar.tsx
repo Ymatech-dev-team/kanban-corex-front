@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import * as Dialog from "@radix-ui/react-dialog";
 import { ChevronDown, ChevronRight, ListFilter, X } from "lucide-react";
 import type { TaskPriority } from "@sistema-tasks/contracts";
 import type { Member, Engagement, Project } from "@/lib/types";
@@ -20,6 +19,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
+import { SheetSelect } from "@/components/ui/sheet-select";
 import { cn } from "@/lib/utils";
 
 const STATUS_OPTS: { v: StatusFilter; label: string }[] = [
@@ -134,63 +135,6 @@ function Chip({ k, v, onRemove }: { k: string; v: string; onRemove: () => void }
   );
 }
 
-/** Select inline do bottom sheet (mobile) — expande a lista NO PRÓPRIO sheet (sem dropdown/portal
- *  aninhado dentro do Dialog, que brigaria por foco/z-index). [shell-mobile] */
-function SheetSelect<T extends string>({
-  label,
-  selected,
-  options,
-  onSelect,
-  disabled,
-  hint,
-}: {
-  label: string;
-  selected: T | undefined;
-  options: { value: T | undefined; label: string }[];
-  onSelect: (v: T | undefined) => void;
-  disabled?: boolean;
-  hint?: string;
-}) {
-  const [open, setOpen] = useState(false);
-  const currentLabel = options.find((o) => o.value === selected)?.label ?? options[0]?.label ?? "";
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-[11px] text-muted-foreground">{label}</span>
-      <button
-        type="button"
-        disabled={disabled}
-        aria-expanded={open}
-        onClick={() => setOpen((o) => !o)}
-        className="flex h-10 items-center justify-between gap-2 rounded-lg border border-input bg-card px-3 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        <span className="truncate">{currentLabel}</span>
-        <ChevronDown className={cn("size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} aria-hidden />
-      </button>
-      {disabled && hint && <span className="text-[11px] text-muted-foreground">{hint}</span>}
-      {open && !disabled && (
-        <div className="max-h-52 overflow-y-auto rounded-lg border border-border bg-card">
-          {options.map((o) => (
-            <button
-              key={o.value ?? "_all"}
-              type="button"
-              onClick={() => {
-                onSelect(o.value);
-                setOpen(false);
-              }}
-              className={cn(
-                "flex w-full items-center px-3 py-2.5 text-left text-[13px] outline-none transition-colors",
-                o.value === selected ? "bg-accent text-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:bg-accent",
-              )}
-            >
-              {o.label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 /** Grupo de pills de escolha única (Status/Prioridade/Prazo) no sheet. Ativo = neutro (bg-accent). */
 function PillGroup<T extends string>({
   label,
@@ -285,119 +229,89 @@ export function GlobalFilterBar({
       {/* ---------- MOBILE (< lg): view switcher + botão Filtros → bottom sheet ---------- */}
       <div className="flex items-center gap-2 px-4 py-2.5 lg:hidden">
         <ViewSwitcher view={view} onView={onView} />
-        <Dialog.Root open={sheetOpen} onOpenChange={setSheetOpen}>
-          <Dialog.Trigger asChild>
-            <button type="button" className={cn(trigBase, "ml-auto", mobileCount > 0 ? trigActive : trigIdle)}>
-              <ListFilter className="size-3.5" aria-hidden />
-              Filtros
-              {mobileCount > 0 && (
-                <span className="flex min-w-[15px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
-                  {mobileCount}
-                </span>
-              )}
-            </button>
-          </Dialog.Trigger>
-          <Dialog.Portal>
-            <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0" />
-            <Dialog.Content className="fixed inset-x-0 bottom-0 z-50 flex max-h-[82dvh] flex-col rounded-t-2xl border-t border-border bg-card pb-[env(safe-area-inset-bottom)] shadow-xl duration-200 data-[state=open]:animate-in data-[state=open]:slide-in-from-bottom data-[state=closed]:animate-out data-[state=closed]:slide-out-to-bottom">
-              <div className="flex justify-center pb-1 pt-2.5">
-                <span className="h-1 w-9 rounded-full bg-muted-foreground/30" aria-hidden />
-              </div>
-              <div className="flex items-center justify-between px-4 pb-2">
-                <Dialog.Title className="text-[15px] font-medium tracking-tight">Filtros</Dialog.Title>
-                <Dialog.Close asChild>
-                  <button
-                    type="button"
-                    aria-label="Fechar filtros"
-                    className="flex size-9 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <X className="size-5" />
-                  </button>
-                </Dialog.Close>
-              </div>
-              <Dialog.Description className="sr-only">Filtros das tarefas</Dialog.Description>
-
-              <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4">
-                <SheetSelect
-                  label="Cliente"
-                  selected={filters.cliente}
-                  options={clientOpts}
-                  onSelect={(v) => set({ cliente: v, projeto: undefined })}
-                />
-                <SheetSelect
-                  label="Projeto"
-                  selected={filters.projeto}
-                  options={projOpts}
-                  onSelect={(v) => set({ projeto: v })}
-                  disabled={projectoDisabled}
-                  hint={!filters.cliente ? "Selecione um cliente primeiro" : "Carregando…"}
-                />
-                <SheetSelect
-                  label="Responsável"
-                  selected={filters.resp}
-                  options={respOpts}
-                  onSelect={(v) => set({ resp: v })}
-                  disabled={respDisabled}
-                  hint="Carregando…"
-                />
-                {view !== "kanban" && (
-                  <PillGroup
-                    label="Status"
-                    selected={filters.status}
-                    options={STATUS_OPTS.map((o) => ({ value: o.v, label: o.label }))}
-                    onSelect={(v) => set({ status: (v as StatusFilter) ?? "ATIVAS" })}
-                  />
-                )}
-                <PillGroup
-                  label="Prioridade"
-                  selected={filters.prio}
-                  options={[{ value: undefined, label: "Todas" }, ...PRIO_OPTS.map((o) => ({ value: o.v, label: o.label }))]}
-                  onSelect={(v) => set({ prio: v as TaskPriority | undefined })}
-                />
-                <PillGroup
-                  label="Prazo"
-                  selected={filters.prazo}
-                  options={[{ value: undefined, label: "Qualquer" }, ...PRAZO_OPTS.map((o) => ({ value: o.v, label: o.label }))]}
-                  onSelect={(v) => set({ prazo: v as PrazoPreset | undefined })}
-                />
-              </div>
-
-              <div className="flex items-center gap-3 border-t border-border px-4 py-3">
-                {hasAnyFilter(filters) && (
-                  <button
-                    type="button"
-                    onClick={() => onChange({ ...DEFAULT_FILTERS })}
-                    className="text-[12.5px] text-muted-foreground underline decoration-muted-foreground/40 underline-offset-2 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    Limpar filtros
-                  </button>
-                )}
-                {showOpenBoard && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSheetOpen(false);
-                      onOpenBoard();
-                    }}
-                    className="inline-flex items-center gap-1 text-[12.5px] text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    Abrir projeto
-                    <ChevronRight className="size-3.5" aria-hidden />
-                  </button>
-                )}
-                <Dialog.Close asChild>
-                  <button
-                    type="button"
-                    className="ml-auto inline-flex h-9 items-center rounded-lg bg-secondary px-4 text-[13px] font-medium text-secondary-foreground outline-none transition-colors hover:bg-secondary/80 focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    {countLabel ? `Ver ${countLabel}` : "Fechar"}
-                  </button>
-                </Dialog.Close>
-              </div>
-            </Dialog.Content>
-          </Dialog.Portal>
-        </Dialog.Root>
+        <button
+          type="button"
+          onClick={() => setSheetOpen(true)}
+          className={cn(trigBase, "ml-auto", mobileCount > 0 ? trigActive : trigIdle)}
+        >
+          <ListFilter className="size-3.5" aria-hidden />
+          Filtros
+          {mobileCount > 0 && (
+            <span className="flex min-w-[15px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
+              {mobileCount}
+            </span>
+          )}
+        </button>
       </div>
+      <BottomSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        title="Filtros"
+        footer={
+          <>
+            {hasAnyFilter(filters) && (
+              <button
+                type="button"
+                onClick={() => onChange({ ...DEFAULT_FILTERS })}
+                className="text-[12.5px] text-muted-foreground underline decoration-muted-foreground/40 underline-offset-2 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                Limpar filtros
+              </button>
+            )}
+            {showOpenBoard && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSheetOpen(false);
+                  onOpenBoard();
+                }}
+                className="inline-flex items-center gap-1 text-[12.5px] text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                Abrir projeto
+                <ChevronRight className="size-3.5" aria-hidden />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setSheetOpen(false)}
+              className="ml-auto inline-flex h-9 items-center rounded-lg bg-secondary px-4 text-[13px] font-medium text-secondary-foreground outline-none transition-colors hover:bg-secondary/80 focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {countLabel ? `Ver ${countLabel}` : "Fechar"}
+            </button>
+          </>
+        }
+      >
+        <SheetSelect label="Cliente" selected={filters.cliente} options={clientOpts} onSelect={(v) => set({ cliente: v, projeto: undefined })} />
+        <SheetSelect
+          label="Projeto"
+          selected={filters.projeto}
+          options={projOpts}
+          onSelect={(v) => set({ projeto: v })}
+          disabled={projectoDisabled}
+          hint={!filters.cliente ? "Selecione um cliente primeiro" : "Carregando…"}
+        />
+        <SheetSelect label="Responsável" selected={filters.resp} options={respOpts} onSelect={(v) => set({ resp: v })} disabled={respDisabled} hint="Carregando…" />
+        {view !== "kanban" && (
+          <PillGroup
+            label="Status"
+            selected={filters.status}
+            options={STATUS_OPTS.map((o) => ({ value: o.v, label: o.label }))}
+            onSelect={(v) => set({ status: (v as StatusFilter) ?? "ATIVAS" })}
+          />
+        )}
+        <PillGroup
+          label="Prioridade"
+          selected={filters.prio}
+          options={[{ value: undefined, label: "Todas" }, ...PRIO_OPTS.map((o) => ({ value: o.v, label: o.label }))]}
+          onSelect={(v) => set({ prio: v as TaskPriority | undefined })}
+        />
+        <PillGroup
+          label="Prazo"
+          selected={filters.prazo}
+          options={[{ value: undefined, label: "Qualquer" }, ...PRAZO_OPTS.map((o) => ({ value: o.v, label: o.label }))]}
+          onSelect={(v) => set({ prazo: v as PrazoPreset | undefined })}
+        />
+      </BottomSheet>
 
       {/* ---------- DESKTOP (≥ lg): barra completa atual ---------- */}
       <div className="hidden flex-col gap-2 px-6 py-3 lg:flex">
