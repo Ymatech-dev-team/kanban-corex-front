@@ -594,7 +594,7 @@ function Segmented<T extends string>({
   label?: string;
 }) {
   return (
-    <div role="group" aria-label={label} className="flex gap-0.5 rounded-lg border border-border bg-card p-[3px]">
+    <div role="group" aria-label={label} className="inline-flex w-fit gap-0.5 rounded-lg border border-border bg-card p-[3px]">
       {options.map((o) => (
         <button
           key={o.value}
@@ -603,7 +603,7 @@ function Segmented<T extends string>({
           aria-pressed={value === o.value}
           onClick={() => onChange(o.value)}
           className={cn(
-            "flex-1 rounded-md px-2.5 py-1.5 text-[12.5px] transition-colors disabled:opacity-60",
+            "whitespace-nowrap rounded-md px-3 py-1.5 text-[12.5px] transition-colors disabled:opacity-60",
             value === o.value ? "bg-accent text-foreground" : "text-muted-foreground enabled:hover:text-foreground",
           )}
         >
