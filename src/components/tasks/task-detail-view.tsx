@@ -316,7 +316,7 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
           if (e.key === "Enter") e.preventDefault(); // título é uma linha lógica; não insere quebra
         }}
         maxLength={200}
-        className="min-h-0 resize-none overflow-hidden border-0 bg-transparent px-0 py-0 text-xl font-medium leading-tight tracking-tight focus-visible:ring-0"
+        className="min-h-0 resize-none overflow-hidden border-0 bg-transparent px-0 py-0 text-xl font-medium leading-tight tracking-tight shadow-none focus-visible:ring-0"
       />
 
       <div className="flex flex-wrap gap-x-8 gap-y-3">
