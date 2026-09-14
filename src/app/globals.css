@@ -158,48 +158,89 @@ body {
   font-family: var(--font-inter), Inter, system-ui, -apple-system, sans-serif;
 }
 
-/* Dot grid sutil no fundo da área do app (cara de quadro/canvas). Atrás do conteúdo. */
-.app-dots {
+/* Fundo da área do app: no DARK usa a aurora âmbar (.app-aurora abaixo); no CLARO mantém o dot
+   grid sutil — a aurora borrada sobre fundo claro fica encardida e come a borda dos cards. [fundo-aurora] */
+:root.light .app-dots {
   background-image: radial-gradient(var(--dot-color) 1.4px, transparent 1.4px);
   background-size: 20px 20px;
   background-position: -1px -1px;
 }
 
-/* Aurora sutil do fundo do login — brilhos da marca flutuando devagar. */
-@keyframes sdt-drift-a {
-  0%,
-  100% {
-    transform: translate(0, 0) scale(1);
-  }
-  50% {
-    transform: translate(48px, 36px) scale(1.18);
-  }
+/* Aurora do fundo do app (só dark): focos âmbar borrados flutuando devagar, atrás do conteúdo.
+   Enviesada pro âmbar (#e8912a) pra não competir com o amarelo-ponteiro dos componentes. [fundo-aurora] */
+.app-aurora {
+  position: absolute;
+  inset: 0;
+  overflow: hidden; /* clipa os blobs aqui, não no <main> (não corta sticky/scroll das telas) */
+  pointer-events: none;
+  z-index: 0;
 }
-@keyframes sdt-drift-b {
-  0%,
-  100% {
-    transform: translate(0, 0) scale(1.12);
-  }
-  50% {
-    transform: translate(-56px, -24px) scale(1);
-  }
+:root.light .app-aurora {
+  display: none;
 }
-@keyframes sdt-drift-c {
-  0%,
-  100% {
-    transform: translate(0, 0) scale(1);
-    opacity: 0.5;
-  }
-  50% {
-    transform: translate(30px, -40px) scale(1.1);
-    opacity: 0.85;
-  }
-}
-.sdt-aurora {
+.app-aurora__blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(48px);
   will-change: transform;
 }
+.app-aurora__blob--1 {
+  width: 40rem;
+  height: 40rem;
+  left: -8rem;
+  top: -12rem;
+  background: radial-gradient(circle, rgba(232, 145, 42, 0.16), transparent 68%);
+  animation: app-aurora-1 32s ease-in-out infinite;
+}
+.app-aurora__blob--2 {
+  width: 34rem;
+  height: 34rem;
+  right: -10rem;
+  bottom: -12rem;
+  background: radial-gradient(circle, rgba(232, 145, 42, 0.14), transparent 68%);
+  animation: app-aurora-2 38s ease-in-out infinite;
+}
+.app-aurora__blob--3 {
+  width: 26rem;
+  height: 26rem;
+  left: 55%;
+  top: 30%;
+  background: radial-gradient(circle, rgba(255, 198, 0, 0.1), transparent 70%);
+  animation: app-aurora-3 30s ease-in-out infinite;
+}
+@keyframes app-aurora-1 {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(50px, 36px) scale(1.06);
+  }
+}
+@keyframes app-aurora-2 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1.05);
+  }
+  50% {
+    transform: translate(-58px, -26px) scale(1);
+  }
+}
+@keyframes app-aurora-3 {
+  0%,
+  100% {
+    transform: translate(0, 0);
+    opacity: 0.6;
+  }
+  50% {
+    transform: translate(34px, -40px) scale(1.07);
+    opacity: 0.9;
+  }
+}
+/* Menos movimento: mira os BLOBS (a animação vive neles, não no container). */
 @media (prefers-reduced-motion: reduce) {
-  .sdt-aurora {
+  .app-aurora__blob {
     animation: none !important;
+    will-change: auto;
   }
 }
