@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   KeyboardSensor,
   useSensor,
   useSensors,
@@ -62,13 +63,21 @@ function SortableCard({
     id: task.id,
     disabled: dragDisabled,
   });
+  // No touch: segurar (delay do TouchSensor) levanta o card; swipe/scroll passa reto. touch-action
+  // fica em "manipulation" (NUNCA "none", que mataria o scroll da coluna); select-none/touch-callout
+  // evitam seleção de texto e menu de contexto no long-press. [painel]
   return (
     <div
       ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
-      className={isDragging ? "opacity-40" : undefined}
-      {...attributes}
-      {...listeners}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        touchAction: "manipulation",
+        WebkitTouchCallout: "none",
+      }}
+      className={isDragging ? "select-none opacity-40" : "select-none"}
+      {...(dragDisabled ? {} : attributes)}
+      {...(dragDisabled ? {} : listeners)}
     >
       <TaskCard task={task} onOpen={onOpen} membersById={membersById} clientName={clientName} />
     </div>
@@ -104,11 +113,22 @@ export function KanbanBoard({
   const move = useMoveTask(projectId, engagementId);
   const applyMove = onMove ?? move.mutate; // global injeta o próprio move; board usa o por-projeto
   const [activeId, setActiveId] = useState<string | null>(null);
+  // Guarda contra "clique fantasma" pós-toque: depois de um drag o click sintético pode chamar
+  // onOpen sem querer. Marcamos durante o drag e liberamos no tick seguinte. [painel]
+  const draggedRef = useRef(false);
 
+  // Mouse (desktop) e Touch (celular) separados: no toque, arrastar só após segurar ~220ms — swipe
+  // rápido rola a coluna (passa da tolerância antes do delay) e toque simples abre. [painel / shell-mobile]
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
+
+  function openGuarded(id: string) {
+    if (draggedRef.current) return; // veio de um drag, não abre
+    onOpenTask(id);
+  }
 
   const byColumn = useMemo(() => {
     const map: Record<TaskStatus, Task[]> = { TODO: [], DOING: [], DONE: [] };
@@ -122,11 +142,21 @@ export function KanbanBoard({
   const activeTask = activeId ? tasks.find((t) => t.id === activeId) ?? null : null;
 
   function handleDragStart(e: DragStartEvent) {
+    draggedRef.current = true;
+    if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate(12); // haptic (Android)
     setActiveId(String(e.active.id));
+  }
+
+  function releaseDragGuard() {
+    // solta no próximo tick, depois do click sintético do toque ter passado
+    setTimeout(() => {
+      draggedRef.current = false;
+    }, 0);
   }
 
   function handleDragEnd(e: DragEndEvent) {
     setActiveId(null);
+    releaseDragGuard();
     const { active, over } = e;
     if (!over) return;
     const overId = String(over.id);
@@ -159,7 +189,10 @@ export function KanbanBoard({
       collisionDetection={closestCorners}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
-      onDragCancel={() => setActiveId(null)}
+      onDragCancel={() => {
+        setActiveId(null);
+        releaseDragGuard();
+      }}
     >
       <div className="grid flex-1 grid-cols-1 gap-4 overflow-auto p-6 md:grid-cols-3">
         {COLUMNS.map((col) => (
@@ -171,7 +204,7 @@ export function KanbanBoard({
             items={byColumn[col.status]}
             membersById={membersById}
             dragDisabled={dragDisabled}
-            onOpenTask={onOpenTask}
+            onOpenTask={openGuarded}
             onAddTask={onAddTask}
             clientNameById={clientNameById}
             showClient={showClient}
@@ -180,11 +213,13 @@ export function KanbanBoard({
       </div>
       <DragOverlay>
         {activeTask ? (
-          <TaskCard
-            task={activeTask}
-            membersById={membersById}
-            clientName={showClient ? clientNameById?.[activeTask.projectId] : undefined}
-          />
+          <div className="scale-[1.02] rounded-xl shadow-md ring-1 ring-border">
+            <TaskCard
+              task={activeTask}
+              membersById={membersById}
+              clientName={showClient ? clientNameById?.[activeTask.projectId] : undefined}
+            />
+          </div>
         ) : null}
       </DragOverlay>
     </DndContext>
