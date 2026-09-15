@@ -13,12 +13,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="flex min-w-0 flex-1 flex-col">
           <MobileTopBar />
           <main className="app-dots relative flex min-h-0 flex-1 flex-col">
-            {/* Aurora âmbar decorativa (só dark) atrás do conteúdo. [fundo-aurora] */}
-            <div className="app-aurora" aria-hidden="true">
-              <div className="app-aurora__blob app-aurora__blob--1" />
-              <div className="app-aurora__blob app-aurora__blob--2" />
-              <div className="app-aurora__blob app-aurora__blob--3" />
-            </div>
+            {/* Corex: fundo grafite liso (aurora removida — glow proibido na régua da marca). */}
             <div className="relative z-[1] flex min-h-0 min-w-0 flex-1 flex-col">{children}</div>
           </main>
           <MobileBottomNav />

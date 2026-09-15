@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { ProjectBoard } from "@/components/board/project-board";
 
-export const metadata: Metadata = { title: "Projeto — YMALOG" };
+export const metadata: Metadata = { title: "Projeto — Corex" };
 
 export default async function ProjetoBoardPage({
   params,

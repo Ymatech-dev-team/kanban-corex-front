@@ -524,7 +524,7 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
       <CostLine taskId={task.id} enabled={canSeeCost} />
 
       {canEdit && dirty && (
-        <div className="sticky bottom-0 z-10 -mx-1 mt-1 flex justify-end gap-2 border-t border-border bg-background/95 px-1 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <div className="sticky bottom-0 z-10 -mx-1 mt-1 flex justify-end gap-2 border-t border-border bg-background px-1 py-3">
           <Button type="button" variant="secondary" onClick={discard}>
             Descartar
           </Button>

@@ -6,7 +6,7 @@ import { useNavItems, isNavActive } from "./use-nav-items";
 import { cn } from "@/lib/utils";
 
 /** Barra de navegação inferior (mobile). Em FLUXO (flex-none) — reserva altura e nunca cobre o
- *  conteúdo/scroll das telas. Fundo sólido (a aurora fica atrás). [shell-mobile] */
+ *  conteúdo/scroll das telas. Fundo sólido grafite. [shell-mobile] */
 export function MobileBottomNav() {
   const pathname = usePathname();
   const { primary } = useNavItems();

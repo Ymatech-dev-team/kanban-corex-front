@@ -76,20 +76,15 @@ export function Sidebar() {
         collapsed ? "w-[60px]" : "w-[236px]",
       )}
     >
-      {/* Marca — logo YMALOG (expandida) / "Y" (recolhida) */}
+      {/* Marca — wordmark COREX. (expandida) / símbolo (recolhida) */}
       <div className={cn("pb-4 pt-4", collapsed ? "flex justify-center" : "px-2")}>
         {collapsed ? (
-          <div
-            role="img"
-            aria-label="YMALOG"
-            className="flex size-7 items-center justify-center rounded-md bg-primary text-[15px] font-bold text-primary-foreground"
-          >
-            Y
-          </div>
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src="/icons/icon-192.png" alt="Corex" className="size-7 rounded-md" />
         ) : (
           <div className="brand-plaque inline-flex items-center rounded-lg px-2.5 py-1.5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-ymalog.png" alt="YMALOG" className="h-5 w-auto" />
+            <img src="/corex-logo-wordmark.png" alt="Corex" className="h-5 w-auto" />
           </div>
         )}
       </div>

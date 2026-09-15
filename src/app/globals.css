@@ -1,21 +1,23 @@
 @import "tailwindcss";
 
 /*
-  Design System do Sistema de Tasks — dark-first, identidade YMA. [design.md §9]
+  Design System — dark-first, identidade COREX. [reskin 2026-09-15]
   3 camadas: primitivo → semântico (o que shadcn/Tailwind consomem) → componente.
-  INVARIANTE travado: --primary-foreground é near-black (nunca branco sobre amarelo). [DS]
+  Marca = verde-menta (acento, ≤10% da tela); texto SOBRE o verde = verde-escuro (nunca branco).
+  Os nomes --yma-* são históricos; os VALORES são Corex (troca de valor propaga o app inteiro).
 */
 :root {
-  /* camada 1 — primitivos (único lugar com hex) */
-  --yma-yellow-500: #ffc600;
-  --yma-neutral-950: #0a0a0a;
-  --yma-neutral-900: #141414;
-  --yma-neutral-800: #1f1f1f;
-  --yma-neutral-700: #2e2e2e;
-  --yma-neutral-400: #a1a1a1;
-  --yma-neutral-50: #fafafa;
-  --yma-red-500: #e5484d;
-  --yma-amber-500: #e8912a;
+  /* camada 1 — primitivos (único lugar com hex) — paleta Corex */
+  --yma-yellow-500: #34f5c5; /* verde-menta — cor de marca (acento) */
+  --primary-ink: #04231c; /* verde-escuro — texto/ícone SOBRE o verde */
+  --yma-neutral-950: #0a0d12; /* grafite — fundo */
+  --yma-neutral-900: #12161e; /* card / popover */
+  --yma-neutral-800: #161c25; /* superfície elevada / hover / accent */
+  --yma-neutral-700: #232a33; /* borda / input */
+  --yma-neutral-400: #9aa3ad; /* texto secundário */
+  --yma-neutral-50: #ffffff; /* texto principal (ink) */
+  --yma-red-500: #e3855a; /* danger / terracota (erro) */
+  --yma-amber-500: #e3b45a; /* warn / âmbar (aviso) — semântico, NÃO é marca */
 
   /* camada 2 — semânticos (dark-first) */
   --background: var(--yma-neutral-950);
@@ -25,7 +27,7 @@
   --popover: var(--yma-neutral-800);
   --popover-foreground: var(--yma-neutral-50);
   --primary: var(--yma-yellow-500);
-  --primary-foreground: var(--yma-neutral-950); /* near-black — nunca branco */
+  --primary-foreground: var(--primary-ink); /* verde-escuro — nunca branco sobre a menta */
   --secondary: var(--yma-neutral-800);
   --secondary-foreground: var(--yma-neutral-50);
   --muted: var(--yma-neutral-800);
@@ -39,16 +41,13 @@
   --ring: var(--yma-yellow-500);
   --radius: 0.5rem;
 
-  /* cor dos pontinhos do fundo (dot grid) — claro e discreto no escuro */
-  --dot-color: rgba(255, 255, 255, 0.09);
-
   color-scheme: dark;
 }
 
 /*
-  Modo claro — ativado por `.light` no <html>. Mantém o amarelo do BOTÃO (lê bem no claro)
-  e o primary-foreground near-black (invariante). O amber de atenção escurece: como #e8912a
-  (dark-first) reprova contraste como texto/ícone pequeno sobre branco, no claro vira um
+  Modo claro — ativado por `.light` no <html>. A menta pura reprova contraste no branco, então a marca
+  vira teal escuro (ver abaixo). O amber de atenção também escurece: o âmbar dark-first (#e3b45a)
+  reprova como texto/ícone pequeno sobre branco, no claro vira um
   âmbar mais escuro que passa AA (texto, dot e barra-left de urgência). [review UX 2026-09-10]
 */
 :root.light {
@@ -61,7 +60,14 @@
   --yma-l-muted: #6b6b74;
   --yma-amber-500: #b45309; /* âmbar de atenção legível no claro (≥4.5:1 como texto pequeno) */
 
-  /* semânticos (só o que muda; primary/ring/destructive herdam; amber escurece acima) */
+  /* Marca no claro: a menta pura reprova contraste sobre branco (botão some, texto ilegível). Vira um
+     teal-Corex escuro que passa AA — botão sólido com TEXTO BRANCO. A Corex é dark-only, isto é só
+     pra não quebrar o toggle de tema do app. [painel a11y] */
+  --primary: #0a7d63;
+  --primary-foreground: #ffffff;
+  --ring: #0a7d63;
+
+  /* semânticos (só o que muda; destructive herda; amber escurece acima) */
   --background: var(--yma-l-bg);
   --foreground: var(--yma-l-text);
   --card: var(--yma-l-surface);
@@ -83,12 +89,12 @@
   color-scheme: light;
 }
 
-/* No claro, o amarelo puro some como ícone/texto pequeno → dourado escuro legível. */
+/* No claro, a menta pura some como ícone/texto pequeno → teal-Corex escuro legível (≥5:1 no branco). */
 :root.light .text-primary {
-  color: #a16207;
+  color: #0a7d63;
 }
 :root.light .\[\&_svg\]\:text-primary svg {
-  color: #a16207;
+  color: #0a7d63;
 }
 
 /*
@@ -105,6 +111,9 @@
 */
 .login-dark {
   color-scheme: dark;
+  --primary: var(--yma-yellow-500); /* menta — o login é sempre escuro, mesmo no tema claro */
+  --primary-foreground: var(--primary-ink);
+  --ring: var(--yma-yellow-500);
   --background: var(--yma-neutral-950);
   --foreground: var(--yma-neutral-50);
   --card: var(--yma-neutral-900);
@@ -158,91 +167,12 @@ body {
   font-family: var(--font-inter), Inter, system-ui, -apple-system, sans-serif;
 }
 
-/* Fundo da área do app: no DARK usa a aurora âmbar (.app-aurora abaixo); no CLARO mantém o dot
-   grid sutil — a aurora borrada sobre fundo claro fica encardida e come a borda dos cards. [fundo-aurora] */
+/* Fundo da área do app. Corex é grafite LISO (glow/gradiente decorativo é proibido na régua da marca,
+   então a antiga aurora âmbar foi removida). No CLARO mantém um dot-grid sutil. [reskin Corex] */
 :root.light .app-dots {
   background-image: radial-gradient(var(--dot-color) 1.4px, transparent 1.4px);
   background-size: 20px 20px;
   background-position: -1px -1px;
-}
-
-/* Aurora do fundo do app (só dark): focos âmbar borrados flutuando devagar, atrás do conteúdo.
-   Enviesada pro âmbar (#e8912a) pra não competir com o amarelo-ponteiro dos componentes. [fundo-aurora] */
-.app-aurora {
-  position: absolute;
-  inset: 0;
-  overflow: hidden; /* clipa os blobs aqui, não no <main> (não corta sticky/scroll das telas) */
-  pointer-events: none;
-  z-index: 0;
-}
-:root.light .app-aurora {
-  display: none;
-}
-.app-aurora__blob {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(48px);
-  will-change: transform;
-}
-.app-aurora__blob--1 {
-  width: 40rem;
-  height: 40rem;
-  left: -8rem;
-  top: -12rem;
-  background: radial-gradient(circle, rgba(232, 145, 42, 0.16), transparent 68%);
-  animation: app-aurora-1 32s ease-in-out infinite;
-}
-.app-aurora__blob--2 {
-  width: 34rem;
-  height: 34rem;
-  right: -10rem;
-  bottom: -12rem;
-  background: radial-gradient(circle, rgba(232, 145, 42, 0.14), transparent 68%);
-  animation: app-aurora-2 38s ease-in-out infinite;
-}
-.app-aurora__blob--3 {
-  width: 26rem;
-  height: 26rem;
-  left: 55%;
-  top: 30%;
-  background: radial-gradient(circle, rgba(255, 198, 0, 0.1), transparent 70%);
-  animation: app-aurora-3 30s ease-in-out infinite;
-}
-@keyframes app-aurora-1 {
-  0%,
-  100% {
-    transform: translate(0, 0);
-  }
-  50% {
-    transform: translate(50px, 36px) scale(1.06);
-  }
-}
-@keyframes app-aurora-2 {
-  0%,
-  100% {
-    transform: translate(0, 0) scale(1.05);
-  }
-  50% {
-    transform: translate(-58px, -26px) scale(1);
-  }
-}
-@keyframes app-aurora-3 {
-  0%,
-  100% {
-    transform: translate(0, 0);
-    opacity: 0.6;
-  }
-  50% {
-    transform: translate(34px, -40px) scale(1.07);
-    opacity: 0.9;
-  }
-}
-/* Menos movimento: mira os BLOBS (a animação vive neles, não no container). */
-@media (prefers-reduced-motion: reduce) {
-  .app-aurora__blob {
-    animation: none !important;
-    will-change: auto;
-  }
 }
 
 /* iOS dá auto-zoom ao focar um campo com fonte < 16px. Em telas de TOQUE, força 16px nos campos

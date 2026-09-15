@@ -62,7 +62,7 @@ export function MobileTopBar() {
               <Dialog.Title asChild>
                 <span className="brand-plaque inline-flex items-center rounded-lg px-2.5 py-1.5">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/logo-ymalog.png" alt="YMALOG" className="h-5 w-auto" />
+                  <img src="/corex-logo-wordmark.png" alt="Corex" className="h-5 w-auto" />
                 </span>
               </Dialog.Title>
               <Dialog.Close asChild>
@@ -132,7 +132,7 @@ export function MobileTopBar() {
 
       <span className="brand-plaque ml-0.5 inline-flex items-center rounded-lg px-2 py-1">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo-ymalog.png" alt="YMALOG" className="h-[18px] w-auto" />
+        <img src="/corex-logo-wordmark.png" alt="Corex" className="h-[18px] w-auto" />
       </span>
 
       <div className="ml-auto flex items-center">

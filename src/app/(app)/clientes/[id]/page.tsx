@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { ClientDetail } from "@/components/client/client-detail";
 
-export const metadata: Metadata = { title: "Cliente — YMALOG" };
+export const metadata: Metadata = { title: "Cliente — Corex" };
 
 export default async function ClienteDetalhePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
