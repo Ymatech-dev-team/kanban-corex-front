@@ -2,7 +2,18 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, CalendarClock, Check, Plus, Trash2, Loader2, AlertTriangle, RefreshCw } from "lucide-react";
+import {
+  ArrowLeft,
+  ArrowUp,
+  ArrowDown,
+  CalendarClock,
+  Check,
+  Plus,
+  Trash2,
+  Loader2,
+  AlertTriangle,
+  RefreshCw,
+} from "lucide-react";
 import { PERMISSIONS, type TaskPriority, type TaskStatus, type UpdateTaskInput } from "@sistema-tasks/contracts";
 import type { CostState, Task } from "@/lib/types";
 import { Input } from "@/components/ui/input";
@@ -15,12 +26,15 @@ import { ActivityTab } from "@/components/board/activity-tab";
 import {
   useTaskDetail,
   useUpdateTask,
+  useMoveTask,
   useDeleteTask,
   useAddSubtask,
   useToggleSubtask,
   useDeleteSubtask,
   errorCode,
 } from "@/lib/hooks/use-tasks";
+import { useEngagementTasks } from "@/lib/hooks/use-engagement-board";
+import { positionForIndex } from "@/lib/position";
 import { useCan } from "@/lib/hooks/use-can";
 import { useProject } from "@/lib/hooks/use-projects";
 import { useProjectMembers } from "@/lib/hooks/use-members";
@@ -101,10 +115,27 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
   const canDelete = useCan(PERMISSIONS.tarefas_excluir);
 
   const update = useUpdateTask(projectId);
+  const move = useMoveTask(projectId, task?.engagementId);
   const del = useDeleteTask(projectId);
   const add = useAddSubtask(taskId);
   const toggle = useToggleSubtask(taskId);
   const removeSub = useDeleteSubtask(taskId);
+
+  // Irmãos da coluna (mesmo engagement + status), pro controle "Posição na coluna". Ordena IGUAL ao
+  // board (position, desempate por id — `position:0` é falsy, então nada de `position || id`). [painel]
+  const engagementTasks = useEngagementTasks(task?.engagementId ?? null);
+  const upRef = useRef<HTMLButtonElement>(null);
+  const downRef = useRef<HTMLButtonElement>(null);
+  const [moveAnnounce, setMoveAnnounce] = useState("");
+  const column = useMemo(() => {
+    if (!task) return null;
+    const list = (engagementTasks.data ?? [])
+      .filter((t) => t.status === task.status)
+      .sort((a, b) => a.position - b.position || (a.id < b.id ? -1 : 1));
+    const index = list.findIndex((t) => t.id === task.id);
+    const others = list.filter((t) => t.id !== task.id).map((t) => t.position);
+    return { others, index, total: list.length };
+  }, [engagementTasks.data, task]);
 
   const [form, setForm] = useState<Form | null>(null);
   // Token de concorrência FIXO no seed — se usasse o updatedAt "ao vivo", o refetch-no-foco o avançaria
@@ -249,6 +280,31 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
     clearDraft();
   }
 
+  // Mover a tarefa 1 posição na coluna (mesmo status). Imediato/otimista, fora do Salvar.
+  // Só quando o form está limpo (senão o /move avançaria o updatedAt e um Save posterior mascararia
+  // conflito de terceiros) — por isso as setas ficam disabled com `dirty`. [painel concorrência]
+  async function moveInColumn(dir: -1 | 1) {
+    if (!task || !column || column.index < 0 || move.isPending) return;
+    const slot = column.index + dir; // ↑ = index-1 · ↓ = index+1 (na lista sem o próprio)
+    if (slot < 0 || slot > column.others.length) return;
+    const position = positionForIndex(column.others, slot);
+    const nextIndex = column.index + dir;
+    try {
+      await move.mutateAsync({ id: task.id, status: task.status, position });
+      // Re-semeia do dado fresco: traz updatedAt/título atuais (pega edição de terceiro) e mantém o
+      // token do Save honesto — bumpar só o updatedAt local mascararia conflito. Como as setas só ficam
+      // ativas com o form limpo, re-semear não descarta edição do usuário. [lente concorrência]
+      seededFor.current = null;
+      detail.refetch();
+      setMoveAnnounce(`Posição ${nextIndex + 1} de ${column.total}`);
+      // Se a seta usada vai desabilitar no limite, joga o foco pra oposta (não perde o foco).
+      if (dir === -1 && nextIndex <= 0) downRef.current?.focus();
+      else if (dir === 1 && nextIndex >= column.total - 1) upRef.current?.focus();
+    } catch {
+      /* erros já viram toast no hook */
+    }
+  }
+
   function reloadFromServer() {
     setConflict(false);
     clearDraft();
@@ -305,6 +361,9 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
       <div className="sr-only">
         <h1>{form.title || "Detalhe da tarefa"}</h1>
       </div>
+      <span role="status" aria-live="polite" className="sr-only">
+        {moveAnnounce}
+      </span>
       <Textarea
         ref={titleRef}
         value={form.title}
@@ -323,6 +382,38 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
         <Field label="Status">
           <Segmented label="Status" value={form.status} options={STATUSES} disabled={!canEdit} onChange={(v) => setForm({ ...form, status: v })} />
         </Field>
+        {canEdit && column && column.total >= 2 && (
+          <Field label="Posição na coluna">
+            <div className="flex items-center gap-2.5">
+              <div role="group" aria-label="Posição na coluna" className="inline-flex w-fit gap-0.5 rounded-lg border border-border bg-card p-[3px]">
+                <button
+                  ref={upRef}
+                  type="button"
+                  aria-label="Mover uma posição para cima na coluna"
+                  disabled={dirty || engagementTasks.isLoading || column.index <= 0}
+                  onClick={() => moveInColumn(-1)}
+                  className="flex size-8 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors enabled:hover:text-foreground disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <ArrowUp className="size-4" />
+                </button>
+                <button
+                  ref={downRef}
+                  type="button"
+                  aria-label="Mover uma posição para baixo na coluna"
+                  disabled={dirty || engagementTasks.isLoading || column.index < 0 || column.index >= column.total - 1}
+                  onClick={() => moveInColumn(1)}
+                  className="flex size-8 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors enabled:hover:text-foreground disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <ArrowDown className="size-4" />
+                </button>
+              </div>
+              <span className="text-[12.5px] text-muted-foreground">
+                {column.index >= 0 ? `${column.index + 1} de ${column.total}` : `— de ${column.total}`}
+              </span>
+              {dirty && <span className="text-[12px] text-muted-foreground">Salve para reordenar</span>}
+            </div>
+          </Field>
+        )}
         <Field label="Prioridade">
           <Segmented label="Prioridade" value={form.priority} options={PRIOS} disabled={!canEdit} onChange={(v) => setForm({ ...form, priority: v })} />
         </Field>
