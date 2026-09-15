@@ -3,12 +3,17 @@ import { Inter } from "next/font/google";
 import { cookies } from "next/headers";
 import "./globals.css";
 import { Providers } from "./providers";
+import { ServiceWorkerRegister } from "./sw-register";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
   title: "Sistema de Tasks",
   description: "Organização de projetos e tarefas — YMALOG",
+  applicationName: "YMALOG Tasks",
+  // iOS "Adicionar à Tela de Início": abre em tela cheia, barra de status escura (combina com o dark).
+  appleWebApp: { capable: true, title: "YMALOG Tasks", statusBarStyle: "black" },
+  icons: { apple: "/icons/apple-touch-icon.png" },
 };
 
 // Cara de app no celular: encosta nas bordas (notch), safe-area disponível, barra do sistema colorida.
@@ -31,6 +36,7 @@ export default async function RootLayout({
     <html lang="pt-BR" className={className}>
       <body>
         <Providers>{children}</Providers>
+        <ServiceWorkerRegister />
       </body>
     </html>
   );
