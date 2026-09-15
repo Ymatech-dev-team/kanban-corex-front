@@ -244,3 +244,14 @@ body {
     will-change: auto;
   }
 }
+
+/* iOS dá auto-zoom ao focar um campo com fonte < 16px. Em telas de TOQUE, força 16px nos campos
+   (recomendação do próprio iOS) sem tocar na densidade do desktop. `!important` vence as utilitárias
+   text-[13/14px]/text-sm espalhadas pelos componentes. [fix zoom-login] */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
