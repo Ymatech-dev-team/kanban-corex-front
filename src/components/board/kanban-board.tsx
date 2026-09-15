@@ -6,19 +6,13 @@ import {
   DragOverlay,
   MouseSensor,
   TouchSensor,
-  KeyboardSensor,
   useSensor,
   useSensors,
   closestCorners,
   type DragStartEvent,
   type DragEndEvent,
 } from "@dnd-kit/core";
-import {
-  SortableContext,
-  useSortable,
-  sortableKeyboardCoordinates,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
+import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { Plus } from "lucide-react";
@@ -59,13 +53,18 @@ function SortableCard({
   dragDisabled?: boolean;
   clientName?: string;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+  const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
     disabled: dragDisabled,
   });
   // No touch: segurar (delay do TouchSensor) levanta o card; swipe/scroll passa reto. touch-action
   // fica em "manipulation" (NUNCA "none", que mataria o scroll da coluna); select-none/touch-callout
   // evitam seleção de texto e menu de contexto no long-press. [painel]
+  //
+  // A11y: o wrapper NÃO recebe `attributes` (role=button/tabIndex do sortable) — quem é focável é o
+  // próprio TaskCard (`asButton`), pra Enter/Espaço ABRIR a tarefa (o arrasto ficou só mouse/touch;
+  // teclado não reordena, mas o status/coluna é editável na tela de detalhe). Sem KeyboardSensor, o
+  // Enter no card não borbulha pra reiniciar drag. [painel a11y]
   return (
     <div
       ref={setNodeRef}
@@ -75,11 +74,10 @@ function SortableCard({
         touchAction: "manipulation",
         WebkitTouchCallout: "none",
       }}
-      className={isDragging ? "select-none opacity-40" : "select-none"}
-      {...(dragDisabled ? {} : attributes)}
+      className={`scroll-my-2 select-none${isDragging ? " opacity-40" : ""}`}
       {...(dragDisabled ? {} : listeners)}
     >
-      <TaskCard task={task} onOpen={onOpen} membersById={membersById} clientName={clientName} />
+      <TaskCard task={task} onOpen={onOpen} membersById={membersById} clientName={clientName} asButton />
     </div>
   );
 }
@@ -122,7 +120,6 @@ export function KanbanBoard({
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
   function openGuarded(id: string) {
@@ -251,10 +248,12 @@ function Column({
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `col:${status}` });
   return (
-    <section className="flex min-w-0 flex-col">
+    <section aria-labelledby={`col-${status}`} className="flex min-w-0 flex-col">
       <div className="flex items-center gap-2.5 px-1 pb-3">
         <Dot kind={dot} />
-        <span className="text-[13px] font-medium">{label}</span>
+        <span id={`col-${status}`} className="text-[13px] font-medium">
+          {label}
+        </span>
         <span className="rounded-full border border-border bg-card px-1.5 text-[11px] leading-[17px] text-muted-foreground">
           {items.length}
         </span>
