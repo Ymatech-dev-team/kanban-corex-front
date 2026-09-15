@@ -15,6 +15,7 @@ import { EditMemberDialog } from "@/components/admin/edit-member-dialog";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { TempPasswordDialog } from "@/components/admin/temp-password-dialog";
 import { compensationLabel } from "@/lib/money";
+import { cn } from "@/lib/utils";
 
 function apiMessage(e: unknown, fallback: string): string {
   return (e as AxiosError<{ error?: { message?: string } }>)?.response?.data?.error?.message ?? fallback;
@@ -101,8 +102,29 @@ export default function MembrosPage() {
               Tentar de novo
             </Button>
           </Centered>
+        ) : (members.data ?? []).length === 0 ? (
+          <div className="flex flex-col items-center gap-2 py-16 text-center">
+            <p className="text-sm text-muted-foreground">Nenhum membro ainda.</p>
+          </div>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-border bg-card">
+          <>
+            {/* Mobile: cards (mesma info da tabela). Só o lápis abre editar, como no desktop. [shell-mobile] */}
+            <ul className="flex flex-col gap-2.5 lg:hidden">
+              {(members.data ?? []).map((m) => (
+                <li key={m.id}>
+                  <MemberCard
+                    m={m}
+                    roleLabel={m.roleId ? rolesById[m.roleId] ?? "—" : "Sem perfil"}
+                    canManage={canManage}
+                    isSelf={m.id === me.data?.userId}
+                    onEdit={() => setEditMember(m)}
+                  />
+                </li>
+              ))}
+            </ul>
+
+            {/* Desktop: tabela */}
+            <div className="hidden overflow-x-auto rounded-xl border border-border bg-card lg:block">
             <table className="w-full min-w-[620px] border-collapse text-[13px]">
               <thead>
                 <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground/70">
@@ -176,7 +198,8 @@ export default function MembrosPage() {
                 })}
               </tbody>
             </table>
-          </div>
+            </div>
+          </>
         )}
       </div>
 
@@ -231,4 +254,84 @@ export default function MembrosPage() {
 
 function Centered({ children }: { children: React.ReactNode }) {
   return <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 text-center">{children}</div>;
+}
+
+/** Card de membro no mobile (ficha rotulada). Mesma info da linha da tabela; só o lápis abre editar. */
+function MemberCard({
+  m,
+  roleLabel,
+  canManage,
+  isSelf,
+  onEdit,
+}: {
+  m: AdminMember;
+  roleLabel: string;
+  canManage: boolean;
+  isSelf: boolean;
+  onEdit: () => void;
+}) {
+  const comp = canManage ? compensationLabel(m.compensationType, m.compensationCents) : null;
+  return (
+    <article className="rounded-xl border border-border bg-card p-3">
+      <div className="flex items-start gap-3">
+        <span
+          aria-hidden
+          className="flex size-9 shrink-0 items-center justify-center rounded-full border border-muted-foreground/40 bg-accent text-[11px] font-medium text-foreground"
+        >
+          {initials(m.name)}
+        </span>
+        <div className="min-w-0 flex-1 leading-tight">
+          <div className="truncate font-medium">
+            {m.name}
+            {isSelf && <span className="ml-2 text-[11px] font-normal text-muted-foreground">você</span>}
+          </div>
+          <div className="truncate text-[12px] text-muted-foreground">{m.email}</div>
+        </div>
+        {canManage && (
+          <button
+            type="button"
+            onClick={onEdit}
+            aria-label={`Editar ${m.name}`}
+            title="Editar"
+            className="flex size-10 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <Pencil className="size-4" />
+          </button>
+        )}
+      </div>
+
+      <dl className="mt-3 flex flex-col gap-1.5 border-t border-border/60 pt-3 text-[12.5px]">
+        <div className="flex items-start justify-between gap-3">
+          <dt className="shrink-0 text-muted-foreground">Perfil</dt>
+          <dd className="flex min-w-0 items-center justify-end gap-2">
+            <span className="truncate text-foreground">{roleLabel}</span>
+            {m.extraPermissions.length > 0 && (
+              <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10.5px] text-muted-foreground">
+                +{m.extraPermissions.length} extra
+              </span>
+            )}
+          </dd>
+        </div>
+        {canManage && (
+          <div className="flex items-center justify-between gap-3">
+            <dt className="shrink-0 text-muted-foreground">Remuneração</dt>
+            <dd className={cn("text-right", comp ? "text-foreground" : "text-muted-foreground/50")}>{comp || "—"}</dd>
+          </div>
+        )}
+        <div className="flex items-center justify-between gap-3">
+          <dt className="shrink-0 text-muted-foreground">Situação</dt>
+          <dd>
+            {m.mustChangePassword ? (
+              <span className="inline-flex items-center gap-1.5 text-amber">
+                <span aria-hidden className="size-1.5 rounded-full bg-amber" />
+                senha temporária
+              </span>
+            ) : (
+              <span className="text-muted-foreground/60">ativo</span>
+            )}
+          </dd>
+        </div>
+      </dl>
+    </article>
+  );
 }
