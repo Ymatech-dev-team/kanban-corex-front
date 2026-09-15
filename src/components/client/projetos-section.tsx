@@ -247,7 +247,12 @@ function DeleteEngagementDialog({
           <Button type="button" variant="secondary" onClick={onClose}>
             Cancelar
           </Button>
-          <Button type="button" variant="destructive" onClick={confirm} disabled={del.isPending}>
+          <Button
+            type="button"
+            className="bg-amber text-primary-foreground hover:bg-amber/90"
+            onClick={confirm}
+            disabled={del.isPending}
+          >
             {del.isPending ? "Excluindo…" : "Excluir"}
           </Button>
         </div>
