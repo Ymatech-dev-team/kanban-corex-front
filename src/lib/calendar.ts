@@ -34,3 +34,32 @@ export function groupTasksByDay(tasks: Task[]): Record<string, Task[]> {
   }
   return map;
 }
+
+/** Prefixo yyyy-mm de uma data local (mesmo esquema de dayKey), pra filtrar chaves por mês sem reparsear. */
+function monthPrefix(d: Date): string {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`;
+}
+
+/**
+ * Dias do mês do `cursor` que têm tarefa, em ordem cronológica crescente — pra agenda mobile.
+ * Filtra as chaves de `byDay` pelo prefixo yyyy-mm (as chaves já são locais/corretas); NÃO reparseia
+ * com `new Date(key)`, que interpretaria a string como UTC e deslocaria o dia em fusos negativos.
+ * Dentro do dia, ordena por status (abertas antes de concluídas) e depois posição, estável.
+ */
+export function agendaDaysForMonth(
+  byDay: Record<string, Task[]>,
+  cursor: Date,
+): { key: string; date: Date; tasks: Task[] }[] {
+  const prefix = monthPrefix(cursor); // "yyyy-mm"
+  return Object.keys(byDay)
+    .filter((k) => k.startsWith(prefix + "-"))
+    .sort()
+    .map((key) => {
+      const [y, m, d] = key.split("-").map(Number);
+      const tasks = [...byDay[key]].sort(
+        (a, b) =>
+          (a.status === "DONE" ? 1 : 0) - (b.status === "DONE" ? 1 : 0) || a.position - b.position,
+      );
+      return { key, date: new Date(y, m - 1, d), tasks };
+    });
+}

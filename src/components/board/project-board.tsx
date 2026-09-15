@@ -320,7 +320,7 @@ export function ProjectBoard({
       ) : effectiveView === "lista" ? (
         <TaskList tasks={visibleTasks} membersById={membersById} onOpenTask={openTask} />
       ) : effectiveView === "calendario" ? (
-        <TaskCalendar tasks={visibleTasks} onOpenTask={openTask} />
+        <TaskCalendar tasks={visibleTasks} onOpenTask={openTask} membersById={membersById} />
       ) : (
         <KanbanBoard
           tasks={visibleTasks}

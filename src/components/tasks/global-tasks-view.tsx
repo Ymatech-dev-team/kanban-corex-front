@@ -191,7 +191,7 @@ export function GlobalTasksView() {
       />
     );
   } else if (view === "calendario") {
-    body = <TaskCalendar tasks={tasks} onOpenTask={openTask} />;
+    body = <TaskCalendar tasks={tasks} onOpenTask={openTask} membersById={membersById} />;
   } else {
     body = (
       <div className="flex-1 overflow-auto p-6">

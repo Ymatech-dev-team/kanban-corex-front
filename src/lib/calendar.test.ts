@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildMonthMatrix, dayKey, groupTasksByDay } from "./calendar";
+import { agendaDaysForMonth, buildMonthMatrix, dayKey, groupTasksByDay } from "./calendar";
 import type { Task } from "@/lib/types";
 
 describe("buildMonthMatrix", () => {
@@ -21,7 +21,7 @@ describe("buildMonthMatrix", () => {
   });
 });
 
-function task(id: string, dueDate: string | null): Task {
+function task(id: string, dueDate: string | null, extra?: Partial<Task>): Task {
   return {
     id,
     projectId: "p1",
@@ -32,6 +32,7 @@ function task(id: string, dueDate: string | null): Task {
     dueDate,
     assigneeId: null,
     position: 1,
+    ...extra,
   };
 }
 
@@ -44,5 +45,43 @@ describe("groupTasksByDay", () => {
     ]);
     expect(g["2026-09-10"].map((t) => t.id)).toEqual(["a", "b"]);
     expect(Object.values(g).flat()).toHaveLength(2);
+  });
+});
+
+describe("agendaDaysForMonth", () => {
+  const cursor = new Date(2026, 8, 1); // setembro/2026
+
+  it("retorna só os dias do mês do cursor, em ordem crescente", () => {
+    const byDay = groupTasksByDay([
+      task("set-20", "2026-09-20T10:00:00"),
+      task("set-05", "2026-09-05T10:00:00"),
+      task("out", "2026-10-01T10:00:00"), // outro mês → fora
+      task("ago", "2026-08-31T10:00:00"), // outro mês → fora
+    ]);
+    const days = agendaDaysForMonth(byDay, cursor);
+    expect(days.map((d) => d.key)).toEqual(["2026-09-05", "2026-09-20"]);
+  });
+
+  it("a data derivada é local (não desloca dia por UTC)", () => {
+    const byDay = groupTasksByDay([task("a", "2026-09-05T10:00:00")]);
+    const [day] = agendaDaysForMonth(byDay, cursor);
+    expect(day.date.getDate()).toBe(5);
+    expect(day.date.getMonth()).toBe(8);
+    expect(dayKey(day.date)).toBe("2026-09-05");
+  });
+
+  it("ordena dentro do dia: abertas antes de concluídas, depois posição", () => {
+    const byDay = groupTasksByDay([
+      task("done", "2026-09-10T10:00:00", { status: "DONE", position: 1 }),
+      task("todo-2", "2026-09-10T10:00:00", { status: "TODO", position: 2 }),
+      task("todo-1", "2026-09-10T10:00:00", { status: "DOING", position: 1 }),
+    ]);
+    const [day] = agendaDaysForMonth(byDay, cursor);
+    expect(day.tasks.map((t) => t.id)).toEqual(["todo-1", "todo-2", "done"]);
+  });
+
+  it("mês sem tarefa retorna vazio", () => {
+    const byDay = groupTasksByDay([task("out", "2026-10-01T10:00:00")]);
+    expect(agendaDaysForMonth(byDay, cursor)).toEqual([]);
   });
 });
