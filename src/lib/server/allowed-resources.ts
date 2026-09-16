@@ -12,6 +12,7 @@ export const ALLOWED_RESOURCES = new Set([
   "members",
   "roles",
   "engagements",
+  "notifications",
 ]);
 
 export function isAllowedResource(segment: string): boolean {
