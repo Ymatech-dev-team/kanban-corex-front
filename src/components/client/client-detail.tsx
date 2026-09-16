@@ -143,7 +143,7 @@ function MembersSection({ projectId }: { projectId: string }) {
               </Button>
               <Button
                 type="button"
-                variant="destructive"
+                className="bg-amber text-primary-foreground hover:bg-amber/90"
                 disabled={revoke.isPending}
                 onClick={async () => {
                   try {
