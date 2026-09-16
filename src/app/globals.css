@@ -16,8 +16,9 @@
   --yma-neutral-700: #232a33; /* borda / input */
   --yma-neutral-400: #9aa3ad; /* texto secundário */
   --yma-neutral-50: #ffffff; /* texto principal (ink) */
-  --yma-red-500: #e3855a; /* danger / terracota (erro) */
-  --yma-amber-500: #e3b45a; /* warn / âmbar (aviso) — semântico, NÃO é marca */
+  --yma-red-500: #e3855a; /* danger / terracota (erro de form) */
+  /* nota: --color-amber (bg-amber/text-amber) aponta pro --primary (menta) — decisão do JP: "tudo menta".
+     Atraso/senha/botões destrutivos usam a cor de marca. Ver @theme inline abaixo. */
 
   /* camada 2 — semânticos (dark-first) */
   --background: var(--yma-neutral-950);
@@ -46,9 +47,8 @@
 
 /*
   Modo claro — ativado por `.light` no <html>. A menta pura reprova contraste no branco, então a marca
-  vira teal escuro (ver abaixo). O amber de atenção também escurece: o âmbar dark-first (#e3b45a)
-  reprova como texto/ícone pequeno sobre branco, no claro vira um
-  âmbar mais escuro que passa AA (texto, dot e barra-left de urgência). [review UX 2026-09-10]
+  vira teal escuro (ver abaixo). Como --color-amber segue o --primary, a "cor de atenção" também vira
+  o teal no claro automaticamente. [review UX / reskin Corex]
 */
 :root.light {
   /* primitivos claros */
@@ -58,7 +58,6 @@
   --yma-l-200: #e6e6e9;
   --yma-l-text: #18181b;
   --yma-l-muted: #6b6b74;
-  --yma-amber-500: #b45309; /* âmbar de atenção legível no claro (≥4.5:1 como texto pequeno) */
 
   /* Marca no claro: a menta pura reprova contraste sobre branco (botão some, texto ilegível). Vira um
      teal-Corex escuro que passa AA — botão sólido com TEXTO BRANCO. A Corex é dark-only, isto é só
@@ -152,7 +151,7 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
-  --color-amber: var(--yma-amber-500);
+  --color-amber: var(--primary); /* "cor de atenção" segue a menta da marca [JP: tudo menta] */
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
