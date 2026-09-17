@@ -27,9 +27,10 @@ export interface AdminRole {
   isSystem: boolean;
 }
 
-export function useMembers() {
+export function useMembers(opts?: { enabled?: boolean }) {
   return useQuery<AdminMember[]>({
     queryKey: ["members"],
+    enabled: opts?.enabled ?? true, // gate por membros_ver: não dispara 403 pra quem não pode ver membros
     queryFn: async () => (await api.get<{ members: AdminMember[] }>("/members")).data.members,
   });
 }

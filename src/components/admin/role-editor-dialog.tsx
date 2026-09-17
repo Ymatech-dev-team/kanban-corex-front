@@ -80,101 +80,150 @@ export function RoleEditorDialog({ open, role, onOpenChange }: Props) {
 
   const pending = create.isPending || update.isPending;
 
+  /** Marca/limpa uma área inteira — só as permissões que VOCÊ pode conceder (respeita canGrant). */
+  function toggleGroup(perms: string[], allSelected: boolean) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      for (const p of perms) allSelected ? next.delete(p) : next.add(p);
+      return next;
+    });
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{role ? `Editar ${role.name}` : "Novo perfil"}</DialogTitle>
-          <DialogDescription>Marque o que este perfil permite fazer.</DialogDescription>
-        </DialogHeader>
-
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="rname">Nome do perfil</Label>
-          <Input id="rname" autoFocus value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
+      <DialogContent className="flex max-h-[calc(100dvh-2rem)] flex-col gap-0 overflow-hidden p-0">
+        {/* topo fixo: título + nome */}
+        <div className="border-b border-border p-5">
+          <DialogHeader>
+            <DialogTitle className="truncate pr-8">{role ? `Editar ${role.name}` : "Novo perfil"}</DialogTitle>
+            <DialogDescription>Marque o que este perfil permite fazer.</DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 flex flex-col gap-1.5">
+            <Label htmlFor="rname">Nome do perfil</Label>
+            <Input id="rname" autoFocus value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
+          </div>
         </div>
 
-        <div className="flex flex-col gap-4">
-          {PERMISSION_GROUPS.map((group) => (
-            <div key={group.title} className="flex flex-col gap-1.5">
-              <span className="text-[11px] uppercase tracking-wide text-muted-foreground/70">{group.title}</span>
-              {group.items.map((item) => {
-                const checked = selected.has(item.perm);
-                const canGrant = userHas.has(item.perm);
-                const locked = !canGrant && checked; // perfil já tem, mas você não pode conceder
-                const disabled = !canGrant;
-                return (
-                  <button
-                    key={item.perm}
-                    type="button"
-                    disabled={disabled}
-                    onClick={() => canGrant && toggle(item.perm)}
-                    className={cn(
-                      "flex items-start gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors",
-                      checked ? "border-muted-foreground/40 bg-accent" : "border-border",
-                      canGrant ? "hover:border-muted-foreground/30" : "cursor-not-allowed opacity-60",
-                    )}
+        {/* meio rolável: permissões por área */}
+        <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-5">
+          {PERMISSION_GROUPS.map((group) => {
+            const grantable = group.items.filter((i) => userHas.has(i.perm)).map((i) => i.perm);
+            const allGrantableSelected = grantable.length > 0 && grantable.every((p) => selected.has(p));
+            const selectedInGroup = group.items.filter((i) => selected.has(i.perm)).length;
+            return (
+              <div key={group.title} className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] uppercase tracking-wide text-muted-foreground/70">{group.title}</span>
+                  <span
+                    className="text-[11px] text-muted-foreground/70"
+                    aria-label={`${selectedInGroup} de ${group.items.length} permissões marcadas`}
                   >
-                    <span
+                    {selectedInGroup}/{group.items.length}
+                  </span>
+                  {grantable.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => toggleGroup(grantable, allGrantableSelected)}
+                      className="ml-auto text-[11px] text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      {allGrantableSelected ? "Limpar área" : "Selecionar tudo"}
+                    </button>
+                  )}
+                </div>
+                {group.items.map((item) => {
+                  const checked = selected.has(item.perm);
+                  const canGrant = userHas.has(item.perm);
+                  const locked = !canGrant && checked; // perfil já tem, mas você não pode conceder/remover
+                  const reason = locked
+                    ? "Você não pode alterar esta permissão — não pode concedê-la."
+                    : "Você não pode conceder esta permissão.";
+                  return (
+                    <button
+                      key={item.perm}
+                      type="button"
+                      aria-disabled={!canGrant || undefined}
+                      aria-pressed={checked}
+                      aria-label={!canGrant ? `${item.label}. ${reason}` : undefined}
+                      title={!canGrant ? reason : undefined}
+                      onClick={() => canGrant && toggle(item.perm)}
                       className={cn(
-                        "mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded-[6px] border transition-colors",
-                        checked
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-muted-foreground/50 text-transparent",
+                        "flex items-start gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors",
+                        checked ? "border-muted-foreground/40 bg-accent" : "border-border",
+                        canGrant ? "hover:border-muted-foreground/30" : "cursor-not-allowed opacity-60",
                       )}
                     >
-                      <Check className="size-3" strokeWidth={3} />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-1.5 text-[13px]">
-                        {item.label}
-                        {item.meta && (
-                          <span className="rounded border border-amber/40 px-1 py-0 text-[10px] text-amber">admin</span>
+                      <span
+                        className={cn(
+                          "mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded-[6px] border transition-colors",
+                          checked
+                            ? "border-primary bg-primary text-primary-foreground"
+                            : "border-muted-foreground/50 text-transparent",
                         )}
-                        {locked && <Lock className="size-3 text-muted-foreground/60" />}
+                      >
+                        <Check className="size-3" strokeWidth={3} />
                       </span>
-                      {item.hint && <span className="block text-[11.5px] text-muted-foreground">{item.hint}</span>}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          ))}
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-center gap-1.5 text-[13px]">
+                          {item.label}
+                          {item.meta && (
+                            <span className="rounded border border-primary/40 px-1 py-0 text-[10px] text-primary">
+                              admin
+                            </span>
+                          )}
+                          {locked && <Lock className="size-3 text-muted-foreground/60" aria-label="Bloqueada" />}
+                        </span>
+                        {item.hint && <span className="block text-[11.5px] text-muted-foreground">{item.hint}</span>}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })}
         </div>
 
-        {addsMeta && (
-          <button
-            type="button"
-            onClick={() => setConfirmMeta((v) => !v)}
-            className="flex items-start gap-2.5 rounded-lg border border-amber/40 bg-amber/5 px-3 py-2.5 text-left"
-          >
-            <span
-              className={cn(
-                "mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded-[6px] border transition-colors",
-                confirmMeta ? "border-amber bg-amber text-primary-foreground" : "border-muted-foreground/50 text-transparent",
-              )}
+        {/* rodapé fixo: confirmação de admin + erro + ações (sempre visíveis) */}
+        <div className="flex flex-col gap-3 border-t border-border p-4">
+          {addsMeta && (
+            <button
+              type="button"
+              role="checkbox"
+              aria-checked={confirmMeta}
+              aria-label="Confirmo que este perfil passa a conceder permissões de administração"
+              onClick={() => setConfirmMeta((v) => !v)}
+              className="flex items-start gap-2.5 rounded-r-md border-l-2 border-primary bg-accent/40 py-2 pl-2.5 pr-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <Check className="size-3" strokeWidth={3} />
-            </span>
-            <span className="text-[12.5px] text-muted-foreground">
-              Este perfil passa a conceder <span className="text-foreground">permissões de administração</span>.
-              Confirmo a mudança.
-            </span>
-          </button>
-        )}
+              <span
+                className={cn(
+                  "mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded-[6px] border transition-colors",
+                  confirmMeta
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-muted-foreground/50 text-transparent",
+                )}
+              >
+                <Check className="size-3" strokeWidth={3} />
+              </span>
+              <span className="text-[12.5px] text-muted-foreground">
+                Este perfil passa a conceder <span className="text-foreground">permissões de administração</span>.
+                Confirmo a mudança.
+              </span>
+            </button>
+          )}
 
-        {err && (
-          <p role="alert" className="text-sm text-destructive">
-            {err}
-          </p>
-        )}
+          {err && (
+            <p role="alert" className="text-sm text-destructive">
+              {err}
+            </p>
+          )}
 
-        <div className="flex justify-end gap-2 pt-1">
-          <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
-            Cancelar
-          </Button>
-          <Button type="button" onClick={save} disabled={!name.trim() || (addsMeta && !confirmMeta) || pending}>
-            {pending ? "Salvando…" : role ? "Salvar" : "Criar perfil"}
-          </Button>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <Button type="button" onClick={save} disabled={!name.trim() || (addsMeta && !confirmMeta) || pending}>
+              {pending ? "Salvando…" : role ? "Salvar" : "Criar perfil"}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

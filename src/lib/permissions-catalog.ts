@@ -91,4 +91,30 @@ export const PERMISSION_LABEL: Record<string, string> = Object.fromEntries(
   PERMISSION_GROUPS.flatMap((g) => g.items.map((i) => [i.perm, i.label])),
 );
 
+/** Conjunto de permissões meta (admin) — vira o marcador "Concede administração" no card. [redesign perfis] */
+const META_SET = new Set<string>(
+  PERMISSION_GROUPS.flatMap((g) => g.items.filter((i) => i.meta).map((i) => i.perm)),
+);
+
+/** O perfil concede alguma permissão de administração (meta)? */
+export function roleConcedeAdmin(permissions: string[]): boolean {
+  return permissions.some((p) => META_SET.has(p));
+}
+
+export interface AreaCoverage {
+  title: string;
+  count: number;
+  total: number;
+}
+
+/** Cobertura por área (na ordem do catálogo) — resumo do card e contador do editor. [redesign perfis] */
+export function roleCoverage(permissions: string[]): AreaCoverage[] {
+  const set = new Set(permissions);
+  return PERMISSION_GROUPS.map((g) => ({
+    title: g.title,
+    count: g.items.filter((i) => set.has(i.perm)).length,
+    total: g.items.length,
+  }));
+}
+
 export { isMeta };

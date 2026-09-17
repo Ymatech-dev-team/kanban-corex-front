@@ -1,20 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import { MoreHorizontal, Plus, Pencil, Trash2, Loader2, AlertTriangle, Lock } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Plus, Loader2, AlertTriangle, ShieldPlus } from "lucide-react";
 import type { AxiosError } from "axios";
 import { PERMISSIONS } from "@sistema-tasks/contracts";
 import { toast } from "sonner";
 import { useCan } from "@/lib/hooks/use-can";
-import { useRoles, useDeleteRole, type AdminRole } from "@/lib/hooks/use-admin";
-import { PERMISSION_LABEL } from "@/lib/permissions-catalog";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
+import { useRoles, useMembers, useDeleteRole, type AdminRole } from "@/lib/hooks/use-admin";
 import { Button } from "@/components/ui/button";
+import { RoleCard } from "@/components/admin/role-card";
 import { RoleEditorDialog } from "@/components/admin/role-editor-dialog";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 
@@ -25,8 +19,19 @@ function apiMessage(e: unknown, fallback: string): string {
 export default function PerfisPage() {
   const canView = useCan(PERMISSIONS.perfis_ver);
   const canManage = useCan(PERMISSIONS.perfis_gerenciar);
+  const canSeeMembers = useCan(PERMISSIONS.membros_ver);
   const roles = useRoles();
+  const members = useMembers({ enabled: canSeeMembers }); // só dispara se puder ver membros
   const del = useDeleteRole();
+
+  // Contagem de membros por perfil, derivada no client. undefined quando não temos direito/dado →
+  // o card NÃO mostra "0" enganoso (a verdade da exclusão é o servidor). [painel]
+  const memberCounts = useMemo(() => {
+    if (!canSeeMembers || !members.data) return undefined;
+    const m = new Map<string, number>();
+    for (const mem of members.data) if (mem.roleId) m.set(mem.roleId, (m.get(mem.roleId) ?? 0) + 1);
+    return m;
+  }, [canSeeMembers, members.data]);
 
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<AdminRole | null>(null);
@@ -92,66 +97,29 @@ export default function PerfisPage() {
         ) : (
           <div className="mx-auto grid max-w-4xl grid-cols-1 gap-3 md:grid-cols-2">
             {(roles.data ?? []).map((role) => (
-              <div key={role.id} className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4">
-                <div className="flex items-start gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <h2 className="font-medium tracking-tight">{role.name}</h2>
-                      {role.isSystem && (
-                        <span className="flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-[10.5px] text-muted-foreground">
-                          <Lock className="size-2.5" />
-                          sistema
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[12px] text-muted-foreground">
-                      {role.permissions.length} {role.permissions.length === 1 ? "permissão" : "permissões"}
-                    </p>
-                  </div>
-                  {canManage && !role.isSystem && (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        aria-label="Ações"
-                        className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-border hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                      >
-                        <MoreHorizontal className="size-4" />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onSelect={() => openEdit(role)}>
-                          <Pencil className="size-4 text-muted-foreground" />
-                          Editar
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onSelect={() => setToDelete(role)}>
-                          <Trash2 className="size-4 text-muted-foreground" />
-                          Remover
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </div>
-
-                {role.permissions.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {role.permissions.slice(0, 8).map((p) => (
-                      <span key={p} className="rounded border border-border px-1.5 py-0.5 text-[11px] text-muted-foreground">
-                        {PERMISSION_LABEL[p] ?? p}
-                      </span>
-                    ))}
-                    {role.permissions.length > 8 && (
-                      <span className="px-1 py-0.5 text-[11px] text-muted-foreground/60">
-                        +{role.permissions.length - 8}
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {role.isSystem && (
-                  <span className="self-start text-[12px] text-muted-foreground/60">
-                    Perfil de sistema — não editável
-                  </span>
-                )}
-              </div>
+              <RoleCard
+                key={role.id}
+                role={role}
+                memberCount={memberCounts?.get(role.id) ?? (memberCounts ? 0 : undefined)}
+                canManage={canManage}
+                onEdit={() => openEdit(role)}
+                onDelete={() => setToDelete(role)}
+              />
             ))}
+            {/* Estado vazio: nenhum perfil personalizado ainda (o de sistema sempre existe). CTA se puder criar. */}
+            {canManage && !(roles.data ?? []).some((r) => !r.isSystem) && (
+              <button
+                type="button"
+                onClick={openCreate}
+                className="flex min-h-[120px] flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-border p-4 text-center outline-none transition-colors hover:border-muted-foreground/40 focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <ShieldPlus className="size-5 text-muted-foreground/60" aria-hidden />
+                <span className="text-[12.5px] text-muted-foreground">Sem perfis personalizados ainda</span>
+                <span className="text-[11.5px] text-muted-foreground/60">
+                  Crie um perfil pra reaproveitar em vários membros
+                </span>
+              </button>
+            )}
           </div>
         )}
       </div>
