@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Mail, Lock, Eye, EyeOff } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { loginSchema, type LoginInput } from "@sistema-tasks/contracts";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -70,7 +70,12 @@ export function LoginForm({ onSubmit, pending, error }: Props) {
       </div>
 
       {error && (
-        <p role="alert" className="rounded-md border-l-2 border-destructive bg-card px-3 py-2 text-sm text-destructive">
+        // Erro de login: barra-left menta + texto neutro (régua "alerta com acento"; menta, não terracota). [identidade-corex]
+        <p
+          role="alert"
+          className="flex items-center gap-2 rounded-md border-l-2 border-primary bg-card px-3 py-2 text-sm text-foreground"
+        >
+          <AlertCircle className="size-4 shrink-0 text-primary" aria-hidden />
           {error}
         </p>
       )}
