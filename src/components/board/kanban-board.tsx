@@ -15,8 +15,9 @@ import {
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { Plus } from "lucide-react";
+import { Check, Plus } from "lucide-react";
 import type { Task } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import type { TaskStatus } from "@sistema-tasks/contracts";
 import { useMoveTask } from "@/lib/hooks/use-tasks";
 import { positionForIndex } from "@/lib/position";
@@ -47,17 +48,60 @@ function SortableCard({
   membersById,
   dragDisabled,
   clientName,
+  selectMode,
+  selected,
+  onToggleSelect,
 }: {
   task: Task;
   onOpen: () => void;
   membersById: Record<string, string>;
   dragDisabled?: boolean;
   clientName?: string;
+  selectMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (id: string) => void;
 }) {
   const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
-    disabled: dragDisabled,
+    disabled: dragDisabled || selectMode, // no modo seleção o arrasto fica desligado [acoes-em-massa RF-1]
   });
+
+  // Modo seleção: o card vira um toggle (clique/Enter/Espaço marca, nunca abre nem arrasta), com checkbox
+  // menta no canto e realce menta na selecionada (distinto da barra-left âmbar de prazo). [RF-2/7]
+  if (selectMode) {
+    return (
+      <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} className="scroll-my-2">
+        <div
+          role="checkbox"
+          tabIndex={0}
+          aria-checked={selected}
+          aria-label={`Selecionar tarefa: ${task.title}`}
+          onClick={() => onToggleSelect?.(task.id)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onToggleSelect?.(task.id);
+            }
+          }}
+          className={cn(
+            "relative cursor-pointer select-none rounded-xl outline-none transition focus-visible:ring-2 focus-visible:ring-ring",
+            selected && "ring-2 ring-primary",
+          )}
+        >
+          <TaskCard task={task} membersById={membersById} clientName={clientName} />
+          <span
+            aria-hidden
+            className={cn(
+              "absolute right-2 top-2 flex size-5 items-center justify-center rounded-md border transition-colors",
+              selected ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/50 bg-card/90",
+            )}
+          >
+            {selected && <Check className="size-3.5" />}
+          </span>
+        </div>
+      </div>
+    );
+  }
   // No touch: segurar (delay do TouchSensor) levanta o card; swipe/scroll passa reto. touch-action
   // fica em "manipulation" (NUNCA "none", que mataria o scroll da coluna); select-none/touch-callout
   // evitam seleção de texto e menu de contexto no long-press. [painel]
@@ -98,6 +142,11 @@ interface Props {
   onMove?: (vars: { id: string; status: TaskStatus; position: number }) => void;
   clientNameById?: Record<string, string>;
   showClient?: boolean;
+  // Seleção múltipla (ações em massa). Props ausentes = board normal, sem seleção. [acoes-em-massa]
+  selectMode?: boolean;
+  isSelected?: (id: string) => boolean;
+  onToggleSelect?: (id: string) => void;
+  onToggleColumn?: (status: TaskStatus) => void; // "selecionar coluna" no header [RF-9]
 }
 
 export function KanbanBoard({
@@ -113,6 +162,10 @@ export function KanbanBoard({
   onMove,
   clientNameById,
   showClient,
+  selectMode,
+  isSelected,
+  onToggleSelect,
+  onToggleColumn,
 }: Props) {
   const move = useMoveTask(projectId, engagementId);
   const applyMove = onMove ?? move.mutate; // global injeta o próprio move; board usa o por-projeto
@@ -197,7 +250,7 @@ export function KanbanBoard({
         releaseDragGuard();
       }}
     >
-      <div className="grid flex-1 grid-cols-1 gap-4 overflow-auto p-6 md:grid-cols-3">
+      <div className={cn("grid flex-1 grid-cols-1 gap-4 overflow-auto p-6 md:grid-cols-3", selectMode && "pb-28")}>
         {COLUMNS.map((col) => (
           <Column
             key={col.status}
@@ -209,10 +262,14 @@ export function KanbanBoard({
             dragDisabled={dragDisabled}
             onOpenTask={openGuarded}
             onAddTask={onAddTask}
-            canCreate={canCreate}
+            canCreate={canCreate && !selectMode}
             onQuickAdd={onQuickAdd}
             clientNameById={clientNameById}
             showClient={showClient}
+            selectMode={selectMode}
+            isSelected={isSelected}
+            onToggleSelect={onToggleSelect}
+            onToggleColumn={onToggleColumn}
           />
         ))}
       </div>
@@ -244,6 +301,10 @@ function Column({
   onQuickAdd,
   clientNameById,
   showClient,
+  selectMode,
+  isSelected,
+  onToggleSelect,
+  onToggleColumn,
 }: {
   status: TaskStatus;
   label: string;
@@ -257,8 +318,13 @@ function Column({
   onQuickAdd?: (status: TaskStatus, title: string) => Promise<void>;
   clientNameById?: Record<string, string>;
   showClient?: boolean;
+  selectMode?: boolean;
+  isSelected?: (id: string) => boolean;
+  onToggleSelect?: (id: string) => void;
+  onToggleColumn?: (status: TaskStatus) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `col:${status}` });
+  const colAllSelected = selectMode && items.length > 0 && items.every((t) => isSelected?.(t.id));
   const [composerOpen, setComposerOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   // quick-add inline só onde faz sentido: com onQuickAdd (board por-cliente) e fora do "Feito". [criar-mais-rapido]
@@ -281,6 +347,27 @@ function Column({
         <span className="rounded-full border border-border bg-card px-1.5 text-[11px] leading-[17px] text-muted-foreground">
           {items.length}
         </span>
+        {selectMode && items.length > 0 && (
+          <button
+            type="button"
+            role="checkbox"
+            aria-checked={colAllSelected}
+            aria-label={colAllSelected ? `Desmarcar coluna ${label}` : `Selecionar coluna ${label}`}
+            onClick={() => onToggleColumn?.(status)}
+            className="ml-auto inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[11px] text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <span
+              aria-hidden
+              className={cn(
+                "flex size-4 items-center justify-center rounded border transition-colors",
+                colAllSelected ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/50",
+              )}
+            >
+              {colAllSelected && <Check className="size-3" />}
+            </span>
+            Coluna
+          </button>
+        )}
         {canCreate && (
           <button
             ref={triggerRef}
@@ -308,6 +395,9 @@ function Column({
               membersById={membersById}
               dragDisabled={dragDisabled}
               clientName={showClient ? clientNameById?.[t.projectId] : undefined}
+              selectMode={selectMode}
+              selected={isSelected?.(t.id)}
+              onToggleSelect={onToggleSelect}
             />
           ))}
         </SortableContext>

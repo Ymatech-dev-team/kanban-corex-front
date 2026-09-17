@@ -1,6 +1,7 @@
 "use client";
 
-import { User } from "lucide-react";
+import { useRef } from "react";
+import { Check, User } from "lucide-react";
 import type { Task } from "@/lib/types";
 import type { TaskPriority, TaskStatus } from "@sistema-tasks/contracts";
 import { initials } from "@/lib/initials";
@@ -27,24 +28,90 @@ export function TaskList({
   tasks,
   membersById,
   onOpenTask,
+  selectMode,
+  isSelected,
+  onToggleSelect,
+  onSelectRange,
+  allSelected,
+  onToggleAll,
 }: {
   tasks: Task[];
   membersById: Record<string, string>;
   onOpenTask: (id: string) => void;
+  // Seleção múltipla (ações em massa). Ausentes = lista normal. [acoes-em-massa]
+  selectMode?: boolean;
+  isSelected?: (id: string) => boolean;
+  onToggleSelect?: (id: string) => void;
+  onSelectRange?: (ids: string[]) => void; // Shift+clique: intervalo contíguo
+  allSelected?: boolean; // checkbox-mestre: todas as visíveis marcadas [RF-9]
+  onToggleAll?: () => void;
 }) {
   const rows = [...tasks].sort(
     (a, b) => STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || a.position - b.position,
   );
 
+  // Âncora do Shift+clique (índice da última linha clicada). [RF-5]
+  const lastIndexRef = useRef<number | null>(null);
+  const activateRow = (idx: number, id: string, shiftKey: boolean) => {
+    if (!selectMode) {
+      onOpenTask(id);
+      return;
+    }
+    if (shiftKey && lastIndexRef.current !== null) {
+      const [a, b] = [lastIndexRef.current, idx].sort((x, y) => x - y);
+      onSelectRange?.(rows.slice(a, b + 1).map((r) => r.id));
+    } else {
+      onToggleSelect?.(id);
+    }
+    lastIndexRef.current = idx;
+  };
+
   return (
-    <div className="flex-1 overflow-auto p-6">
+    <div className={cn("flex-1 overflow-auto p-6", selectMode && "pb-28")}>
       {/* Mobile: cards (um por tarefa, mesma ordem da tabela). Reusa o TaskCard. [shell-mobile] */}
       <ul className="flex flex-col gap-2.5 lg:hidden">
-        {rows.map((t) => (
-          <li key={t.id}>
-            <TaskCard task={t} onOpen={() => onOpenTask(t.id)} membersById={membersById} asButton />
-          </li>
-        ))}
+        {rows.map((t, idx) => {
+          const sel = isSelected?.(t.id);
+          if (selectMode) {
+            return (
+              <li key={t.id}>
+                <div
+                  role="checkbox"
+                  tabIndex={0}
+                  aria-checked={sel}
+                  aria-label={`Selecionar tarefa: ${t.title}`}
+                  onClick={(e) => activateRow(idx, t.id, e.shiftKey)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      activateRow(idx, t.id, e.shiftKey);
+                    }
+                  }}
+                  className={cn(
+                    "relative cursor-pointer select-none rounded-xl outline-none transition focus-visible:ring-2 focus-visible:ring-ring",
+                    sel && "ring-2 ring-primary",
+                  )}
+                >
+                  <TaskCard task={t} membersById={membersById} />
+                  <span
+                    aria-hidden
+                    className={cn(
+                      "absolute right-2 top-2 flex size-5 items-center justify-center rounded-md border transition-colors",
+                      sel ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/50 bg-card/90",
+                    )}
+                  >
+                    {sel && <Check className="size-3.5" />}
+                  </span>
+                </div>
+              </li>
+            );
+          }
+          return (
+            <li key={t.id}>
+              <TaskCard task={t} onOpen={() => onOpenTask(t.id)} membersById={membersById} asButton />
+            </li>
+          );
+        })}
       </ul>
 
       {/* Desktop: tabela */}
@@ -52,6 +119,29 @@ export function TaskList({
         <table className="w-full min-w-[640px] border-collapse text-[13px]">
           <thead>
             <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground/70">
+              {selectMode && (
+                <th className="w-10 px-4 py-2.5 font-medium">
+                  <span
+                    role="checkbox"
+                    aria-checked={allSelected}
+                    aria-label={allSelected ? "Desmarcar todas" : "Selecionar todas"}
+                    tabIndex={0}
+                    onClick={() => onToggleAll?.()}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        onToggleAll?.();
+                      }
+                    }}
+                    className={cn(
+                      "flex size-5 cursor-pointer items-center justify-center rounded-md border outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                      allSelected ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/50 bg-card",
+                    )}
+                  >
+                    {allSelected && <Check className="size-3.5" />}
+                  </span>
+                </th>
+              )}
               <th className="px-4 py-2.5 font-medium">Tarefa</th>
               <th className="px-4 py-2.5 font-medium">Status</th>
               <th className="px-4 py-2.5 font-medium">Prioridade</th>
@@ -60,8 +150,9 @@ export function TaskList({
             </tr>
           </thead>
           <tbody>
-            {rows.map((t) => {
+            {rows.map((t, idx) => {
               const done = t.status === "DONE";
+              const sel = isSelected?.(t.id);
               const due = dueState(t.dueDate, t.status);
               const attention = due.state === "soon" || due.state === "overdue";
               // união (principal primeiro, depois extras) — coerente com o card [review R1]
@@ -74,9 +165,35 @@ export function TaskList({
               return (
                 <tr
                   key={t.id}
-                  onClick={() => onOpenTask(t.id)}
-                  className="cursor-pointer border-b border-border/60 transition-colors last:border-0 hover:bg-card"
+                  onClick={(e) => activateRow(idx, t.id, e.shiftKey)}
+                  className={cn(
+                    "cursor-pointer border-b border-border/60 transition-colors last:border-0 hover:bg-card",
+                    sel && "bg-primary/10",
+                  )}
                 >
+                  {selectMode && (
+                    <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
+                      <span
+                        role="checkbox"
+                        aria-checked={sel}
+                        aria-label={`Selecionar tarefa: ${t.title}`}
+                        tabIndex={0}
+                        onClick={(e) => activateRow(idx, t.id, e.shiftKey)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            activateRow(idx, t.id, e.shiftKey);
+                          }
+                        }}
+                        className={cn(
+                          "flex size-5 cursor-pointer items-center justify-center rounded-md border outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                          sel ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/50 bg-card",
+                        )}
+                      >
+                        {sel && <Check className="size-3.5" />}
+                      </span>
+                    </td>
+                  )}
                   <td className="px-4 py-2.5">
                     <span className={cn(done && "text-muted-foreground line-through")}>{t.title}</span>
                     {subs.length > 0 && (

@@ -175,7 +175,8 @@ export function useDeleteTask(projectId: string) {
 export function useRestoreTask(projectId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id }: { id: string; engagementId?: string }) =>
+    // `count` (do undo de lote) só ajusta a mensagem — restaura o lote inteiro de qualquer jeito.
+    mutationFn: async ({ id }: { id: string; engagementId?: string; count?: number }) =>
       (await api.post(`/tasks/${id}/restore`)).data,
     onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: tasksKey(projectId) });
@@ -187,13 +188,88 @@ export function useRestoreTask(projectId: string) {
         qc.invalidateQueries({ queryKey: engTasksKey(vars.engagementId) });
         qc.invalidateQueries({ queryKey: engCostKey(vars.engagementId) });
       }
-      toast.success("Tarefa restaurada");
+      const n = vars.count ?? 1;
+      toast.success(n > 1 ? `${n} tarefas restauradas` : "Tarefa restaurada");
     },
     onError: (err) => {
       const code = errorCode(err);
       if (code === "VALIDACAO") toast.error("Não foi possível desfazer: o projeto ou o cliente foi excluído");
       else toast.error("Não foi possível restaurar a tarefa");
     },
+  });
+}
+
+// ---- Ações em massa [acoes-em-massa] ----
+
+/** Invalida as mesmas chaves do delete/move unitário (lista do cliente + do projeto + custo + contagens). */
+function invalidateBoard(qc: ReturnType<typeof useQueryClient>, projectId: string, engagementId?: string) {
+  qc.invalidateQueries({ queryKey: tasksKey(projectId) });
+  qc.invalidateQueries({ queryKey: ["tasks", "all"] });
+  qc.invalidateQueries({ queryKey: projectCostKey(projectId) });
+  qc.invalidateQueries({ queryKey: engagementsKey(projectId) });
+  if (engagementId) {
+    qc.invalidateQueries({ queryKey: engTasksKey(engagementId) });
+    qc.invalidateQueries({ queryKey: engCostKey(engagementId) });
+  }
+  // painéis por-tarefa que possam estar abertos em cache (detalhe/timeline/custo) — o lote muda status/existência.
+  qc.invalidateQueries({ queryKey: ["task"] });
+  qc.invalidateQueries({ queryKey: ["activity"] });
+  qc.invalidateQueries({ queryKey: ["task-cost"] });
+}
+
+/**
+ * Excluir em lote: um POST → um deletionBatchId no backend → um Desfazer (restore de qualquer id do lote).
+ * Best-effort: `deletedIds` diz o que realmente saiu (o resto = sem permissão). O toast de Desfazer e o
+ * aviso de falha parcial ficam na tela (como no delete unitário). [acoes-em-massa]
+ */
+export function useBulkDeleteTasks(projectId: string, engagementId?: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ ids }: { ids: string[] }) =>
+      (await api.post<{ deletedCount: number; deletedIds: string[] }>(`/tasks/bulk-delete`, { ids })).data,
+    onSuccess: () => invalidateBoard(qc, projectId, engagementId),
+    onError: (err) => {
+      const code = errorCode(err);
+      if (code === "SEM_PERMISSAO") toast.error("Você não tem permissão para excluir estas tarefas");
+      else toast.error("Não foi possível excluir as tarefas");
+    },
+  });
+}
+
+export interface BulkMoveResult {
+  total: number;
+  failedIds: string[];
+  anyAccessLost: boolean;
+}
+
+/**
+ * Mudar status/coluna em lote: loop client-side sobre /move (last-write-wins, sem token). Posições
+ * pré-calculadas na tela (fim da coluna destino) pra não colidir. Promise.allSettled — aplica o que deu
+ * certo e devolve os ids que falharam (a tela mantém só esses selecionados). [acoes-em-massa RF-11/14/16]
+ */
+export function useBulkMove(projectId: string, engagementId?: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ moves }: { moves: MoveVars[] }): Promise<BulkMoveResult> => {
+      const results = await Promise.allSettled(
+        moves.map((m) => api.patch(`/tasks/${m.id}/move`, { status: m.status, position: m.position })),
+      );
+      const failedIds = moves.filter((_, i) => results[i].status === "rejected").map((m) => m.id);
+      const anyAccessLost = results.some(
+        (r) => r.status === "rejected" && errorCode((r as PromiseRejectedResult).reason) === "PROJETO_SEM_ACESSO",
+      );
+      return { total: moves.length, failedIds, anyAccessLost };
+    },
+    onSettled: (res) => {
+      invalidateBoard(qc, projectId, engagementId);
+      qc.invalidateQueries({ queryKey: ["tasks", "all"] });
+      // se alguém perdeu acesso ao cliente no meio, atualiza a lista de clientes/permissões (como o move unitário)
+      if (res?.anyAccessLost) {
+        qc.invalidateQueries({ queryKey: ["projects"] });
+        qc.invalidateQueries({ queryKey: ["me"] });
+      }
+    },
+    onError: () => toast.error("Não foi possível mover as tarefas"),
   });
 }
 

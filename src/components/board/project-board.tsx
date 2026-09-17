@@ -3,12 +3,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, ChevronDown, FolderX, ListFilter, Loader2 } from "lucide-react";
+import { ArrowLeft, ChevronDown, FolderX, ListChecks, ListFilter, Loader2, X } from "lucide-react";
 import { PERMISSIONS, type TaskStatus } from "@sistema-tasks/contracts";
 import { useProject, useProjects } from "@/lib/hooks/use-projects";
 import { generalEngagementId } from "@/lib/engagements";
 import { useEngagements } from "@/lib/hooks/use-engagements";
 import { useEngagementTasks, useCreateEngagementTask } from "@/lib/hooks/use-engagement-board";
+import { useBulkDeleteTasks, useBulkMove, useRestoreTask } from "@/lib/hooks/use-tasks";
+import { useTaskSelection } from "@/lib/hooks/use-task-selection";
 import { useProjectMembers } from "@/lib/hooks/use-members";
 import { useCan } from "@/lib/hooks/use-can";
 import { httpStatus } from "@/lib/http-error";
@@ -37,6 +39,9 @@ import { TaskList } from "@/components/board/task-list";
 import { TaskCalendar } from "@/components/board/task-calendar";
 import { AssigneeFilter as AssigneeFilterControl } from "@/components/board/assignee-filter";
 import { CreateTaskDialog } from "@/components/board/create-task-dialog";
+import { BulkActionBar } from "@/components/board/bulk-action-bar";
+import { ConfirmDialog } from "@/components/admin/confirm-dialog";
+import { undoToast } from "@/lib/undo-toast";
 import { CostTab } from "@/components/board/cost-tab";
 import { BoardSkeleton, BoardError, EmptyTasks } from "@/components/board/board-states";
 import { Button } from "@/components/ui/button";
@@ -118,12 +123,139 @@ export function ProjectBoard({
     }
   };
 
+  // Ações em massa: seleção múltipla (dona aqui → sobrevive a Kanban↔Lista e ao refetch). [acoes-em-massa]
+  const canDelete = useCan(PERMISSIONS.tarefas_excluir);
+  const canMove = useCan(PERMISSIONS.tarefas_mover);
+  const selection = useTaskSelection();
+  const { selectMode, selectedIds, count, enter, exit, toggle, selectMany, deselectMany, pruneTo } = selection;
+  const bulkDelete = useBulkDeleteTasks(clientId, engagementId);
+  const bulkMove = useBulkMove(clientId, engagementId);
+  const restoreTask = useRestoreTask(clientId);
+  const [confirmBulk, setConfirmBulk] = useState(false);
+  const busy = bulkDelete.isPending || bulkMove.isPending; // bloqueia sair no meio do envio (não perde a re-seleção de falha)
+  const selectBtnRef = useRef<HTMLButtonElement>(null); // foco volta pra cá ao sair do modo [a11y]
+  const wasSelectingRef = useRef(false);
+
   // No Kanban o Status é ignorado (as colunas já são o status). [RF-3]
   const kanban = effectiveView === "kanban";
   const visibleTasks = useMemo(
     () => filterTasks(tasks.data ?? [], filters, { ignoreStatus: kanban }),
     [tasks.data, filters, kanban],
   );
+
+  // Poda a seleção pro que continua visível (filtro/refetch); encerra ao trocar contexto ou sair de
+  // Kanban/Lista; Esc sai do modo. [RF-3/17/18/19]
+  useEffect(() => {
+    pruneTo(new Set(visibleTasks.map((t) => t.id)));
+  }, [visibleTasks, pruneTo]);
+  useEffect(() => {
+    exit();
+  }, [clientId, engagementId, exit]);
+  useEffect(() => {
+    if (effectiveView !== "kanban" && effectiveView !== "lista") exit();
+  }, [effectiveView, exit]);
+  useEffect(() => {
+    if (!selectMode) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !confirmBulk && !busy) exit();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectMode, confirmBulk, busy, exit]);
+  // ao SAIR do modo, devolve o foco pro botão "Selecionar" (não deixa cair no body). [a11y RF-4]
+  useEffect(() => {
+    if (wasSelectingRef.current && !selectMode) selectBtnRef.current?.focus();
+    wasSelectingRef.current = selectMode;
+  }, [selectMode]);
+
+  const canSelect =
+    (canDelete || canMove) && (effectiveView === "kanban" || effectiveView === "lista") && (tasks.data?.length ?? 0) > 0;
+
+  // desmarcar a última sai do modo (RF-3); no envio, ignora pra não perder a re-seleção de falha.
+  const handleToggle = (id: string) => {
+    if (busy) return;
+    if (selectedIds.size === 1 && selectedIds.has(id)) exit();
+    else toggle(id);
+  };
+  const enterOrExit = () => {
+    if (busy) return;
+    selectMode ? exit() : enter();
+  };
+  // "selecionar todas as visíveis" (checkbox-mestre da Lista). Tudo marcado → limpa e sai. [RF-9]
+  const visibleIds = useMemo(() => visibleTasks.map((t) => t.id), [visibleTasks]);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+  const toggleAllVisible = () => {
+    if (busy) return;
+    if (allVisibleSelected) exit();
+    else selectMany(visibleIds);
+  };
+  // "selecionar coluna" (Kanban). Coluna toda marcada → desmarca; se zerar tudo, sai. [RF-9]
+  const toggleColumn = (status: TaskStatus) => {
+    if (busy) return;
+    const colIds = visibleTasks.filter((t) => t.status === status).map((t) => t.id);
+    if (colIds.length === 0) return;
+    const allSel = colIds.every((id) => selectedIds.has(id));
+    if (allSel) {
+      const rest = [...selectedIds].filter((id) => !colIds.includes(id));
+      if (rest.length === 0) exit();
+      else deselectMany(colIds);
+    } else selectMany(colIds);
+  };
+
+  const doBulkDelete = () => {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    bulkDelete.mutate(
+      { ids },
+      {
+        onSuccess: (res) => {
+          setConfirmBulk(false);
+          const failed = ids.filter((id) => !res.deletedIds.includes(id));
+          const n = res.deletedCount;
+          undoToast(`${n} ${n === 1 ? "tarefa excluída" : "tarefas excluídas"}`, () => {
+            if (res.deletedIds[0]) restoreTask.mutate({ id: res.deletedIds[0], engagementId, count: n });
+          });
+          if (failed.length > 0) {
+            // best-effort: as que sobraram foram removidas/alteradas por outra pessoa nesse meio-tempo. [RF-14]
+            toast.message(
+              `${failed.length} ${failed.length === 1 ? "não pôde" : "não puderam"} ser excluída${failed.length === 1 ? "" : "s"} — recarregue e tente de novo.`,
+            );
+            pruneTo(new Set(failed)); // mantém só as que falharam
+          } else {
+            exit();
+          }
+        },
+      },
+    );
+  };
+
+  const doBulkMove = (status: TaskStatus) => {
+    const all = tasks.data ?? [];
+    const selected = all.filter((t) => selectedIds.has(t.id));
+    if (selected.length === 0) return;
+    // posições no fim da coluna destino (base = maior posição entre as NÃO selecionadas de lá). [design]
+    const base = all
+      .filter((t) => t.status === status && !selectedIds.has(t.id))
+      .reduce((mx, t) => Math.max(mx, t.position), 0);
+    const moves = selected.map((t, i) => ({ id: t.id, status, position: base + i + 1 }));
+    bulkMove.mutate(
+      { moves },
+      {
+        onSuccess: (res) => {
+          if (res.failedIds.length === 0) {
+            toast.success(`${res.total} ${res.total === 1 ? "tarefa movida" : "tarefas movidas"}`);
+            exit();
+          } else {
+            const ok = res.total - res.failedIds.length;
+            toast.message(
+              `${ok} de ${res.total} movidas · ${res.failedIds.length} ${res.failedIds.length === 1 ? "falhou" : "falharam"}`,
+            );
+            pruneTo(new Set(res.failedIds)); // mantém só as que falharam pra tentar de novo
+          }
+        },
+      },
+    );
+  };
 
   // Preset "aplicado" = aquele cujos filtros batem exatamente com os atuais. [Versão B — sem "modificado"]
   const activePresetId = useMemo(() => {
@@ -291,6 +423,20 @@ export function ProjectBoard({
               </span>
             )}
           </button>
+          {canSelect && (
+            <button
+              type="button"
+              aria-pressed={selectMode}
+              aria-label={selectMode ? "Cancelar seleção" : "Selecionar tarefas"}
+              onClick={enterOrExit}
+              className={cn(
+                "flex size-10 shrink-0 items-center justify-center rounded-lg border outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                selectMode ? "border-primary bg-accent text-primary" : "border-border bg-card text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {selectMode ? <X className="size-4" aria-hidden /> : <ListChecks className="size-4" aria-hidden />}
+            </button>
+          )}
         </div>
         {renderTabs("flex gap-0.5 overflow-x-auto rounded-lg border border-border bg-card p-[3px] text-[12.5px]")}
       </header>
@@ -423,6 +569,23 @@ export function ProjectBoard({
         {renderTabs("ml-1 flex gap-0.5 rounded-lg border border-border bg-card p-[3px] text-[12.5px]")}
 
         <div className="ml-auto flex items-center gap-2">
+          {canSelect && (
+            <button
+              ref={selectBtnRef}
+              type="button"
+              aria-pressed={selectMode}
+              onClick={enterOrExit}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[12px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                selectMode
+                  ? "border-primary bg-accent text-primary"
+                  : "border-border bg-card text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {selectMode ? <X className="size-3.5" aria-hidden /> : <ListChecks className="size-3.5" aria-hidden />}
+              {selectMode ? "Cancelar" : "Selecionar"}
+            </button>
+          )}
           {canSave && (
             <button
               type="button"
@@ -471,7 +634,17 @@ export function ProjectBoard({
           </Button>
         </div>
       ) : effectiveView === "lista" ? (
-        <TaskList tasks={visibleTasks} membersById={membersById} onOpenTask={openTask} />
+        <TaskList
+          tasks={visibleTasks}
+          membersById={membersById}
+          onOpenTask={openTask}
+          selectMode={selectMode}
+          isSelected={(id) => selectedIds.has(id)}
+          onToggleSelect={handleToggle}
+          onSelectRange={selectMany}
+          allSelected={allVisibleSelected}
+          onToggleAll={toggleAllVisible}
+        />
       ) : effectiveView === "calendario" ? (
         <TaskCalendar tasks={visibleTasks} onOpenTask={openTask} membersById={membersById} />
       ) : (
@@ -480,11 +653,15 @@ export function ProjectBoard({
           projectId={clientId}
           engagementId={engagementId}
           membersById={membersById}
-          dragDisabled={hasBoardFilterExceptStatus(filters)}
+          dragDisabled={hasBoardFilterExceptStatus(filters) || selectMode}
           onOpenTask={openTask}
           onAddTask={openCreate}
           canCreate={canCreate}
           onQuickAdd={quickAdd}
+          selectMode={selectMode}
+          isSelected={(id) => selectedIds.has(id)}
+          onToggleSelect={handleToggle}
+          onToggleColumn={toggleColumn}
         />
       )}
 
@@ -515,6 +692,33 @@ export function ProjectBoard({
             setAddStatus(null);
             setAddInitialTitle("");
           }
+        }}
+      />
+
+      {/* Ações em massa: barra flutuante (≥1 selecionada) + confirmação do excluir em lote. [acoes-em-massa] */}
+      {selectMode && count > 0 && (
+        <BulkActionBar
+          count={count}
+          canMove={canMove}
+          canDelete={canDelete}
+          pending={bulkDelete.isPending || bulkMove.isPending}
+          onMoveTo={doBulkMove}
+          onDelete={() => setConfirmBulk(true)}
+          onClear={exit}
+        />
+      )}
+      <ConfirmDialog
+        open={confirmBulk}
+        title={`Excluir ${count} ${count === 1 ? "tarefa" : "tarefas"}?`}
+        description="As tarefas selecionadas serão removidas do quadro."
+        reversible
+        danger
+        confirmLabel="Excluir"
+        pendingLabel="Excluindo…"
+        pending={bulkDelete.isPending}
+        onConfirm={doBulkDelete}
+        onOpenChange={(o) => {
+          if (!o) setConfirmBulk(false);
         }}
       />
     </>
