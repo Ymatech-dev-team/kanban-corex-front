@@ -49,12 +49,7 @@ export function ConfirmDialog({
           <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button
-            type="button"
-            onClick={onConfirm}
-            disabled={pending}
-            className={danger ? "bg-amber text-primary-foreground hover:bg-amber/90" : undefined}
-          >
+          <Button type="button" onClick={onConfirm} disabled={pending} variant={danger ? "danger" : "default"}>
             {pending ? pendingLabel : confirmLabel}
           </Button>
         </div>

@@ -476,12 +476,7 @@ export function EditMemberDialog({
               <Button type="button" variant="secondary" onClick={() => setPendingClose(false)}>
                 Continuar editando
               </Button>
-              <Button
-                ref={discardRef}
-                type="button"
-                onClick={() => onOpenChange(false)}
-                className="bg-amber text-primary-foreground hover:bg-amber/90"
-              >
+              <Button ref={discardRef} type="button" variant="danger" onClick={() => onOpenChange(false)}>
                 Descartar
               </Button>
             </div>
