@@ -148,6 +148,7 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
   const [confirmLeave, setConfirmLeave] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const seededFor = useRef<string | null>(null);
+  const freshTokenFor = useRef<string | null>(null); // token já corrigido do fetch fresco desta carga
   const descRef = useRef<HTMLTextAreaElement>(null);
   const titleRef = useRef<HTMLTextAreaElement>(null);
 
@@ -199,11 +200,22 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
         draft = null;
       }
       setForm(draft ?? baselineFrom(task));
-      setSeededUpdatedAt(task.updatedAt);
+      setSeededUpdatedAt(task.updatedAt); // provisório (pode vir de cache); corrigido pelo efeito abaixo
       setTab("detalhes");
       seededFor.current = task.id;
+      freshTokenFor.current = null; // libera o re-semear do fetch fresco deste mount
     }
   }, [task]);
+
+  // Corrige o token de concorrência com o updatedAt FRESCO (o fetch DESTE mount), não o do cache velho —
+  // senão o if-unmodified-since sai defasado e todo save dá 409 falso. Uma vez por carga: refetch-no-foco
+  // NÃO re-semeia (o guard freshTokenFor preserva a proteção contra sobrescrever edição alheia). [bug 409]
+  useEffect(() => {
+    if (task && detail.isFetchedAfterMount && freshTokenFor.current !== task.id) {
+      setSeededUpdatedAt(task.updatedAt);
+      freshTokenFor.current = task.id;
+    }
+  }, [task, detail.isFetchedAfterMount]);
 
   const subs = task?.subtasks ?? [];
   const doneCount = subs.filter((s) => s.done).length;

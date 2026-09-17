@@ -255,6 +255,9 @@ export function useTaskDetail(taskId: string | null) {
     queryKey: taskKey(taskId),
     enabled: !!taskId,
     queryFn: async () => (await api.get<Task>(`/tasks/${taskId}`)).data,
+    // Sempre refaz no mount: o token de concorrência é semeado do fetch fresco (não do cache velho),
+    // evitando o 409 falso ao reabrir a tarefa vinda do board. [fix bug 409]
+    refetchOnMount: "always",
   });
 }
 
