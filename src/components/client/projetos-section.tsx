@@ -172,8 +172,9 @@ function EngagementFormDialog({
   const [description, setDescription] = useState(engagement?.description ?? "");
   const pending = create.isPending || update.isPending;
 
-  async function save() {
-    if (!name.trim()) return;
+  async function save(e: React.FormEvent) {
+    e.preventDefault(); // <form> → Enter no Nome submete (antes era div+onClick, Enter não criava) [criar-mais-rapido]
+    if (!name.trim() || pending) return;
     try {
       if (engagement) {
         await update.mutateAsync({ id: engagement.id, patch: { name: name.trim(), description: description.trim() || null } });
@@ -192,7 +193,7 @@ function EngagementFormDialog({
         <DialogHeader>
           <DialogTitle>{engagement ? "Editar projeto" : "Novo projeto"}</DialogTitle>
         </DialogHeader>
-        <div className="flex flex-col gap-3">
+        <form onSubmit={save} className="flex flex-col gap-3">
           <div className="flex flex-col gap-1.5">
             <Label htmlFor="eng-name">Nome</Label>
             <Input id="eng-name" autoFocus value={name} maxLength={200} onChange={(e) => setName(e.target.value)} />
@@ -201,15 +202,15 @@ function EngagementFormDialog({
             <Label htmlFor="eng-desc">Descrição</Label>
             <Input id="eng-desc" value={description} maxLength={5000} onChange={(e) => setDescription(e.target.value)} />
           </div>
-        </div>
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button type="button" onClick={save} disabled={!name.trim() || pending}>
-            {pending ? "Salvando…" : engagement ? "Salvar" : "Criar projeto"}
-          </Button>
-        </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={!name.trim() || pending}>
+              {pending ? "Salvando…" : engagement ? "Salvar" : "Criar projeto"}
+            </Button>
+          </div>
+        </form>
       </DialogContent>
     </Dialog>
   );

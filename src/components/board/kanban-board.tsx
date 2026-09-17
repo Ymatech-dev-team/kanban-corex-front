@@ -20,6 +20,7 @@ import type { Task } from "@/lib/types";
 import type { TaskStatus } from "@sistema-tasks/contracts";
 import { useMoveTask } from "@/lib/hooks/use-tasks";
 import { positionForIndex } from "@/lib/position";
+import { QuickAddInput } from "@/components/ui/quick-add-input";
 import { TaskCard } from "./task-card";
 
 const COLUMNS: { status: TaskStatus; label: string; dot: "todo" | "doing" | "done" }[] = [
@@ -89,7 +90,10 @@ interface Props {
   membersById: Record<string, string>;
   dragDisabled?: boolean;
   onOpenTask: (id: string) => void;
-  onAddTask: (status: TaskStatus) => void;
+  onAddTask: (status: TaskStatus, initialTitle?: string) => void;
+  canCreate?: boolean; // esconde os controles de "+" quando falta tarefas_criar [criar-mais-rapido]
+  // quick-add inline na coluna (só no board por-cliente, engagement conhecido). Ausente = "+" abre o modal.
+  onQuickAdd?: (status: TaskStatus, title: string) => Promise<void>;
   // Visão GLOBAL: move próprio (otimista na lista agregada) + kicker de cliente no card. [tarefas-visao-global]
   onMove?: (vars: { id: string; status: TaskStatus; position: number }) => void;
   clientNameById?: Record<string, string>;
@@ -104,6 +108,8 @@ export function KanbanBoard({
   dragDisabled,
   onOpenTask,
   onAddTask,
+  canCreate = true,
+  onQuickAdd,
   onMove,
   clientNameById,
   showClient,
@@ -203,6 +209,8 @@ export function KanbanBoard({
             dragDisabled={dragDisabled}
             onOpenTask={openGuarded}
             onAddTask={onAddTask}
+            canCreate={canCreate}
+            onQuickAdd={onQuickAdd}
             clientNameById={clientNameById}
             showClient={showClient}
           />
@@ -232,6 +240,8 @@ function Column({
   dragDisabled,
   onOpenTask,
   onAddTask,
+  canCreate = true,
+  onQuickAdd,
   clientNameById,
   showClient,
 }: {
@@ -242,11 +252,25 @@ function Column({
   membersById: Record<string, string>;
   dragDisabled?: boolean;
   onOpenTask: (id: string) => void;
-  onAddTask: (status: TaskStatus) => void;
+  onAddTask: (status: TaskStatus, initialTitle?: string) => void;
+  canCreate?: boolean;
+  onQuickAdd?: (status: TaskStatus, title: string) => Promise<void>;
   clientNameById?: Record<string, string>;
   showClient?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: `col:${status}` });
+  const [composerOpen, setComposerOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  // quick-add inline só onde faz sentido: com onQuickAdd (board por-cliente) e fora do "Feito". [criar-mais-rapido]
+  const supportsQuick = !!onQuickAdd && status !== "DONE";
+  // gatilho "+": abre o composer inline (se suportado) ou o modal completo.
+  const trigger = () => (supportsQuick ? setComposerOpen(true) : onAddTask(status));
+  // fecha o composer e devolve o foco ao "+" (a11y — não deixa o foco cair no body). [review]
+  const closeComposer = () => {
+    setComposerOpen(false);
+    triggerRef.current?.focus();
+  };
+
   return (
     <section aria-labelledby={`col-${status}`} className="flex min-w-0 flex-col">
       <div className="flex items-center gap-2.5 px-1 pb-3">
@@ -257,14 +281,17 @@ function Column({
         <span className="rounded-full border border-border bg-card px-1.5 text-[11px] leading-[17px] text-muted-foreground">
           {items.length}
         </span>
-        <button
-          type="button"
-          aria-label={`Nova tarefa em ${label}`}
-          onClick={() => onAddTask(status)}
-          className="ml-auto flex size-6 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-card hover:text-foreground"
-        >
-          <Plus className="size-4" />
-        </button>
+        {canCreate && (
+          <button
+            ref={triggerRef}
+            type="button"
+            aria-label={`Nova tarefa em ${label}`}
+            onClick={trigger}
+            className="ml-auto flex size-6 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-card hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <Plus className="size-4" />
+          </button>
+        )}
       </div>
       <div
         ref={setNodeRef}
@@ -284,10 +311,25 @@ function Column({
             />
           ))}
         </SortableContext>
-        {items.length === 0 && (
+
+        {/* composer inline no rodapé (tarefa nasce no fim, acima dele) */}
+        {canCreate && supportsQuick && composerOpen && (
+          <QuickAddInput
+            placeholder="Título da tarefa"
+            ariaLabel={`Título da nova tarefa em ${label}`}
+            onSubmit={(title) => onQuickAdd!(status, title)}
+            onExpand={(title) => {
+              setComposerOpen(false);
+              onAddTask(status, title);
+            }}
+            onClose={closeComposer}
+          />
+        )}
+
+        {canCreate && items.length === 0 && !composerOpen && (
           <button
             type="button"
-            onClick={() => onAddTask(status)}
+            onClick={trigger}
             className="flex items-center gap-1.5 px-1 py-2 text-xs text-muted-foreground/50 transition-colors hover:text-muted-foreground"
           >
             <Plus className="size-3.5" /> Adicionar tarefa

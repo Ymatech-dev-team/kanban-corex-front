@@ -4,12 +4,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ArrowLeft, ChevronDown, FolderX, ListFilter, Loader2 } from "lucide-react";
-import type { TaskStatus } from "@sistema-tasks/contracts";
+import { PERMISSIONS, type TaskStatus } from "@sistema-tasks/contracts";
 import { useProject, useProjects } from "@/lib/hooks/use-projects";
 import { generalEngagementId } from "@/lib/engagements";
 import { useEngagements } from "@/lib/hooks/use-engagements";
-import { useEngagementTasks } from "@/lib/hooks/use-engagement-board";
+import { useEngagementTasks, useCreateEngagementTask } from "@/lib/hooks/use-engagement-board";
 import { useProjectMembers } from "@/lib/hooks/use-members";
+import { useCan } from "@/lib/hooks/use-can";
 import { httpStatus } from "@/lib/http-error";
 import { filterTasks, respToAssignee, type AssigneeFilter } from "@/lib/filter";
 import {
@@ -72,6 +73,7 @@ export function ProjectBoard({
   const clients = useProjects(); // clientes que o usuário acessa (o backend já filtra por permissão) [seletor de clientes]
   const engagements = useEngagements(clientId);
   const [addStatus, setAddStatus] = useState<TaskStatus | null>(null);
+  const [addInitialTitle, setAddInitialTitle] = useState(""); // título vindo do quick-add ao "abrir completo"
   const [filters, setFilters] = useState<BoardFilters>(EMPTY_BOARD_FILTERS);
   const [view, setView] = useState<ViewKey>("kanban");
   const [sheetOpen, setSheetOpen] = useState(false); // sheet do header no mobile [shell-mobile]
@@ -99,6 +101,22 @@ export function ProjectBoard({
   const membersById = useMemo(() => Object.fromEntries(members.map((m) => [m.id, m.name])), [members]);
   const list = engagements.data ?? [];
   const current = list.find((e) => e.id === engagementId) ?? null;
+
+  // Criar rápido: quick-add inline na coluna (cria quieto, sem toast em série) + "abrir completo". [criar-mais-rapido]
+  const canCreate = useCan(PERMISSIONS.tarefas_criar);
+  const createTask = useCreateEngagementTask(engagementId);
+  const openCreate = (status: TaskStatus, initialTitle?: string) => {
+    setAddInitialTitle(initialTitle ?? "");
+    setAddStatus(status);
+  };
+  const quickAdd = async (status: TaskStatus, title: string) => {
+    const created = await createTask.mutateAsync({ title, status, quiet: true });
+    // avisa só se a nova tarefa REALMENTE some pelo filtro atual (ex.: "Sem responsável"/"Média" a mantêm
+    // visível). `id` fixo evita empilhar toasts na criação em série. [RF-11, review]
+    if (filterTasks([created], filters, { ignoreStatus: kanban }).length === 0) {
+      toast.message("Tarefa criada, mas oculta pelo filtro atual.", { id: "quickadd-oculta" });
+    }
+  };
 
   // No Kanban o Status é ignorado (as colunas já são o status). [RF-3]
   const kanban = effectiveView === "kanban";
@@ -464,7 +482,9 @@ export function ProjectBoard({
           membersById={membersById}
           dragDisabled={hasBoardFilterExceptStatus(filters)}
           onOpenTask={openTask}
-          onAddTask={setAddStatus}
+          onAddTask={openCreate}
+          canCreate={canCreate}
+          onQuickAdd={quickAdd}
         />
       )}
 
@@ -487,9 +507,15 @@ export function ProjectBoard({
         projectId={clientId}
         engagementId={engagementId}
         status={addStatus}
+        initialTitle={addInitialTitle}
         members={members}
         canSeeCost={canSeeCost}
-        onOpenChange={(o) => !o && setAddStatus(null)}
+        onOpenChange={(o) => {
+          if (!o) {
+            setAddStatus(null);
+            setAddInitialTitle("");
+          }
+        }}
       />
     </>
   );

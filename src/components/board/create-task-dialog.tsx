@@ -25,12 +25,13 @@ interface Props {
   projectId: string;
   engagementId?: string; // quando presente, cria a tarefa NO PROJETO (endpoint por engagement) [B2]
   status: TaskStatus | null; // coluna de origem; null = fechado
+  initialTitle?: string; // título vindo do quick-add ("abrir completo") [criar-mais-rapido]
   members: Member[];
   canSeeCost?: boolean; // custos.ver no cliente — libera "Horas estimadas" (insumo do custo) [SEC-custo]
   onOpenChange: (open: boolean) => void;
 }
 
-export function CreateTaskDialog({ projectId, engagementId, status, members, canSeeCost = false, onOpenChange }: Props) {
+export function CreateTaskDialog({ projectId, engagementId, status, initialTitle, members, canSeeCost = false, onOpenChange }: Props) {
   const createClient = useCreateTask(projectId);
   const createEng = useCreateEngagementTask(engagementId ?? "");
   const create = engagementId ? createEng : createClient;
@@ -42,13 +43,13 @@ export function CreateTaskDialog({ projectId, engagementId, status, members, can
 
   useEffect(() => {
     if (status) {
-      setTitle("");
+      setTitle(initialTitle ?? ""); // preenche com o título do quick-add, se veio de "abrir completo"
       setPriority("MEDIUM");
       setDue("");
       setAssigneeId(null);
       setEstimated("");
     }
-  }, [status]);
+  }, [status, initialTitle]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();

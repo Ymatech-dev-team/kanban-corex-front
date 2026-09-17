@@ -38,10 +38,11 @@ export function useEngagementCost(engagementId: string | null, enabled: boolean)
 export function useCreateEngagementTask(engagementId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (input: CreateTaskInput) =>
+    // `quiet` (quick-add em série) suprime o toast de sucesso — não vai no payload da API.
+    mutationFn: async ({ quiet: _quiet, ...input }: CreateTaskInput & { quiet?: boolean }) =>
       (await api.post<Task>(`/engagements/${engagementId}/tasks`, input, { headers: { "idempotency-key": idemKey() } }))
         .data,
-    onSuccess: (data) => {
+    onSuccess: (data, vars) => {
       qc.invalidateQueries({ queryKey: engTasksKey(engagementId) });
       qc.invalidateQueries({ queryKey: engCostKey(engagementId) });
       qc.invalidateQueries({ queryKey: ["tasks", "all"] }); // visão global reflete a criação [tarefas-visao-global RF-E5]
@@ -52,7 +53,7 @@ export function useCreateEngagementTask(engagementId: string) {
         qc.invalidateQueries({ queryKey: ["project-cost", data.projectId] });
         qc.invalidateQueries({ queryKey: ["engagements", data.projectId] });
       }
-      toast.success("Tarefa criada");
+      if (!vars.quiet) toast.success("Tarefa criada");
     },
     onError: () => toast.error("Não foi possível criar a tarefa"),
   });

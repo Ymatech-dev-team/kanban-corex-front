@@ -39,6 +39,7 @@ export function GlobalTasksView() {
   // Gate da aba global: sem tarefas.ver_globais, não entra (redireciona quando o /me resolve). [tarefas-visao-global]
   const me = useMe();
   const canView = hasPermission(me.data?.permissions, PERMISSIONS.tarefas_ver_globais);
+  const canCreate = hasPermission(me.data?.permissions, PERMISSIONS.tarefas_criar); // gate do "+" [criar-mais-rapido RF-12]
   useEffect(() => {
     if (me.isSuccess && !canView) router.replace("/");
   }, [me.isSuccess, canView, router]);
@@ -188,6 +189,7 @@ export function GlobalTasksView() {
         showClient={showClient}
         onOpenTask={openTask}
         onAddTask={setAddStatus}
+        canCreate={canCreate}
       />
     );
   } else if (view === "calendario") {
