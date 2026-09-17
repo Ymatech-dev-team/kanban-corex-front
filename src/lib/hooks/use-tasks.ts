@@ -160,12 +160,38 @@ export function useDeleteTask(projectId: string) {
         qc.invalidateQueries({ queryKey: engTasksKey(vars.engagementId) });
         qc.invalidateQueries({ queryKey: engCostKey(vars.engagementId) });
       }
-      toast.success("Tarefa excluída");
+      // o toast de sucesso vira o toast de "Desfazer", disparado pela tela.
     },
     onError: (err) => {
       const code = errorCode(err);
       if (code === "SEM_PERMISSAO") toast.error("Você não tem permissão para excluir");
       else toast.error("Não foi possível excluir a tarefa");
+    },
+  });
+}
+
+/** Desfaz a exclusão da tarefa (restaura o lote). Idempotente no backend. [excluir-com-seguranca] */
+export function useRestoreTask(projectId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id }: { id: string; engagementId?: string }) =>
+      (await api.post(`/tasks/${id}/restore`)).data,
+    onSuccess: (_d, vars) => {
+      qc.invalidateQueries({ queryKey: tasksKey(projectId) });
+      qc.invalidateQueries({ queryKey: ["tasks", "all"] });
+      qc.invalidateQueries({ queryKey: projectCostKey(projectId) });
+      qc.invalidateQueries({ queryKey: engagementsKey(projectId) });
+      qc.invalidateQueries({ queryKey: taskKey(vars.id) });
+      if (vars.engagementId) {
+        qc.invalidateQueries({ queryKey: engTasksKey(vars.engagementId) });
+        qc.invalidateQueries({ queryKey: engCostKey(vars.engagementId) });
+      }
+      toast.success("Tarefa restaurada");
+    },
+    onError: (err) => {
+      const code = errorCode(err);
+      if (code === "VALIDACAO") toast.error("Não foi possível desfazer: o projeto ou o cliente foi excluído");
+      else toast.error("Não foi possível restaurar a tarefa");
     },
   });
 }

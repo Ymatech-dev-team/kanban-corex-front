@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api } from "@/lib/api";
+import { errorCode, tasksKey } from "@/lib/hooks/use-tasks";
+import { projectCostKey } from "@/lib/hooks/use-cost";
 import type { Consultor, Engagement } from "@/lib/types";
 
 export function engagementsKey(clientId: string | null) {
@@ -51,9 +53,32 @@ export function useDeleteEngagement(clientId: string) {
     mutationFn: async (id: string) => (await api.delete(`/engagements/${id}`)).data,
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: engagementsKey(clientId) });
-      toast.success("Projeto excluído");
+      qc.invalidateQueries({ queryKey: ["tasks", "all"] }); // as tarefas do projeto saem da visão global
+      qc.invalidateQueries({ queryKey: tasksKey(clientId) }); // métricas do cliente (ClientMetrics) [review]
+      qc.invalidateQueries({ queryKey: projectCostKey(clientId) }); // custo agregado do cliente [review]
+      // o toast de sucesso vira o toast de "Desfazer", disparado pela tela.
     },
     onError: () => toast.error("Não foi possível excluir o projeto"),
+  });
+}
+
+/** Desfaz a exclusão do projeto (restaura o lote: projeto + tarefas). [excluir-com-seguranca] */
+export function useRestoreEngagement(clientId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => (await api.post(`/engagements/${id}/restore`)).data,
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: engagementsKey(clientId) });
+      qc.invalidateQueries({ queryKey: ["tasks", "all"] });
+      qc.invalidateQueries({ queryKey: tasksKey(clientId) }); // métricas do cliente voltam [review]
+      qc.invalidateQueries({ queryKey: projectCostKey(clientId) });
+      toast.success("Projeto restaurado");
+    },
+    onError: (err) => {
+      const code = errorCode(err);
+      if (code === "VALIDACAO") toast.error("Não foi possível desfazer: o cliente foi excluído");
+      else toast.error("Não foi possível restaurar o projeto");
+    },
   });
 }
 

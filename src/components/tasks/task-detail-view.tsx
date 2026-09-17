@@ -28,11 +28,13 @@ import {
   useUpdateTask,
   useMoveTask,
   useDeleteTask,
+  useRestoreTask,
   useAddSubtask,
   useToggleSubtask,
   useDeleteSubtask,
   errorCode,
 } from "@/lib/hooks/use-tasks";
+import { undoToast } from "@/lib/undo-toast";
 import { useEngagementTasks } from "@/lib/hooks/use-engagement-board";
 import { positionForIndex } from "@/lib/position";
 import { useCan } from "@/lib/hooks/use-can";
@@ -117,6 +119,7 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
   const update = useUpdateTask(projectId);
   const move = useMoveTask(projectId, task?.engagementId);
   const del = useDeleteTask(projectId);
+  const restoreTask = useRestoreTask(projectId);
   const add = useAddSubtask(taskId);
   const toggle = useToggleSubtask(taskId);
   const removeSub = useDeleteSubtask(taskId);
@@ -146,7 +149,6 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
   const [isLg, setIsLg] = useState(false);
   const [conflict, setConflict] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const seededFor = useRef<string | null>(null);
   const freshTokenFor = useRef<string | null>(null); // token já corrigido do fetch fresco desta carga
   const descRef = useRef<HTMLTextAreaElement>(null);
@@ -332,12 +334,20 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
     await add.mutateAsync(t);
   }
 
+  // Excluir tarefa: direto (sem modal), com "Desfazer" no toast. [excluir-com-seguranca]
   async function onDelete() {
     if (!task) return;
-    setConfirmDelete(false);
-    await del.mutateAsync({ id: task.id, engagementId: task.engagementId });
-    clearDraft();
-    router.push(backPath);
+    const { id, engagementId } = task;
+    const nSub = task.subtasks?.length ?? 0;
+    try {
+      await del.mutateAsync({ id, engagementId });
+      clearDraft();
+      router.push(backPath);
+      const msg = nSub > 0 ? `Tarefa e ${nSub} ${nSub === 1 ? "subtarefa" : "subtarefas"} excluídas` : "Tarefa excluída";
+      undoToast(msg, () => restoreTask.mutate({ id, engagementId }));
+    } catch {
+      /* erro já vira toast no hook; permanece na tela */
+    }
   }
 
   // ---- estados de topo ----
@@ -575,11 +585,12 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
         {canDelete && (
           <button
             type="button"
-            onClick={() => setConfirmDelete(true)}
-            className="ml-auto inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[12.5px] text-muted-foreground outline-none transition-colors hover:text-amber focus-visible:ring-2 focus-visible:ring-ring"
+            onClick={onDelete}
+            disabled={del.isPending}
+            className="ml-auto inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[12.5px] text-muted-foreground outline-none transition-colors hover:text-amber focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
           >
             <Trash2 className="size-4" />
-            Excluir
+            {del.isPending ? "Excluindo…" : "Excluir"}
           </button>
         )}
       </header>
@@ -645,24 +656,6 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
               }}
             >
               Descartar
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Confirmar exclusão */}
-      <Dialog open={confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(false)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Excluir esta tarefa?</DialogTitle>
-            <DialogDescription>A tarefa e suas subtarefas serão removidas. Esta ação não pode ser desfeita.</DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="secondary" onClick={() => setConfirmDelete(false)}>
-              Cancelar
-            </Button>
-            <Button type="button" className="bg-amber text-primary-foreground hover:bg-amber/90" disabled={del.isPending} onClick={onDelete}>
-              {del.isPending ? "Excluindo…" : "Excluir"}
             </Button>
           </div>
         </DialogContent>

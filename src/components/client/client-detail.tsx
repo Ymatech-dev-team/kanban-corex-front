@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { AlertTriangle, ArrowLeft, ChevronRight, FolderTree, Loader2, Plus, Trash2, User, Wallet, X } from "lucide-react";
 import { PERMISSIONS } from "@sistema-tasks/contracts";
-import { useProject, useDeleteProject } from "@/lib/hooks/use-projects";
+import { useProject, useDeleteProject, useRestoreProject } from "@/lib/hooks/use-projects";
 import { useEngagements } from "@/lib/hooks/use-engagements";
+import { undoToast } from "@/lib/undo-toast";
+import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { tasksKey, errorCode } from "@/lib/hooks/use-tasks";
 import { useProjectMembers, useGrantAccess, useRevokeAccess } from "@/lib/hooks/use-members";
 import { useMembers } from "@/lib/hooks/use-admin";
@@ -222,10 +224,11 @@ function NotFound() {
   );
 }
 
-/** Confirmação de excluir cliente — mostra o impacto da cascata (projetos + tarefas). [painel] */
+/** Confirmação de excluir cliente — mostra a cascata (projetos + tarefas) + undo. [excluir-com-seguranca] */
 function DeleteClientDialog({ projectId, name, onClose }: { projectId: string; name: string; onClose: () => void }) {
   const router = useRouter();
   const del = useDeleteProject();
+  const restore = useRestoreProject();
   const engs = useEngagements(projectId); // cache quente (ProjetosSection já carregou)
   const ready = !engs.isLoading && !engs.isError && !!engs.data;
   const data = engs.data ?? [];
@@ -235,48 +238,45 @@ function DeleteClientDialog({ projectId, name, onClose }: { projectId: string; n
   const parts = [
     projetos > 0 ? `${projetos} ${projetos === 1 ? "projeto" : "projetos"}` : null,
     tarefas > 0 ? `${tarefas} ${tarefas === 1 ? "tarefa" : "tarefas"}` : null,
-  ].filter(Boolean);
+  ].filter(Boolean) as string[];
+  // Cascata honesta: com cache frio não afirma "0", diz "todos os seus projetos e tarefas". [RF-2]
+  const cascade = !ready ? "todos os seus projetos e tarefas" : parts.length > 0 ? parts.join(" e ") : null;
 
   async function confirm() {
     try {
       await del.mutateAsync(projectId);
+      onClose();
       router.push("/clientes");
+      const msg = projetos > 0 ? `Cliente e ${projetos} ${projetos === 1 ? "projeto" : "projetos"} excluídos` : "Cliente excluído";
+      undoToast(msg, () => restore.mutate(projectId));
     } catch (e) {
-      // Já excluído por outro: o objetivo foi atingido — navega mesmo assim. [painel]
-      if (errorCode(e) === "NAO_ENCONTRADO") router.push("/clientes");
+      // Já excluído por outro: o objetivo foi atingido — navega mesmo assim.
+      if (errorCode(e) === "NAO_ENCONTRADO") {
+        onClose();
+        router.push("/clientes");
+      }
       // demais erros: toast já no hook, permanece na tela
     }
   }
 
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Excluir cliente</DialogTitle>
-        </DialogHeader>
-        <p className="text-sm text-muted-foreground">
-          Excluir o cliente <span className="text-foreground">{name}</span>?{" "}
-          {!ready
-            ? "Isso remove todos os seus projetos e tarefas, e não pode ser desfeito."
-            : parts.length > 0
-              ? `Isso remove ${parts.join(" e ")}, e não pode ser desfeito.`
-              : "Isso não pode ser desfeito."}
-        </p>
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button
-            type="button"
-            className="bg-amber text-primary-foreground hover:bg-amber/90"
-            onClick={confirm}
-            disabled={del.isPending}
-          >
-            {del.isPending ? "Excluindo…" : "Excluir"}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+    <ConfirmDialog
+      open
+      title="Excluir cliente"
+      description={
+        <>
+          Excluir o cliente <span className="text-foreground">{name}</span>?
+          {cascade ? ` Isto remove ${cascade}.` : ""}
+        </>
+      }
+      reversible
+      confirmLabel="Excluir"
+      pendingLabel="Excluindo…"
+      danger
+      pending={del.isPending}
+      onConfirm={confirm}
+      onOpenChange={(o) => !o && onClose()}
+    />
   );
 }
 

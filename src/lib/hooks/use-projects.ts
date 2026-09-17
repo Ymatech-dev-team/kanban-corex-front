@@ -56,13 +56,33 @@ export function useDeleteProject() {
       qc.removeQueries({ queryKey: ["engagements", id] }); // projetos do cliente
       qc.removeQueries({ queryKey: ["members", id] });
       qc.removeQueries({ queryKey: ["project-cost", id] });
-      toast.success("Cliente excluído");
+      // o toast de sucesso vira o toast de "Desfazer", disparado pela tela (que tem a contagem da cascata).
     },
     onError: (err) => {
       const code = errorCode(err);
       if (code === "SEM_PERMISSAO") toast.error("Você não tem permissão para excluir clientes");
       else if (code === "NAO_ENCONTRADO") toast.error("Este cliente já não existe");
       else toast.error("Não foi possível excluir o cliente");
+    },
+  });
+}
+
+/** Desfaz a exclusão do cliente (restaura o lote: cliente + projetos + tarefas). [excluir-com-seguranca] */
+export function useRestoreProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => (await api.post(`/projects/${id}/restore`)).data,
+    onSuccess: (_data, id) => {
+      qc.invalidateQueries({ queryKey: ["projects"] });
+      qc.invalidateQueries({ queryKey: ["tasks", "all"] });
+      qc.invalidateQueries({ queryKey: projectKey(id) });
+      qc.invalidateQueries({ queryKey: ["engagements", id] });
+      toast.success("Cliente restaurado");
+    },
+    onError: (err) => {
+      const code = errorCode(err);
+      if (code === "VALIDACAO") toast.error("Não foi possível desfazer: este cliente mudou");
+      else toast.error("Não foi possível restaurar o cliente");
     },
   });
 }

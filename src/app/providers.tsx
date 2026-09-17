@@ -28,6 +28,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <Toaster
         theme="dark"
         position="bottom-right"
+        // no mobile o toast (e o "Desfazer") sobe pra não ficar atrás da bottom-nav. [review UX]
+        mobileOffset={{ bottom: "calc(80px + env(safe-area-inset-bottom))" }}
         toastOptions={{
           style: {
             background: "var(--color-card)",

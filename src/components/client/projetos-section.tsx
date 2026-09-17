@@ -10,12 +10,15 @@ import {
   useCreateEngagement,
   useUpdateEngagement,
   useDeleteEngagement,
+  useRestoreEngagement,
   useConsultores,
   useAddConsultor,
   useRemoveConsultor,
 } from "@/lib/hooks/use-engagements";
 import { useProjectMembers } from "@/lib/hooks/use-members";
 import { useCan } from "@/lib/hooks/use-can";
+import { undoToast } from "@/lib/undo-toast";
+import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -222,42 +225,37 @@ function DeleteEngagementDialog({
   onClose: () => void;
 }) {
   const del = useDeleteEngagement(projectId);
+  const restore = useRestoreEngagement(projectId);
+  const n = engagement.taskCount;
+  const cascade = n > 0 ? ` e suas ${n} ${n === 1 ? "tarefa" : "tarefas"}` : "";
   async function confirm() {
     try {
       await del.mutateAsync(engagement.id);
       onClose();
+      const msg = n > 0 ? `Projeto e ${n} ${n === 1 ? "tarefa" : "tarefas"} excluídos` : "Projeto excluído";
+      undoToast(msg, () => restore.mutate(engagement.id));
     } catch {
       /* toast no hook */
     }
   }
   return (
-    <Dialog open onOpenChange={(o) => !o && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Excluir projeto</DialogTitle>
-        </DialogHeader>
-        <p className="text-sm text-muted-foreground">
+    <ConfirmDialog
+      open
+      title="Excluir projeto"
+      description={
+        <>
           Excluir o projeto <span className="text-foreground">{engagement.name}</span>
-          {engagement.taskCount > 0
-            ? ` e suas ${engagement.taskCount} ${engagement.taskCount === 1 ? "tarefa" : "tarefas"}?`
-            : "?"}{" "}
-          Isso não pode ser desfeito.
-        </p>
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancelar
-          </Button>
-          <Button
-            type="button"
-            className="bg-amber text-primary-foreground hover:bg-amber/90"
-            onClick={confirm}
-            disabled={del.isPending}
-          >
-            {del.isPending ? "Excluindo…" : "Excluir"}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+          {cascade}?
+        </>
+      }
+      reversible
+      confirmLabel="Excluir"
+      pendingLabel="Excluindo…"
+      danger
+      pending={del.isPending}
+      onConfirm={confirm}
+      onOpenChange={(o) => !o && onClose()}
+    />
   );
 }
 
