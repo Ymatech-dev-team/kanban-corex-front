@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { ArrowLeft, ChevronDown, FolderX, ListFilter, Loader2 } from "lucide-react";
 import type { TaskStatus } from "@sistema-tasks/contracts";
 import { useProject, useProjects } from "@/lib/hooks/use-projects";
@@ -10,7 +11,26 @@ import { useEngagements } from "@/lib/hooks/use-engagements";
 import { useEngagementTasks } from "@/lib/hooks/use-engagement-board";
 import { useProjectMembers } from "@/lib/hooks/use-members";
 import { httpStatus } from "@/lib/http-error";
-import { filterByAssignee, type AssigneeFilter } from "@/lib/filter";
+import { filterTasks, respToAssignee, type AssigneeFilter } from "@/lib/filter";
+import {
+  type BoardFilters,
+  EMPTY_BOARD_FILTERS,
+  boardFiltersEqual,
+  hasAnyBoardFilter,
+  hasBoardFilterExceptStatus,
+  parseBoardFilters,
+  readAppliedPresetId,
+  writeAppliedPresetId,
+} from "@/lib/board-filters";
+import { useBoardPresets, type Preset } from "@/lib/hooks/use-board-filters";
+import {
+  FacetPills,
+  FacetsDropdown,
+  PresetDialogs,
+  PresetsControl,
+  PresetsSheet,
+  type PresetDialogState,
+} from "@/components/board/board-filters-ui";
 import { KanbanBoard } from "@/components/board/kanban-board";
 import { TaskList } from "@/components/board/task-list";
 import { TaskCalendar } from "@/components/board/task-calendar";
@@ -31,6 +51,13 @@ import { cn } from "@/lib/utils";
 
 type ViewKey = "kanban" | "lista" | "calendario" | "custo";
 
+/** AssigneeFilter (controle) → campo `resp` do BoardFilters. */
+function assigneeToResp(af: AssigneeFilter): string | undefined {
+  if (af.type === "all") return undefined;
+  if (af.type === "none") return "none";
+  return af.id;
+}
+
 export function ProjectBoard({
   clientId,
   engagementId,
@@ -45,9 +72,12 @@ export function ProjectBoard({
   const clients = useProjects(); // clientes que o usuário acessa (o backend já filtra por permissão) [seletor de clientes]
   const engagements = useEngagements(clientId);
   const [addStatus, setAddStatus] = useState<TaskStatus | null>(null);
-  const [assigneeFilter, setAssigneeFilter] = useState<AssigneeFilter>({ type: "all" });
+  const [filters, setFilters] = useState<BoardFilters>(EMPTY_BOARD_FILTERS);
   const [view, setView] = useState<ViewKey>("kanban");
   const [sheetOpen, setSheetOpen] = useState(false); // sheet do header no mobile [shell-mobile]
+  const [dialog, setDialog] = useState<PresetDialogState>({ kind: "none" });
+
+  const presets = useBoardPresets(clientId);
 
   // Abrir tarefa = navegar pra tela dedicada (o `from` faz o "voltar" retornar a este board). [tela-detalhe-tarefa]
   const boardPath = `/clientes/${clientId}/projetos/${engagementId}`;
@@ -69,10 +99,59 @@ export function ProjectBoard({
   const membersById = useMemo(() => Object.fromEntries(members.map((m) => [m.id, m.name])), [members]);
   const list = engagements.data ?? [];
   const current = list.find((e) => e.id === engagementId) ?? null;
+
+  // No Kanban o Status é ignorado (as colunas já são o status). [RF-3]
+  const kanban = effectiveView === "kanban";
   const visibleTasks = useMemo(
-    () => filterByAssignee(tasks.data ?? [], assigneeFilter),
-    [tasks.data, assigneeFilter],
+    () => filterTasks(tasks.data ?? [], filters, { ignoreStatus: kanban }),
+    [tasks.data, filters, kanban],
   );
+
+  // Preset "aplicado" = aquele cujos filtros batem exatamente com os atuais. [Versão B — sem "modificado"]
+  const activePresetId = useMemo(() => {
+    const found = (presets.data ?? []).find((p) => boardFiltersEqual(parseBoardFilters(p.filters), filters));
+    return found?.id ?? null;
+  }, [presets.data, filters]);
+
+  // Reinicialização por cliente: ao trocar de cliente, zera e reaplica o preset lembrado (F5/RF-23).
+  const initedClientRef = useRef<string | null>(null);
+  const userTouchedRef = useRef(false); // usuário mexeu num filtro → init não pisa por cima
+  // Toda mudança MANUAL de filtro passa por aqui (marca interação). setFilters cru fica p/ init/programático.
+  const changeFilters: typeof setFilters = (next) => {
+    userTouchedRef.current = true;
+    setFilters(next);
+  };
+  useEffect(() => {
+    if (initedClientRef.current !== clientId) {
+      setFilters(EMPTY_BOARD_FILTERS); // troca de cliente → limpa
+      userTouchedRef.current = false;
+    }
+  }, [clientId]);
+  useEffect(() => {
+    if (initedClientRef.current === clientId) return; // já inicializou este cliente
+    if (!(presets.isSuccess || presets.isError)) return; // espera a lista assentar (sucesso ou erro)
+    if (!userTouchedRef.current) {
+      const storedId = readAppliedPresetId(clientId);
+      const p = storedId ? (presets.data ?? []).find((x) => x.id === storedId) : undefined;
+      if (p) setFilters(parseBoardFilters(p.filters));
+    }
+    initedClientRef.current = clientId;
+  }, [clientId, presets.isSuccess, presets.isError, presets.data]);
+  // Persiste o preset aplicado (só depois de inicializar, pra não apagar o lembrado antes de lê-lo).
+  useEffect(() => {
+    if (initedClientRef.current !== clientId) return;
+    writeAppliedPresetId(clientId, activePresetId);
+  }, [clientId, activePresetId]);
+
+  const applyPreset = (p: Preset) => {
+    const f = parseBoardFilters(p.filters);
+    // Responsável salvo saiu do cliente → cai pra "todos" e avisa (só quando já sei os membros). [RF-17]
+    if (membersQuery.isSuccess && f.resp && f.resp !== "none" && !members.some((m) => m.id === f.resp)) {
+      delete f.resp;
+      toast.message("O responsável salvo não está mais neste cliente — apliquei o resto do filtro.");
+    }
+    changeFilters(f);
+  };
 
   // Cliente inexistente/sem acesso, ou projeto que não existe nele → "não encontrado".
   const clientNotFound = project.isError && [404, 403].includes(httpStatus(project.error) ?? 0);
@@ -131,23 +210,29 @@ export function ProjectBoard({
     </div>
   );
 
-  // Responsável (filtro local) encodado como string pro SheetSelect do mobile.
-  const respActive = assigneeFilter.type !== "all";
-  const respSelected =
-    assigneeFilter.type === "all" ? "all" : assigneeFilter.type === "none" ? "none" : `user:${assigneeFilter.id}`;
+  const total = tasks.data?.length ?? 0;
+  const filtering = visibleTasks.length !== total;
+  const canSave = hasAnyBoardFilter(filters);
+
+  // Responsável encodado como string pro SheetSelect do mobile.
+  const respSelected = filters.resp === undefined ? "all" : filters.resp === "none" ? "none" : `user:${filters.resp}`;
   const respOptions = [
     { value: "all", label: "Todos" },
     { value: "none", label: "Sem responsável" },
     ...members.map((m) => ({ value: `user:${m.id}`, label: m.name })),
   ];
-  const setResp = (v: string | undefined) => {
-    if (v === "none") setAssigneeFilter({ type: "none" });
-    else if (v && v.startsWith("user:")) setAssigneeFilter({ type: "user", id: v.slice(5) });
-    else setAssigneeFilter({ type: "all" });
-  };
+  const setResp = (v: string | undefined) =>
+    changeFilters((f) => ({ ...f, resp: !v || v === "all" ? undefined : v === "none" ? "none" : v.slice(5) }));
+
+  // Contagem de facets ativos aplicáveis (Status não conta no Kanban). Badge do botão "Filtros" no mobile.
+  const activeCount =
+    (filters.resp !== undefined ? 1 : 0) +
+    (filters.prio ? 1 : 0) +
+    (filters.prazo ? 1 : 0) +
+    (!kanban && filters.status ? 1 : 0);
+
   const clienteOptions = (clients.data ?? []).map((c) => ({ value: c.id, label: c.name }));
   const projetoOptions = list.map((e) => ({ value: e.id, label: e.name }));
-  const visibleCount = assigneeFilter.type === "all" ? (tasks.data?.length ?? 0) : visibleTasks.length;
 
   return (
     <>
@@ -178,12 +263,14 @@ export function ProjectBoard({
             onClick={() => setSheetOpen(true)}
             className={cn(
               "flex h-10 shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-[12.5px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-              respActive ? "border-muted-foreground/40 bg-accent text-foreground" : "border-border bg-card text-muted-foreground hover:text-foreground",
+              activeCount > 0 ? "border-muted-foreground/40 bg-accent text-foreground" : "border-border bg-card text-muted-foreground hover:text-foreground",
             )}
           >
             <ListFilter className="size-3.5" aria-hidden />
-            {respActive && (
-              <span className="flex size-[15px] items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-primary-foreground">1</span>
+            {activeCount > 0 && (
+              <span className="flex min-w-[15px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
+                {activeCount}
+              </span>
             )}
           </button>
         </div>
@@ -195,15 +282,38 @@ export function ProjectBoard({
         onOpenChange={setSheetOpen}
         title="Filtros do quadro"
         footer={
-          <button
-            type="button"
-            onClick={() => setSheetOpen(false)}
-            className="ml-auto inline-flex h-9 items-center rounded-lg bg-secondary px-4 text-[13px] font-medium text-secondary-foreground outline-none transition-colors hover:bg-secondary/80 focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            Ver {visibleCount} {visibleCount === 1 ? "tarefa" : "tarefas"}
-          </button>
+          <>
+            {canSave && (
+              <button
+                type="button"
+                onClick={() => changeFilters(EMPTY_BOARD_FILTERS)}
+                className="text-[12.5px] text-muted-foreground underline decoration-muted-foreground/40 underline-offset-2 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                Limpar filtros
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setSheetOpen(false)}
+              className="ml-auto inline-flex h-9 items-center rounded-lg bg-secondary px-4 text-[13px] font-medium text-secondary-foreground outline-none transition-colors hover:bg-secondary/80 focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              Ver {visibleTasks.length} {visibleTasks.length === 1 ? "tarefa" : "tarefas"}
+            </button>
+          </>
         }
       >
+        <PresetsSheet
+          presets={presets.data ?? []}
+          isLoading={presets.isLoading}
+          isError={presets.isError}
+          activeId={activePresetId}
+          canSave={canSave}
+          onApply={applyPreset}
+          onSave={() => { setSheetOpen(false); setDialog({ kind: "save" }); }}
+          onDelete={(p) => { setSheetOpen(false); setDialog({ kind: "delete", preset: p }); }}
+          onRetry={() => presets.refetch()}
+        />
+        <div className="h-px bg-border" />
         {(clients.data?.length ?? 0) > 1 && (
           <SheetSelect
             label="Cliente"
@@ -229,6 +339,7 @@ export function ProjectBoard({
           }}
         />
         <SheetSelect label="Responsável" selected={respSelected} options={respOptions} onSelect={setResp} />
+        <FacetPills filters={filters} onChange={changeFilters} showStatus={!kanban} />
       </BottomSheet>
 
       {/* ---------- DESKTOP header (≥ lg): barra atual ---------- */}
@@ -288,18 +399,42 @@ export function ProjectBoard({
         </DropdownMenu>
 
         <span className="rounded-md border border-border bg-card px-2 py-0.5 text-[11px] text-muted-foreground">
-          {assigneeFilter.type === "all"
-            ? `${tasks.data?.length ?? 0} tarefas`
-            : `${visibleTasks.length} de ${tasks.data?.length ?? 0}`}
+          {filtering ? `${visibleTasks.length} de ${total}` : `${total} tarefas`}
         </span>
 
         {renderTabs("ml-1 flex gap-0.5 rounded-lg border border-border bg-card p-[3px] text-[12.5px]")}
 
-        {members.length > 0 && (
-          <div className="ml-auto">
-            <AssigneeFilterControl members={members} value={assigneeFilter} onChange={setAssigneeFilter} />
-          </div>
-        )}
+        <div className="ml-auto flex items-center gap-2">
+          {canSave && (
+            <button
+              type="button"
+              onClick={() => changeFilters(EMPTY_BOARD_FILTERS)}
+              className="text-[12px] text-muted-foreground underline decoration-muted-foreground/40 underline-offset-2 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              Limpar
+            </button>
+          )}
+          <PresetsControl
+            presets={presets.data ?? []}
+            isLoading={presets.isLoading}
+            isError={presets.isError}
+            activeId={activePresetId}
+            canSave={canSave}
+            onApply={applyPreset}
+            onSave={() => setDialog({ kind: "save" })}
+            onRename={(p) => setDialog({ kind: "rename", preset: p })}
+            onDelete={(p) => setDialog({ kind: "delete", preset: p })}
+            onRetry={() => presets.refetch()}
+          />
+          <FacetsDropdown filters={filters} onChange={changeFilters} showStatus={!kanban} />
+          {members.length > 0 && (
+            <AssigneeFilterControl
+              members={members}
+              value={respToAssignee(filters.resp)}
+              onChange={(af) => changeFilters((f) => ({ ...f, resp: assigneeToResp(af) }))}
+            />
+          )}
+        </div>
       </header>
 
       {effectiveView === "custo" ? (
@@ -308,13 +443,13 @@ export function ProjectBoard({
         <BoardSkeleton />
       ) : tasks.isError ? (
         <BoardError onRetry={() => tasks.refetch()} />
-      ) : (tasks.data?.length ?? 0) === 0 ? (
+      ) : total === 0 ? (
         <EmptyTasks onAdd={() => setAddStatus("TODO")} />
       ) : visibleTasks.length === 0 && effectiveView !== "kanban" ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
-          <p className="text-sm text-muted-foreground">Nenhuma tarefa para este filtro de responsável.</p>
-          <Button variant="secondary" onClick={() => setAssigneeFilter({ type: "all" })}>
-            Limpar filtro
+          <p className="text-sm text-muted-foreground">Nenhuma tarefa para este filtro.</p>
+          <Button variant="secondary" onClick={() => changeFilters(EMPTY_BOARD_FILTERS)}>
+            Limpar filtros
           </Button>
         </div>
       ) : effectiveView === "lista" ? (
@@ -327,11 +462,26 @@ export function ProjectBoard({
           projectId={clientId}
           engagementId={engagementId}
           membersById={membersById}
-          dragDisabled={assigneeFilter.type !== "all"}
+          dragDisabled={hasBoardFilterExceptStatus(filters)}
           onOpenTask={openTask}
           onAddTask={setAddStatus}
         />
       )}
+
+      <PresetDialogs
+        state={dialog}
+        onClose={() => setDialog({ kind: "none" })}
+        projectId={clientId}
+        currentFilters={filters}
+        presets={presets.data ?? []}
+        activeId={activePresetId}
+        onSavedApplied={(id) => {
+          const p = (presets.data ?? []).find((x) => x.id === id);
+          if (p) setFilters(parseBoardFilters(p.filters));
+          writeAppliedPresetId(clientId, id);
+        }}
+        onDeletedApplied={() => writeAppliedPresetId(clientId, null)}
+      />
 
       <CreateTaskDialog
         projectId={clientId}
