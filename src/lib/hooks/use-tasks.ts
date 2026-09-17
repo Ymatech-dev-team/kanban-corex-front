@@ -119,7 +119,8 @@ export function useUpdateTask(projectId: string) {
     mutationFn: async ({ id, patch, updatedAt }: { id: string; patch: UpdateTaskInput; updatedAt?: string }) =>
       (
         await api.patch<Task>(`/tasks/${id}`, patch, {
-          headers: updatedAt ? { "if-unmodified-since": updatedAt } : undefined,
+          // header customizado (não `If-Unmodified-Since`, que o edge da Vercel barra com 412). [fix 412]
+          headers: updatedAt ? { "x-expected-updated-at": updatedAt } : undefined,
         })
       ).data,
     onSuccess: (data, vars) => {

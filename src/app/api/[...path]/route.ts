@@ -29,8 +29,10 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
   const extraHeaders: Record<string, string> = {};
   const idem = req.headers.get("idempotency-key");
   if (idem && /^[A-Za-z0-9_-]{1,128}$/.test(idem)) extraHeaders["idempotency-key"] = idem;
-  const ius = req.headers.get("if-unmodified-since");
-  if (ius && !Number.isNaN(Date.parse(ius))) extraHeaders["if-unmodified-since"] = ius;
+  // Token de concorrência otimista — header CUSTOMIZADO (não o `If-Unmodified-Since` reservado, que o
+  // edge da Vercel intercepta e responde 412 antes de chegar no backend). [fix 412]
+  const iums = req.headers.get("x-expected-updated-at");
+  if (iums && !Number.isNaN(Date.parse(iums))) extraHeaders["x-expected-updated-at"] = iums;
 
   const access = await getAccess();
   let res = await callApi(method, target, { body, accessToken: access, extraHeaders });
