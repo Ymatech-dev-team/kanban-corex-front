@@ -84,7 +84,10 @@ export function RoleEditorDialog({ open, role, onOpenChange }: Props) {
   function toggleGroup(perms: string[], allSelected: boolean) {
     setSelected((prev) => {
       const next = new Set(prev);
-      for (const p of perms) allSelected ? next.delete(p) : next.add(p);
+      for (const p of perms) {
+        if (allSelected) next.delete(p);
+        else next.add(p);
+      }
       return next;
     });
   }

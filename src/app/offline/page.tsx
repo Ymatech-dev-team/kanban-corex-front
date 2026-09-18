@@ -31,6 +31,7 @@ export default function OfflinePage() {
       <p style={{ fontSize: "14px", lineHeight: 1.6, color: "#9aa3ad", maxWidth: "300px", margin: 0 }}>
         Não foi possível carregar esta tela. Verifique a internet e tente de novo.
       </p>
+      {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- offline: recarrega o app inteiro ao voltar online (sem client-nav) */}
       <a
         href="/"
         style={{

@@ -43,7 +43,12 @@ export function markSeen(keys: string[]) {
   if (keys.length === 0) return;
   const next = new Set(read());
   let changed = false;
-  for (const k of keys) if (!next.has(k)) (next.add(k), (changed = true));
+  for (const k of keys) {
+    if (!next.has(k)) {
+      next.add(k);
+      changed = true;
+    }
+  }
   if (changed) commit(next);
 }
 

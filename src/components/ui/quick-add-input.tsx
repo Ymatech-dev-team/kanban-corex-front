@@ -65,7 +65,6 @@ export function QuickAddInput({
       className="flex flex-col gap-1.5 rounded-xl border border-primary/60 bg-card p-2 ring-1 ring-primary/20"
     >
       <div className="flex items-center gap-1.5">
-        {/* eslint-disable-next-line jsx-a11y/no-autofocus */}
         <input
           ref={inputRef}
           value={value}

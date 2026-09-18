@@ -179,7 +179,8 @@ export function ProjectBoard({
   };
   const enterOrExit = () => {
     if (busy) return;
-    selectMode ? exit() : enter();
+    if (selectMode) exit();
+    else enter();
   };
   // "selecionar todas as visíveis" (checkbox-mestre da Lista). Tudo marcado → limpa e sai. [RF-9]
   const visibleIds = useMemo(() => visibleTasks.map((t) => t.id), [visibleTasks]);

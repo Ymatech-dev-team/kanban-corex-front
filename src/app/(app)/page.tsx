@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, CalendarClock, CalendarDays, CircleDashed, ChevronRight, Loader2, ListTodo } from "lucide-react";
+import { AlertTriangle, ChevronRight, ListTodo } from "lucide-react";
 import type { Task } from "@/lib/types";
 import { useMyTasks } from "@/lib/hooks/use-my-tasks";
 import { useProjects } from "@/lib/hooks/use-projects";

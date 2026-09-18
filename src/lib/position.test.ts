@@ -15,7 +15,7 @@ describe("midpoint", () => {
     expect(midpoint(10, 20)).toBe(15);
   });
   it("aguenta várias inserções seguidas no mesmo vão", () => {
-    let a = 0;
+    const a = 0;
     let b = 1;
     for (let i = 0; i < 20; i++) {
       const m = midpoint(a, b);
