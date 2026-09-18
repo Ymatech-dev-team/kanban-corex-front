@@ -8,9 +8,11 @@ const csp = [
   "default-src 'self'",
   `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  // anexo de imagem exibido inline (lightbox) via URL assinada de curta duração do Blob privado. [anexos B]
+  "img-src 'self' data: blob: https://*.blob.vercel-storage.com",
   "font-src 'self' data:",
-  `connect-src 'self'${isDev ? " ws:" : ""}`,
+  // upload de anexo: XHR PUT direto pro Blob (API de controle vercel.com + host de storage do redirect). [anexos B]
+  `connect-src 'self' https://vercel.com https://*.blob.vercel-storage.com${isDev ? " ws:" : ""}`,
   "worker-src 'self' blob:",
   "manifest-src 'self'",
   "frame-ancestors 'none'",

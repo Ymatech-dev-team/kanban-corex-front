@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { dueTag, isDueUrgent } from "@/lib/due";
 import { AssigneesEditor } from "@/components/board/assignees-editor";
+import { AttachmentsSection } from "@/components/board/attachments-section";
 import { ActivityTab } from "@/components/board/activity-tab";
 import {
   useTaskDetail,
@@ -542,6 +543,8 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
           </button>
         </form>
       </div>
+
+      <AttachmentsSection taskId={task.id} disabled={!canEdit} />
 
       <CostLine taskId={task.id} enabled={canSeeCost} />
 
