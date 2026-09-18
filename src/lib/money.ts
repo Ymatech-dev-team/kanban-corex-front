@@ -10,6 +10,12 @@ export function compensationLabel(type: string | null, cents: number | null): st
   return type === "MONTHLY" ? `${value}/mês` : `${value}/h`;
 }
 
+/** Valor + sufixo separados (ex.: { value: "R$ 90,00", suffix: "/h" }). null se não definida. [redesign membros] */
+export function compensationParts(type: string | null, cents: number | null): { value: string; suffix: string } | null {
+  if (!type || cents == null) return null;
+  return { value: formatBRL(cents), suffix: type === "MONTHLY" ? "/mês" : "/h" };
+}
+
 /** "2.500,50" ou "2500.50" ou "2500" → centavos (250050). null se inválido/vazio. */
 export function parseReaisToCents(input: string): number | null {
   const cleaned = input.trim().replace(/\s|R\$/g, "");

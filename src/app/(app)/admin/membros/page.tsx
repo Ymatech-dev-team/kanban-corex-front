@@ -8,14 +8,32 @@ import { toast } from "sonner";
 import { useMe } from "@/lib/hooks/use-me";
 import { useCan } from "@/lib/hooks/use-can";
 import { useMembers, useRoles, useResetPassword, useDeleteMember, type AdminMember } from "@/lib/hooks/use-admin";
-import { initials } from "@/lib/initials";
 import { Button } from "@/components/ui/button";
+import { Avatar } from "@/components/admin/avatar";
+import { RoleChip } from "@/components/admin/role-chip";
+import { MemberStatus } from "@/components/admin/member-status";
 import { CreateMemberDialog } from "@/components/admin/create-member-dialog";
 import { EditMemberDialog } from "@/components/admin/edit-member-dialog";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { TempPasswordDialog } from "@/components/admin/temp-password-dialog";
-import { compensationLabel } from "@/lib/money";
-import { cn } from "@/lib/utils";
+import { compensationParts } from "@/lib/money";
+
+/** Rótulo do perfil: nome do perfil, "—" se o perfil sumiu, ou null (= "Sem perfil"). */
+function roleLabel(roleId: string | null, rolesById: Record<string, string>): string | null {
+  return roleId ? rolesById[roleId] ?? "—" : null;
+}
+
+/** Célula de remuneração — valor em destaque, sufixo (/h, /mês) muted; "—" quando não definida. */
+function Compensation({ type, cents }: { type: string | null; cents: number | null }) {
+  const c = compensationParts(type, cents);
+  if (!c) return <span className="text-[12px] text-muted-foreground/50">—</span>;
+  return (
+    <span className="text-[12.5px] text-foreground">
+      {c.value}
+      <span className="text-muted-foreground">{c.suffix}</span>
+    </span>
+  );
+}
 
 function apiMessage(e: unknown, fallback: string): string {
   return (e as AxiosError<{ error?: { message?: string } }>)?.response?.data?.error?.message ?? fallback;
@@ -40,6 +58,19 @@ export default function MembrosPage() {
     () => Object.fromEntries((roles.data ?? []).map((r) => [r.id, r.name])),
     [roles.data],
   );
+
+  // Ordena por nome (pt-BR, case-insensitive, estável) — some com o "pula" da ordem do backend. [painel]
+  const sorted = useMemo(
+    () => [...(members.data ?? [])].sort((a, b) => a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" })),
+    [members.data],
+  );
+  // Resumo factual: total + quantos em onboarding (senha temporária). Sem "admins", sem agregado de $. [painel]
+  const tempCount = sorted.filter((m) => m.mustChangePassword).length;
+  const summary =
+    sorted.length === 0
+      ? null
+      : `${sorted.length} ${sorted.length === 1 ? "membro" : "membros"}` +
+        (tempCount > 0 ? ` · ${tempCount} com senha temporária` : "");
 
   if (!canView) {
     return (
@@ -102,19 +133,29 @@ export default function MembrosPage() {
               Tentar de novo
             </Button>
           </Centered>
-        ) : (members.data ?? []).length === 0 ? (
-          <div className="flex flex-col items-center gap-2 py-16 text-center">
+        ) : sorted.length === 0 ? (
+          <div className="flex flex-col items-center gap-3 py-16 text-center">
             <p className="text-sm text-muted-foreground">Nenhum membro ainda.</p>
+            {canManage && (
+              <Button onClick={() => setCreateOpen(true)}>
+                <Plus className="size-4" />
+                Novo membro
+              </Button>
+            )}
           </div>
         ) : (
           <>
+            {summary && <p className="mb-3 px-1 text-[12px] text-muted-foreground">{summary}</p>}
+
             {/* Mobile: cards (mesma info da tabela). Só o lápis abre editar, como no desktop. [shell-mobile] */}
             <ul className="flex flex-col gap-2.5 lg:hidden">
-              {(members.data ?? []).map((m) => (
+              {sorted.map((m) => (
                 <li key={m.id}>
                   <MemberCard
                     m={m}
-                    roleLabel={m.roleId ? rolesById[m.roleId] ?? "—" : "Sem perfil"}
+                    rolesReady={roles.isSuccess}
+                    rolesError={roles.isError}
+                    roleName={roleLabel(m.roleId, rolesById)}
                     canManage={canManage}
                     isSelf={m.id === me.data?.userId}
                     onEdit={() => setEditMember(m)}
@@ -124,80 +165,74 @@ export default function MembrosPage() {
             </ul>
 
             {/* Desktop: tabela */}
-            <div className="hidden overflow-x-auto rounded-xl border border-border bg-card lg:block">
-            <table className="w-full min-w-[620px] border-collapse text-[13px]">
-              <thead>
-                <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground/70">
-                  <th className="px-4 py-2.5 font-medium">Membro</th>
-                  <th className="px-4 py-2.5 font-medium">Perfil</th>
-                  {canManage && <th className="px-4 py-2.5 font-medium">Remuneração</th>}
-                  <th className="px-4 py-2.5 font-medium">Situação</th>
-                  <th className="px-4 py-2.5" />
-                </tr>
-              </thead>
-              <tbody>
-                {(members.data ?? []).map((m) => {
-                  const isSelf = m.id === me.data?.userId;
-                  return (
-                    <tr key={m.id} className="border-b border-border/60 last:border-0">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <span className="flex size-8 shrink-0 items-center justify-center rounded-full border border-muted-foreground/40 bg-accent text-[11px] font-medium text-foreground">
-                            {initials(m.name)}
-                          </span>
-                          <div className="leading-tight">
-                            <div className="font-medium">
-                              {m.name}
-                              {isSelf && <span className="ml-2 text-[11px] text-muted-foreground">você</span>}
-                            </div>
-                            <div className="text-[12px] text-muted-foreground">{m.email}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {m.roleId ? rolesById[m.roleId] ?? "—" : "Sem perfil"}
-                        {m.extraPermissions.length > 0 && (
-                          <span className="ml-2 rounded border border-border px-1.5 py-0.5 text-[10.5px]">
-                            +{m.extraPermissions.length} extra
-                          </span>
-                        )}
-                      </td>
-                      {canManage && (
+            <div className="hidden overflow-hidden rounded-xl border border-border bg-card lg:block">
+              <table className="w-full min-w-[620px] border-collapse text-[13px]">
+                <thead>
+                  <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground/70">
+                    <th className="px-4 py-2.5 font-medium">Membro</th>
+                    <th className="px-4 py-2.5 font-medium">Perfil</th>
+                    {canManage && <th className="px-4 py-2.5 font-medium">Remuneração</th>}
+                    <th className="px-4 py-2.5 font-medium">Situação</th>
+                    <th className="px-4 py-2.5" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {sorted.map((m) => {
+                    const isSelf = m.id === me.data?.userId;
+                    return (
+                      <tr
+                        key={m.id}
+                        className="border-b border-border/60 transition-colors last:border-0 hover:bg-accent/30"
+                      >
                         <td className="px-4 py-3">
-                          {compensationLabel(m.compensationType, m.compensationCents) ? (
-                            <span className="text-[12.5px] text-foreground">
-                              {compensationLabel(m.compensationType, m.compensationCents)}
-                            </span>
+                          <div className="flex items-center gap-3">
+                            <Avatar name={m.name} size="sm" />
+                            <div className="leading-tight">
+                              <div className="font-medium">
+                                {m.name}
+                                {isSelf && (
+                                  <span className="ml-2 text-[11px] font-normal text-muted-foreground">você</span>
+                                )}
+                              </div>
+                              <div className="text-[12px] text-muted-foreground">{m.email}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          {roles.isSuccess ? (
+                            <RoleChip roleName={roleLabel(m.roleId, rolesById)} extraCount={m.extraPermissions.length} />
+                          ) : roles.isError ? (
+                            <span className="text-muted-foreground/60">—</span>
                           ) : (
-                            <span className="text-[12px] text-muted-foreground/50">—</span>
+                            <span className="inline-block h-4 w-20 animate-pulse rounded bg-border" />
                           )}
                         </td>
-                      )}
-                      <td className="px-4 py-3">
-                        {m.mustChangePassword ? (
-                          <span className="text-[12px] text-amber">senha temporária</span>
-                        ) : (
-                          <span className="text-[12px] text-muted-foreground/60">ativo</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right">
                         {canManage && (
-                          <button
-                            type="button"
-                            onClick={() => setEditMember(m)}
-                            aria-label={`Editar ${m.name}`}
-                            title="Editar"
-                            className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                          >
-                            <Pencil className="size-4" />
-                          </button>
+                          <td className="px-4 py-3">
+                            <Compensation type={m.compensationType} cents={m.compensationCents} />
+                          </td>
                         )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        <td className="px-4 py-3 text-[12px]">
+                          <MemberStatus mustChangePassword={m.mustChangePassword} />
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          {canManage && (
+                            <button
+                              type="button"
+                              onClick={() => setEditMember(m)}
+                              aria-label={`Editar ${m.name}`}
+                              title="Editar"
+                              className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                            >
+                              <Pencil className="size-4" />
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </>
         )}
@@ -259,27 +294,25 @@ function Centered({ children }: { children: React.ReactNode }) {
 /** Card de membro no mobile (ficha rotulada). Mesma info da linha da tabela; só o lápis abre editar. */
 function MemberCard({
   m,
-  roleLabel,
+  rolesReady,
+  rolesError,
+  roleName,
   canManage,
   isSelf,
   onEdit,
 }: {
   m: AdminMember;
-  roleLabel: string;
+  rolesReady: boolean;
+  rolesError: boolean;
+  roleName: string | null;
   canManage: boolean;
   isSelf: boolean;
   onEdit: () => void;
 }) {
-  const comp = canManage ? compensationLabel(m.compensationType, m.compensationCents) : null;
   return (
     <article className="rounded-xl border border-border bg-card p-3">
       <div className="flex items-start gap-3">
-        <span
-          aria-hidden
-          className="flex size-9 shrink-0 items-center justify-center rounded-full border border-muted-foreground/40 bg-accent text-[11px] font-medium text-foreground"
-        >
-          {initials(m.name)}
-        </span>
+        <Avatar name={m.name} size="md" />
         <div className="min-w-0 flex-1 leading-tight">
           <div className="truncate font-medium">
             {m.name}
@@ -304,31 +337,27 @@ function MemberCard({
         <div className="flex items-start justify-between gap-3">
           <dt className="shrink-0 text-muted-foreground">Perfil</dt>
           <dd className="flex min-w-0 items-center justify-end gap-2">
-            <span className="truncate text-foreground">{roleLabel}</span>
-            {m.extraPermissions.length > 0 && (
-              <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10.5px] text-muted-foreground">
-                +{m.extraPermissions.length} extra
-              </span>
+            {rolesReady ? (
+              <RoleChip roleName={roleName} extraCount={m.extraPermissions.length} />
+            ) : rolesError ? (
+              <span className="text-muted-foreground/60">—</span>
+            ) : (
+              <span className="inline-block h-4 w-20 animate-pulse rounded bg-border" />
             )}
           </dd>
         </div>
         {canManage && (
           <div className="flex items-center justify-between gap-3">
             <dt className="shrink-0 text-muted-foreground">Remuneração</dt>
-            <dd className={cn("text-right", comp ? "text-foreground" : "text-muted-foreground/50")}>{comp || "—"}</dd>
+            <dd className="text-right">
+              <Compensation type={m.compensationType} cents={m.compensationCents} />
+            </dd>
           </div>
         )}
         <div className="flex items-center justify-between gap-3">
           <dt className="shrink-0 text-muted-foreground">Situação</dt>
           <dd>
-            {m.mustChangePassword ? (
-              <span className="inline-flex items-center gap-1.5 text-amber">
-                <span aria-hidden className="size-1.5 rounded-full bg-amber" />
-                senha temporária
-              </span>
-            ) : (
-              <span className="text-muted-foreground/60">ativo</span>
-            )}
+            <MemberStatus mustChangePassword={m.mustChangePassword} />
           </dd>
         </div>
       </dl>

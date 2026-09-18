@@ -11,7 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useUpdateMember, useSetCompensation, type AdminMember, type AdminRole } from "@/lib/hooks/use-admin";
-import { initials } from "@/lib/initials";
+import { Avatar } from "@/components/admin/avatar";
+import { RolePicker } from "@/components/admin/role-picker";
 import { parseReaisToCents } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
@@ -74,7 +75,6 @@ export function EditMemberDialog({
 
   const nameRef = useRef<HTMLInputElement>(null);
   const amountRef = useRef<HTMLInputElement>(null);
-  const roleRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const cancelRef = useRef<HTMLButtonElement>(null);
   const discardRef = useRef<HTMLButtonElement>(null);
   const closePrompted = useRef(false);
@@ -133,22 +133,6 @@ export function EditMemberDialog({
   const compDirty = canManage && (curCents !== baseCents || (curCents !== null && compType !== baseType));
   const anyDirty = nameDirty || accessDirty || compDirty;
   const saving = update.isPending || setComp.isPending;
-
-  // opções de perfil (radiogroup) — "Sem perfil" primeiro
-  const roleOptions: { id: string | null; name: string; hint: string }[] = [
-    { id: null, name: "Sem perfil", hint: "acesso mínimo" },
-    ...roles.map((r) => ({ id: r.id, name: r.name, hint: `${r.permissions.length} permissões` })),
-  ];
-  const selectedIdx = roleOptions.findIndex((o) => o.id === roleId);
-
-  function onRoleKeyDown(e: React.KeyboardEvent) {
-    if (!["ArrowDown", "ArrowRight", "ArrowUp", "ArrowLeft"].includes(e.key)) return;
-    e.preventDefault();
-    const dir = e.key === "ArrowDown" || e.key === "ArrowRight" ? 1 : -1;
-    const next = (selectedIdx + dir + roleOptions.length) % roleOptions.length;
-    setRoleId(roleOptions[next].id);
-    roleRefs.current[next]?.focus();
-  }
 
   function requestClose() {
     if (anyDirty) {
@@ -235,9 +219,7 @@ export function EditMemberDialog({
     <Dialog open onOpenChange={(o) => !o && requestClose()}>
       <DialogContent className="max-w-lg">
         <div className="flex items-center gap-3 pr-6">
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-full border border-muted-foreground/40 bg-accent text-[13px] font-medium text-foreground">
-            {initials(member.name)}
-          </span>
+          <Avatar name={member.name} size="lg" />
           <DialogHeader className="gap-0.5">
             <DialogTitle>Editar membro</DialogTitle>
             <DialogDescription>
@@ -337,39 +319,18 @@ export function EditMemberDialog({
               ) : (
                 <>
                   <p className="text-[12.5px] text-muted-foreground">O perfil define o que a pessoa pode fazer no sistema.</p>
-                  <div role="radiogroup" aria-label="Perfil" onKeyDown={onRoleKeyDown} className="flex flex-col gap-1.5">
-                    {roleOptions.map((opt, i) => {
-                      const selected = roleId === opt.id;
-                      return (
-                        <button
-                          key={opt.id ?? "none"}
-                          ref={(el) => {
-                            roleRefs.current[i] = el;
-                          }}
-                          type="button"
-                          role="radio"
-                          aria-checked={selected}
-                          tabIndex={selected || (selectedIdx === -1 && i === 0) ? 0 : -1}
-                          onClick={() => setRoleId(opt.id)}
-                          className={cn(
-                            "flex items-center justify-between rounded-lg border px-3 py-2.5 text-left text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-                            selected
-                              ? "border-muted-foreground/40 bg-accent"
-                              : "border-border hover:border-muted-foreground/30",
-                          )}
-                        >
-                          <span>
-                            <span className="font-medium">{opt.name}</span>
-                            <span className="ml-2 text-muted-foreground">{opt.hint}</span>
-                          </span>
-                          {selected && <Check className="size-4 text-primary" aria-hidden="true" />}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  {/* trocar de perfil reexige a confirmação de admin (o gate sensível não pode ficar marcado escondido) */}
+                  <RolePicker
+                    roles={roles}
+                    value={roleId}
+                    onChange={(id) => {
+                      setRoleId(id);
+                      setConfirmMeta(false);
+                    }}
+                  />
 
                   {addsMeta && (
-                    <div className="flex items-start gap-2.5 rounded-lg border border-amber/40 bg-amber/5 px-3 py-2.5">
+                    <div className="flex items-start gap-2.5 rounded-r-md border-l-2 border-primary bg-accent/40 px-3 py-2.5">
                       <button
                         type="button"
                         role="checkbox"
@@ -380,7 +341,7 @@ export function EditMemberDialog({
                         className={cn(
                           "mt-0.5 flex size-[18px] shrink-0 items-center justify-center rounded-[6px] border outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
                           confirmMeta
-                            ? "border-amber bg-amber text-primary-foreground"
+                            ? "border-primary bg-primary text-primary-foreground"
                             : "border-muted-foreground/50 text-transparent",
                         )}
                       >

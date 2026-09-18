@@ -1,18 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronDown } from "lucide-react";
 import type { AxiosError } from "axios";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
+import { RolePicker } from "@/components/admin/role-picker";
 import { useCreateMember, type AdminRole } from "@/lib/hooks/use-admin";
 
 function apiMessage(e: unknown, fallback: string): string {
@@ -41,8 +35,6 @@ export function CreateMemberDialog({ open, roles, onOpenChange, onCreated }: Pro
       setErr(null);
     }
   }, [open]);
-
-  const roleName = roles.find((r) => r.id === roleId)?.name ?? "Sem perfil";
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -79,22 +71,7 @@ export function CreateMemberDialog({ open, roles, onOpenChange, onCreated }: Pro
           </div>
           <div className="flex flex-col gap-1.5">
             <Label>Perfil</Label>
-            <DropdownMenu>
-              <DropdownMenuTrigger className="flex items-center justify-between rounded-lg border border-border bg-card px-3 py-2 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring hover:border-muted-foreground/40">
-                {roleName}
-                <ChevronDown className="size-4 text-muted-foreground" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="max-h-64 overflow-y-auto">
-                <DropdownMenuItem active={roleId === null} onSelect={() => setRoleId(null)}>
-                  Sem perfil
-                </DropdownMenuItem>
-                {roles.map((r) => (
-                  <DropdownMenuItem key={r.id} active={r.id === roleId} onSelect={() => setRoleId(r.id)}>
-                    {r.name}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <RolePicker roles={roles} value={roleId} onChange={setRoleId} />
           </div>
           {err && (
             <p role="alert" className="text-sm text-destructive">
