@@ -23,6 +23,7 @@ import {
   idemKey,
 } from "@/lib/hooks/use-task-activity";
 import { initials } from "@/lib/initials";
+import { STATUS_LABEL, type BoardStatus } from "@/lib/board-filters";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 
@@ -37,7 +38,6 @@ function loadDraft(taskId: string): string {
   }
 }
 
-const STATUS_LABEL: Record<string, string> = { TODO: "A fazer", DOING: "Fazendo", DONE: "Feito" };
 const FIELD_LABEL: Record<string, string> = {
   title: "título",
   description: "descrição",
@@ -73,8 +73,8 @@ function describe(e: TaskActivity, nameOf: (id: string) => string): ReactNode {
     case "CREATED":
       return <>{who} criou a tarefa</>;
     case "STATUS_CHANGED": {
-      const from = STATUS_LABEL[str(p.from) ?? ""] ?? str(p.from) ?? "?";
-      const to = STATUS_LABEL[str(p.to) ?? ""] ?? str(p.to) ?? "?";
+      const from = STATUS_LABEL[(str(p.from) ?? "") as BoardStatus] ?? str(p.from) ?? "?";
+      const to = STATUS_LABEL[(str(p.to) ?? "") as BoardStatus] ?? str(p.to) ?? "?";
       return <>{who} moveu de <span className="text-muted-foreground">{from}</span> para <span className="text-muted-foreground">{to}</span></>;
     }
     case "FIELD_EDITED": {

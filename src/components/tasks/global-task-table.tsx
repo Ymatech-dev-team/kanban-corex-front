@@ -5,10 +5,9 @@ import type { Task } from "@/lib/types";
 import type { TaskPriority, TaskStatus } from "@sistema-tasks/contracts";
 import { initials } from "@/lib/initials";
 import { dueTag, isDueUrgent } from "@/lib/due";
+import { STATUS_LABEL } from "@/lib/board-filters";
 import { TaskCard } from "@/components/board/task-card";
 import { cn } from "@/lib/utils";
-
-const STATUS_LABEL: Record<TaskStatus, string> = { TODO: "A fazer", DOING: "Fazendo", DONE: "Feito" };
 const PRIO_LABEL: Record<TaskPriority, string> = { LOW: "Baixa", MEDIUM: "Média", HIGH: "Alta" };
 
 function StatusDot({ status }: { status: TaskStatus }) {

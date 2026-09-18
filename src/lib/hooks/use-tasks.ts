@@ -42,14 +42,7 @@ export function useCreateTask(projectId: string) {
         })
       ).data,
     onSuccess: (data, vars) => {
-      qc.invalidateQueries({ queryKey: tasksKey(projectId) });
-      qc.invalidateQueries({ queryKey: ["tasks", "all"] }); // visão global reflete a mudança [tarefas-visao-global RF-E5]
-      qc.invalidateQueries({ queryKey: projectCostKey(projectId) }); // custo agregado muda
-      qc.invalidateQueries({ queryKey: engagementsKey(projectId) }); // taskCount dos cards de projeto
-      if (data?.engagementId) {
-        qc.invalidateQueries({ queryKey: engTasksKey(data.engagementId) });
-        qc.invalidateQueries({ queryKey: engCostKey(data.engagementId) });
-      }
+      invalidateTaskLists(qc, projectId, data?.engagementId);
       if (!vars.quiet) toast.success("Tarefa criada");
     },
     onError: () => toast.error("Não foi possível criar a tarefa"),
@@ -153,14 +146,7 @@ export function useDeleteTask(projectId: string) {
   return useMutation({
     mutationFn: async ({ id }: { id: string; engagementId?: string }) => (await api.delete(`/tasks/${id}`)).data,
     onSuccess: (_d, vars) => {
-      qc.invalidateQueries({ queryKey: tasksKey(projectId) });
-      qc.invalidateQueries({ queryKey: ["tasks", "all"] }); // visão global reflete a mudança [tarefas-visao-global RF-E5]
-      qc.invalidateQueries({ queryKey: projectCostKey(projectId) }); // custo agregado muda
-      qc.invalidateQueries({ queryKey: engagementsKey(projectId) }); // taskCount dos cards de projeto
-      if (vars.engagementId) {
-        qc.invalidateQueries({ queryKey: engTasksKey(vars.engagementId) });
-        qc.invalidateQueries({ queryKey: engCostKey(vars.engagementId) });
-      }
+      invalidateTaskLists(qc, projectId, vars.engagementId);
       // o toast de sucesso vira o toast de "Desfazer", disparado pela tela.
     },
     onError: (err) => {
@@ -179,15 +165,8 @@ export function useRestoreTask(projectId: string) {
     mutationFn: async ({ id }: { id: string; engagementId?: string; count?: number }) =>
       (await api.post(`/tasks/${id}/restore`)).data,
     onSuccess: (_d, vars) => {
-      qc.invalidateQueries({ queryKey: tasksKey(projectId) });
-      qc.invalidateQueries({ queryKey: ["tasks", "all"] });
-      qc.invalidateQueries({ queryKey: projectCostKey(projectId) });
-      qc.invalidateQueries({ queryKey: engagementsKey(projectId) });
-      qc.invalidateQueries({ queryKey: taskKey(vars.id) });
-      if (vars.engagementId) {
-        qc.invalidateQueries({ queryKey: engTasksKey(vars.engagementId) });
-        qc.invalidateQueries({ queryKey: engCostKey(vars.engagementId) });
-      }
+      invalidateTaskLists(qc, projectId, vars.engagementId);
+      qc.invalidateQueries({ queryKey: taskKey(vars.id) }); // detalhe da tarefa restaurada
       const n = vars.count ?? 1;
       toast.success(n > 1 ? `${n} tarefas restauradas` : "Tarefa restaurada");
     },
@@ -202,16 +181,21 @@ export function useRestoreTask(projectId: string) {
 // ---- Ações em massa [acoes-em-massa] ----
 
 /** Invalida as mesmas chaves do delete/move unitário (lista do cliente + do projeto + custo + contagens). */
-function invalidateBoard(qc: ReturnType<typeof useQueryClient>, projectId: string, engagementId?: string) {
+/** Invalida as LISTAS de tarefas do board (cliente + projeto + custo agregado + contagens). [T7] */
+function invalidateTaskLists(qc: ReturnType<typeof useQueryClient>, projectId: string, engagementId?: string) {
   qc.invalidateQueries({ queryKey: tasksKey(projectId) });
-  qc.invalidateQueries({ queryKey: ["tasks", "all"] });
-  qc.invalidateQueries({ queryKey: projectCostKey(projectId) });
-  qc.invalidateQueries({ queryKey: engagementsKey(projectId) });
+  qc.invalidateQueries({ queryKey: ["tasks", "all"] }); // visão global [tarefas-visao-global RF-E5]
+  qc.invalidateQueries({ queryKey: projectCostKey(projectId) }); // custo agregado
+  qc.invalidateQueries({ queryKey: engagementsKey(projectId) }); // taskCount dos cards de projeto
   if (engagementId) {
     qc.invalidateQueries({ queryKey: engTasksKey(engagementId) });
     qc.invalidateQueries({ queryKey: engCostKey(engagementId) });
   }
-  // painéis por-tarefa que possam estar abertos em cache (detalhe/timeline/custo) — o lote muda status/existência.
+}
+
+/** Listas + painéis por-tarefa abertos em cache (detalhe/timeline/custo) — pro lote, que muda status/existência. */
+function invalidateBoard(qc: ReturnType<typeof useQueryClient>, projectId: string, engagementId?: string) {
+  invalidateTaskLists(qc, projectId, engagementId);
   qc.invalidateQueries({ queryKey: ["task"] });
   qc.invalidateQueries({ queryKey: ["activity"] });
   qc.invalidateQueries({ queryKey: ["task-cost"] });

@@ -6,10 +6,9 @@ import type { Task } from "@/lib/types";
 import type { TaskPriority, TaskStatus } from "@sistema-tasks/contracts";
 import { initials } from "@/lib/initials";
 import { dueState } from "@/lib/due";
+import { STATUS_LABEL } from "@/lib/board-filters";
 import { TaskCard } from "@/components/board/task-card";
 import { cn } from "@/lib/utils";
-
-const STATUS_LABEL: Record<TaskStatus, string> = { TODO: "A fazer", DOING: "Fazendo", DONE: "Feito" };
 const STATUS_ORDER: Record<TaskStatus, number> = { TODO: 0, DOING: 1, DONE: 2 };
 const PRIO_LABEL: Record<TaskPriority, string> = { LOW: "Baixa", MEDIUM: "Média", HIGH: "Alta" };
 

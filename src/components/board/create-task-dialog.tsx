@@ -11,6 +11,7 @@ import { AssigneePicker } from "./assignee-picker";
 import { useCreateTask } from "@/lib/hooks/use-tasks";
 import { useCreateEngagementTask } from "@/lib/hooks/use-engagement-board";
 import { parseHoursToMinutes } from "@/lib/duration";
+import { STATUS_LABEL } from "@/lib/board-filters";
 import { cn } from "@/lib/utils";
 
 const PRIOS: { value: TaskPriority; label: string }[] = [
@@ -19,7 +20,6 @@ const PRIOS: { value: TaskPriority; label: string }[] = [
   { value: "HIGH", label: "Alta" },
 ];
 
-const STATUS_LABEL: Record<TaskStatus, string> = { TODO: "A fazer", DOING: "Fazendo", DONE: "Feito" };
 
 interface Props {
   projectId: string;

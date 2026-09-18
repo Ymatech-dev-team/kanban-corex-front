@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AssigneePicker } from "@/components/board/assignee-picker";
+import { STATUS_LABEL } from "@/lib/board-filters";
 import { cn } from "@/lib/utils";
 
 const PRIOS: { value: TaskPriority; label: string }[] = [
@@ -18,7 +19,6 @@ const PRIOS: { value: TaskPriority; label: string }[] = [
   { value: "MEDIUM", label: "Média" },
   { value: "HIGH", label: "Alta" },
 ];
-const STATUS_LABEL: Record<TaskStatus, string> = { TODO: "A fazer", DOING: "Fazendo", DONE: "Feito" };
 
 function SelectRow({
   label,
