@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AxiosError } from "axios";
 import { api } from "@/lib/api";
+import { setTempPassword } from "@/lib/temp-password-relay";
 import { LoginForm } from "@/components/forms/login-form";
 import type { LoginInput } from "@sistema-tasks/contracts";
 
@@ -18,12 +19,8 @@ export default function LoginPage() {
     try {
       const { data } = await api.post<{ mustChangePassword: boolean }>("/auth/login", values);
       if (data.mustChangePassword) {
-        // Leva a senha temporária pro 1º acesso (só na sessão do navegador, apagada ao usar).
-        try {
-          sessionStorage.setItem("sdt_temp_pw", values.password);
-        } catch {
-          /* sem sessionStorage: a pessoa digita a senha de novo, sem problema */
-        }
+        // Leva a senha temporária pro 1º acesso via relay EM MEMÓRIA (não storage). [hardening T6]
+        setTempPassword(values.password);
         router.push("/first-login");
       } else {
         router.push("/");

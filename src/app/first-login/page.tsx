@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AxiosError } from "axios";
 import { api } from "@/lib/api";
+import { takeTempPassword } from "@/lib/temp-password-relay";
 import { ChangePasswordForm } from "@/components/forms/change-password-form";
 import type { FirstLoginInput } from "@sistema-tasks/contracts";
 
@@ -11,24 +12,8 @@ export default function FirstLoginPage() {
   const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Senha temporária vinda do login (só na sessão do navegador).
-  const [tempPassword] = useState<string>(() => {
-    if (typeof window === "undefined") return "";
-    try {
-      return sessionStorage.getItem("sdt_temp_pw") ?? "";
-    } catch {
-      return "";
-    }
-  });
-
-  // Apaga assim que a tela monta — a senha não fica guardada além do necessário.
-  useEffect(() => {
-    try {
-      sessionStorage.removeItem("sdt_temp_pw");
-    } catch {
-      /* nada a fazer */
-    }
-  }, []);
+  // Senha temporária vinda do login via relay em memória (lê-e-limpa, uso único). [hardening T6]
+  const [tempPassword] = useState<string>(() => takeTempPassword());
 
   async function onSubmit(values: FirstLoginInput) {
     setPending(true);
