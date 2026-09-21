@@ -109,8 +109,15 @@ export function MobileTopBar() {
                   pathname.startsWith("/conta") && "bg-accent",
                 )}
               >
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-full border border-border bg-card text-[11px] font-medium text-muted-foreground">
-                  {me.data?.name ? initials(me.data.name) : <User className="size-4" />}
+                <span className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-card text-[11px] font-medium text-muted-foreground">
+                  {me.data?.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={me.data.avatarUrl} alt="" className="size-full object-cover" />
+                  ) : me.data?.name ? (
+                    initials(me.data.name)
+                  ) : (
+                    <User className="size-4" />
+                  )}
                 </span>
                 <div className="min-w-0 leading-tight">
                   <div className="truncate text-[12.5px] font-medium">{accountName}</div>

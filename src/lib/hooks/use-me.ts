@@ -6,6 +6,7 @@ export interface Me {
   orgId: string;
   name: string;
   email: string;
+  avatarUrl: string | null;
   permissions: string[];
   mustChangePassword: boolean;
 }

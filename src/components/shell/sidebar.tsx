@@ -139,13 +139,20 @@ export function Sidebar() {
           >
             <span
               className={cn(
-                "flex size-8 shrink-0 items-center justify-center rounded-full border text-[11px] font-medium",
+                "flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-full border text-[11px] font-medium",
                 pathname.startsWith("/conta")
                   ? "border-muted-foreground/40 bg-accent text-foreground"
                   : "border-border bg-card text-muted-foreground",
               )}
             >
-              {me.data?.name ? initials(me.data.name) : <User className="size-4" />}
+              {me.data?.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={me.data.avatarUrl} alt="" className="size-full object-cover" />
+              ) : me.data?.name ? (
+                initials(me.data.name)
+              ) : (
+                <User className="size-4" />
+              )}
             </span>
             {!collapsed && (
               <div className="min-w-0 leading-tight">
