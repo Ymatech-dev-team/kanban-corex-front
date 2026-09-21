@@ -1,11 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Space_Grotesk } from "next/font/google";
 import { cookies } from "next/headers";
 import "./globals.css";
 import { Providers } from "./providers";
 import { ServiceWorkerRegister } from "./sw-register";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
+// Título do login (Space Grotesk 500). Exposta como var; usada pontualmente. [login-redesign]
+const spaceGrotesk = Space_Grotesk({ subsets: ["latin"], weight: ["500"], variable: "--font-display" });
 
 export const metadata: Metadata = {
   title: "Corex",
@@ -30,7 +32,8 @@ export default async function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   // Tema vem de cookie → o servidor já renderiza a classe certa (sem flash, sem mismatch de hidratação).
   const theme = (await cookies()).get("sdt-theme")?.value;
-  const className = theme === "light" ? `${inter.variable} light` : inter.variable;
+  const fonts = `${inter.variable} ${spaceGrotesk.variable}`;
+  const className = theme === "light" ? `${fonts} light` : fonts;
 
   return (
     <html lang="pt-BR" className={className}>
