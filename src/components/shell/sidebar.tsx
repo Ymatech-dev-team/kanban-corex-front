@@ -82,10 +82,8 @@ export function Sidebar() {
           // eslint-disable-next-line @next/next/no-img-element
           <img src="/icons/icon-192.png" alt="Corex" className="size-7 rounded-md" />
         ) : (
-          <div className="brand-plaque inline-flex items-center rounded-lg px-2.5 py-1.5">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/corex-logo-wordmark.png" alt="Corex" className="h-5 w-auto" />
-          </div>
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src="/corex-logo-wordmark.png" alt="Corex" className="h-8 w-auto" />
         )}
       </div>
 
