@@ -38,6 +38,24 @@ export function useCreateProject() {
   });
 }
 
+/** Editar CLIENTE (nome/descrição). Gated por `projetos_editar` no backend (PATCH /projects/:id). [crud-kebab] */
+export function useUpdateProject() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, patch }: { id: string; patch: { name?: string; description?: string | null } }) =>
+      (await api.patch<Project>(`/projects/${id}`, patch)).data,
+    onSuccess: (_data, { id }) => {
+      qc.invalidateQueries({ queryKey: ["projects"] });
+      qc.invalidateQueries({ queryKey: projectKey(id) });
+    },
+    onError: (err) => {
+      const code = errorCode(err);
+      if (code === "SEM_PERMISSAO") toast.error("Você não tem permissão para editar clientes");
+      else toast.error("Não foi possível salvar o cliente");
+    },
+  });
+}
+
 /**
  * Excluir CLIENTE (soft-delete em cascata no backend: leva projetos+tarefas). Gated por
  * `projetos_excluir`. Invalida o que tem observers vivos (lista de clientes, visão global) e REMOVE

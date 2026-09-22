@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ArrowLeft, ChevronRight, FolderTree, Loader2, Plus, Trash2, User, Wallet, X } from "lucide-react";
+import { AlertTriangle, ArrowLeft, ChevronRight, FolderTree, Loader2, Pencil, Plus, Trash2, User, Wallet, X } from "lucide-react";
 import { PERMISSIONS } from "@sistema-tasks/contracts";
 import { useProject, useDeleteProject, useRestoreProject } from "@/lib/hooks/use-projects";
+import { ActionsMenu } from "@/components/ui/actions-menu";
+import { CreateProjectDialog } from "@/components/board/create-project-dialog";
 import { useEngagements } from "@/lib/hooks/use-engagements";
 import { undoToast } from "@/lib/undo-toast";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
@@ -285,7 +287,9 @@ export function ClientDetail({ projectId }: { projectId: string }) {
   const qc = useQueryClient();
   const project = useProject(projectId);
   const canDelete = useCan(PERMISSIONS.projetos_excluir);
+  const canEdit = useCan(PERMISSIONS.projetos_editar);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   const status = httpStatus(project.error);
   const notFound = project.isError && (status === 404 || status === 403);
@@ -350,27 +354,35 @@ export function ClientDetail({ projectId }: { projectId: string }) {
             {p?.description && <p className="mt-1 text-[13px] text-muted-foreground">{p.description}</p>}
           </div>
           <div className="flex items-center gap-2 sm:shrink-0">
-            {canDelete && (
-              <button
-                type="button"
-                onClick={() => setConfirmDelete(true)}
-                aria-label="Excluir cliente"
-                className="order-2 inline-flex h-10 items-center gap-1.5 rounded-md px-2 text-[12.5px] text-muted-foreground outline-none transition-colors hover:text-amber focus-visible:ring-2 focus-visible:ring-ring sm:order-1 sm:h-auto sm:py-1"
-              >
-                <Trash2 className="size-4" />
-                Excluir
-              </button>
-            )}
-            <Button onClick={openBoard} className="order-1 flex-1 sm:order-2 sm:flex-none">
+            <Button onClick={openBoard} className="flex-1 sm:flex-none">
               Abrir quadro
               <ChevronRight className="size-4" />
             </Button>
+            <ActionsMenu
+              label={`Ações do cliente ${p?.name ?? ""}`}
+              className="shrink-0"
+              items={[
+                ...(canEdit
+                  ? [{ key: "edit", label: "Editar", icon: Pencil, onSelect: () => setEditing(true) }]
+                  : []),
+                ...(canDelete
+                  ? [{ key: "del", label: "Excluir", icon: Trash2, danger: true, onSelect: () => setConfirmDelete(true) }]
+                  : []),
+              ]}
+            />
           </div>
         </div>
       </div>
 
       {confirmDelete && p && (
         <DeleteClientDialog projectId={projectId} name={p.name} onClose={() => setConfirmDelete(false)} />
+      )}
+      {editing && p && (
+        <CreateProjectDialog
+          open
+          onOpenChange={(o) => !o && setEditing(false)}
+          project={{ id: projectId, name: p.name, description: p.description ?? null }}
+        />
       )}
 
       <Section title="Visão geral">

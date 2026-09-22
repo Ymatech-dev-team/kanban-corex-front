@@ -18,6 +18,7 @@ import {
 import { useProjectMembers } from "@/lib/hooks/use-members";
 import { useCan } from "@/lib/hooks/use-can";
 import { undoToast } from "@/lib/undo-toast";
+import { ActionsMenu } from "@/components/ui/actions-menu";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -85,41 +86,38 @@ export function ProjetosSection({ projectId }: { projectId: string }) {
                   <span className="truncate font-medium tracking-tight">{e.name}</span>
                   <ChevronRight className="size-4 shrink-0 text-muted-foreground/50 transition-colors group-hover/name:text-foreground" />
                 </button>
-                <div className="flex shrink-0 gap-1 text-muted-foreground">
-                  {canEdit && (
-                    <button
-                      type="button"
-                      aria-label={`Editar projeto ${e.name}`}
-                      onClick={() => {
-                        setEditing(e);
-                        setFormOpen(true);
-                      }}
-                      className="flex size-7 items-center justify-center rounded-md border border-border outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      <Pencil className="size-[15px]" />
-                    </button>
-                  )}
-                  {canDelete &&
-                    (e.isGeneral ? (
-                      <span
-                        title="O Projeto geral não pode ser excluído"
-                        aria-disabled="true"
-                        aria-label="Excluir indisponível: o Projeto geral não pode ser excluído"
-                        className="flex size-7 items-center justify-center rounded-md border border-border opacity-40"
-                      >
-                        <Trash2 className="size-[15px]" />
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        aria-label={`Excluir projeto ${e.name}`}
-                        onClick={() => setDeleting(e)}
-                        className="flex size-7 items-center justify-center rounded-md border border-border outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                      >
-                        <Trash2 className="size-[15px]" />
-                      </button>
-                    ))}
-                </div>
+                <ActionsMenu
+                  label={`Ações do projeto ${e.name}`}
+                  className="shrink-0"
+                  items={[
+                    ...(canEdit
+                      ? [
+                          {
+                            key: "edit",
+                            label: "Editar",
+                            icon: Pencil,
+                            onSelect: () => {
+                              setEditing(e);
+                              setFormOpen(true);
+                            },
+                          },
+                        ]
+                      : []),
+                    ...(canDelete
+                      ? [
+                          {
+                            key: "delete",
+                            label: "Excluir",
+                            icon: Trash2,
+                            danger: true,
+                            onSelect: () => setDeleting(e),
+                            disabled: e.isGeneral,
+                            disabledReason: e.isGeneral ? "O Projeto geral não pode ser excluído" : undefined,
+                          },
+                        ]
+                      : []),
+                  ]}
+                />
               </div>
               {e.description && <p className="line-clamp-1 text-[12.5px] text-muted-foreground">{e.description}</p>}
               <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-[12px] text-muted-foreground">

@@ -9,11 +9,13 @@ import {
   CalendarClock,
   Check,
   Plus,
+  Copy,
   Trash2,
   Loader2,
   AlertTriangle,
   RefreshCw,
 } from "lucide-react";
+import { toast } from "sonner";
 import { PERMISSIONS, type TaskPriority, type TaskStatus, type UpdateTaskInput } from "@sistema-tasks/contracts";
 import type { CostState, Task } from "@/lib/types";
 import { Input } from "@/components/ui/input";
@@ -30,13 +32,16 @@ import {
   useMoveTask,
   useDeleteTask,
   useRestoreTask,
+  useCreateTask,
   useAddSubtask,
   useToggleSubtask,
   useDeleteSubtask,
   errorCode,
 } from "@/lib/hooks/use-tasks";
 import { undoToast } from "@/lib/undo-toast";
-import { useEngagementTasks } from "@/lib/hooks/use-engagement-board";
+import { copyName } from "@/lib/copy-name";
+import { ActionsMenu } from "@/components/ui/actions-menu";
+import { useEngagementTasks, useCreateEngagementTask } from "@/lib/hooks/use-engagement-board";
 import { positionForIndex } from "@/lib/position";
 import { useCan } from "@/lib/hooks/use-can";
 import { useProject } from "@/lib/hooks/use-projects";
@@ -116,11 +121,16 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
 
   const canEdit = useCan(PERMISSIONS.tarefas_editar);
   const canDelete = useCan(PERMISSIONS.tarefas_excluir);
+  const canDuplicate = useCan(PERMISSIONS.tarefas_criar);
 
   const update = useUpdateTask(projectId);
   const move = useMoveTask(projectId, task?.engagementId);
   const del = useDeleteTask(projectId);
   const restoreTask = useRestoreTask(projectId);
+  // Duplicar roteia pelo parent: engagement real → /engagements/:id/tasks; senão cairia no Projeto geral.
+  const createProjectTask = useCreateTask(projectId);
+  const createEngTask = useCreateEngagementTask(task?.engagementId ?? "");
+  const [duplicating, setDuplicating] = useState(false);
   const add = useAddSubtask(taskId);
   const toggle = useToggleSubtask(taskId);
   const removeSub = useDeleteSubtask(taskId);
@@ -348,6 +358,35 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
       undoToast(msg, () => restoreTask.mutate({ id, engagementId }));
     } catch {
       /* erro já vira toast no hook; permanece na tela */
+    }
+  }
+
+  // Duplicar tarefa: cópia RASA (só os campos do create) roteando pelo parent. Não traz subtarefas/anexos. [crud-kebab]
+  async function onDuplicate() {
+    if (!task || duplicating) return;
+    setDuplicating(true);
+    const payload = {
+      quiet: true, // sem o toast genérico "Tarefa criada" do hook — mostro o meu, com o escopo
+      title: copyName(task.title),
+      description: task.description ?? undefined,
+      status: task.status,
+      priority: task.priority,
+      dueDate: task.dueDate ?? undefined,
+      assigneeId: task.assigneeId ?? undefined,
+      // horas estimadas só entram pra quem tem custos.ver (espelha o save()). [SEC-custo]
+      ...(canSeeCost ? { estimatedMinutes: task.estimatedMinutes ?? undefined } : {}),
+    };
+    try {
+      const created = task.engagementId
+        ? await createEngTask.mutateAsync(payload)
+        : await createProjectTask.mutateAsync(payload);
+      toast.success("Cópia criada — sem subtarefas nem anexos", {
+        action: { label: "Abrir", onClick: () => router.push(`/tarefas/${created.id}?from=${encodeURIComponent(backPath)}`) },
+      });
+    } catch {
+      /* o toast de erro já vem do hook de create */
+    } finally {
+      setDuplicating(false);
     }
   }
 
@@ -585,17 +624,18 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
           <span className="text-muted-foreground/50">›</span>
           {engagementName ? <span className="truncate">{engagementName}</span> : <span className="h-3 w-16 animate-pulse rounded bg-muted" />}
         </nav>
-        {canDelete && (
-          <button
-            type="button"
-            onClick={onDelete}
-            disabled={del.isPending}
-            className="ml-auto inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[12.5px] text-muted-foreground outline-none transition-colors hover:text-amber focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-          >
-            <Trash2 className="size-4" />
-            {del.isPending ? "Excluindo…" : "Excluir"}
-          </button>
-        )}
+        <ActionsMenu
+          label={`Ações da tarefa: ${task.title}`}
+          className="ml-auto"
+          items={[
+            ...(canDuplicate
+              ? [{ key: "dup", label: "Duplicar", icon: Copy, onSelect: onDuplicate }]
+              : []),
+            ...(canDelete
+              ? [{ key: "del", label: "Excluir", icon: Trash2, danger: true, onSelect: onDelete }]
+              : []),
+          ]}
+        />
       </header>
 
       <div className="flex-1 overflow-auto">
