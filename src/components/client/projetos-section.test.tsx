@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ProjetosSection } from "./projetos-section";
 import { useEngagements } from "@/lib/hooks/use-engagements";
@@ -10,6 +10,7 @@ vi.mock("@/lib/hooks/use-engagements", () => ({
   useCreateEngagement: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useUpdateEngagement: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useDeleteEngagement: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useRestoreEngagement: () => ({ mutate: vi.fn() }),
   useConsultores: () => ({ data: [], isLoading: false }),
   useAddConsultor: () => ({ mutate: vi.fn(), isPending: false }),
   useRemoveConsultor: () => ({ mutate: vi.fn(), isPending: false }),
@@ -47,17 +48,29 @@ describe("ProjetosSection", () => {
     expect(screen.getByText("3 consultores")).toBeInTheDocument();
   });
 
-  it("Projeto geral não tem botão de excluir (só o aviso desabilitado)", () => {
+  it("Projeto geral mostra o motivo no menu e não abre exclusão", async () => {
     mockList.mockReturnValue(state([eng({ id: "gen-p1", name: "Projeto geral", isGeneral: true })]));
     render(<ProjetosSection projectId="p1" />);
-    expect(screen.queryByLabelText(/^Excluir projeto/)).not.toBeInTheDocument();
-    expect(screen.getByLabelText(/não pode ser excluído/i)).toBeInTheDocument();
+    const trigger = screen.getByRole("button", { name: "Ações do projeto Projeto geral" });
+    trigger.focus();
+    fireEvent.keyDown(trigger, { key: "Enter" });
+    const remove = screen.getByRole("menuitem", { name: /Excluir.*não pode ser excluído/i });
+    expect(remove).toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(remove);
+    expect(screen.queryByRole("dialog", { name: "Excluir projeto" })).not.toBeInTheDocument();
+    expect(screen.getByText("O Projeto geral não pode ser excluído")).toBeInTheDocument();
   });
 
-  it("projeto normal tem botão de excluir", () => {
+  it("projeto normal abre confirmação de exclusão pelo menu", async () => {
     mockList.mockReturnValue(state([eng({ id: "e2", name: "Rebranding" })]));
     render(<ProjetosSection projectId="p1" />);
-    expect(screen.getByLabelText("Excluir projeto Rebranding")).toBeInTheDocument();
+    const trigger = screen.getByRole("button", { name: "Ações do projeto Rebranding" });
+    trigger.focus();
+    fireEvent.keyDown(trigger, { key: "Enter" });
+    const remove = screen.getByRole("menuitem", { name: "Excluir" });
+    expect(remove).not.toHaveAttribute("aria-disabled", "true");
+    fireEvent.click(remove);
+    expect(await screen.findByRole("dialog", { name: "Excluir projeto" })).toHaveTextContent("Rebranding");
   });
 
   it("sem permissão de criar → sem botão 'Novo projeto'", () => {

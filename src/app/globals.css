@@ -184,3 +184,53 @@ body {
     font-size: 16px !important;
   }
 }
+
+/* Interaction tokens shared by the existing interface. Motion communicates state. */
+:root {
+  --motion-fast: 140ms;
+  --motion-panel: 200ms;
+  --motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.ui-button {
+  transition-property: color, background-color, border-color, opacity, translate;
+  transition-duration: var(--motion-fast);
+  transition-timing-function: var(--motion-ease);
+}
+.ui-button:enabled:active { translate: 0 1px; }
+.ui-button[aria-busy="true"] { cursor: progress; }
+
+.ui-skeleton { animation: skeleton-breathe 1.8s ease-in-out infinite; }
+@keyframes skeleton-breathe { 50% { opacity: 0.45; } }
+
+.ui-dialog-overlay[data-state="open"] { animation: dialog-fade-in var(--motion-fast) ease-out; }
+.ui-dialog-overlay[data-state="closed"] { animation: dialog-fade-out var(--motion-fast) ease-in; }
+.ui-dialog-content[data-state="open"] { animation: dialog-enter var(--motion-panel) var(--motion-ease); }
+.ui-dialog-content[data-state="closed"] { animation: dialog-fade-out var(--motion-fast) ease-in; }
+@keyframes dialog-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes dialog-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes dialog-enter {
+  from { opacity: 0; scale: 0.98; }
+  to { opacity: 1; scale: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-button { transition: none; }
+  .ui-button:enabled:active { translate: none; }
+  .ui-skeleton,
+  .ui-dialog-overlay,
+  .ui-dialog-content,
+  .animate-pulse,
+  .animate-spin { animation: none !important; }
+}
+
+/* Contextual task drawer: desktop side panel, full viewport on mobile. */
+.ui-task-panel[data-state="open"] { animation: task-panel-enter var(--motion-panel) var(--motion-ease); }
+.ui-task-panel[data-state="closed"] { animation: dialog-fade-out var(--motion-fast) ease-in; }
+@keyframes task-panel-enter {
+  from { opacity: 0.6; translate: 24px 0; }
+  to { opacity: 1; translate: 0 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ui-task-panel { animation: none !important; }
+}

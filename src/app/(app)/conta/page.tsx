@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { McpConnections } from "@/components/account/mcp-connections";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 
 function apiMessage(e: unknown, fallback: string): string {
@@ -70,6 +71,7 @@ export default function ContaPage() {
               </TabsContent>
             </Tabs>
 
+            <McpConnections />
             <DangerZone />
           </>
         )}

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ListTodo, Loader2, SearchX } from "lucide-react";
+import { ListTodo, SearchX } from "lucide-react";
 import { PERMISSIONS, type TaskStatus } from "@sistema-tasks/contracts";
 import { useMe } from "@/lib/hooks/use-me";
 import { hasPermission } from "@/lib/hooks/use-can";
@@ -28,6 +28,7 @@ import { GlobalFilterBar } from "./global-filter-bar";
 import { GlobalTaskTable, type EngagementLite } from "./global-task-table";
 import { GlobalCreateTaskDialog } from "./global-create-task-dialog";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const VIEW_STORAGE_KEY = "sdt_tarefas_view";
 
@@ -142,15 +143,18 @@ export function GlobalTasksView() {
     const v = parseView(sp.get("view"));
     if (v) qs.set("view", v);
     const from = qs.toString() ? `/tarefas?${qs.toString()}` : "/tarefas";
-    router.push(`/tarefas/${id}?from=${encodeURIComponent(from)}`);
+    router.push(`/tarefas/${id}?from=${encodeURIComponent(from)}`, { scroll: false });
   };
 
   // ----- estados de topo (antes da barra) -----
   if (me.isError) return <BoardError onRetry={() => me.refetch()} />; // não trava no spinner se o /me falhar [review]
   if (me.isLoading || !canView) {
     return (
-      <div className="flex flex-1 items-center justify-center py-16 text-muted-foreground">
-        <Loader2 className="size-5 animate-spin" />
+      <div role="status" aria-label="Carregando tarefas" className="flex flex-1 flex-col gap-5 p-6">
+        <span className="sr-only">Carregando suas tarefas…</span>
+        <Skeleton className="h-7 w-36" />
+        <Skeleton className="h-9 w-full max-w-lg" />
+        {[0, 1, 2, 3].map((row) => <Skeleton key={row} className="h-14 w-full" />)}
       </div>
     );
   }

@@ -23,6 +23,7 @@ import { CostSummary } from "@/components/cost/cost-summary";
 import { ClientMetrics } from "./client-metrics";
 import { ProjetosSection } from "./projetos-section";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   DropdownMenu,
@@ -305,8 +306,21 @@ export function ClientDetail({ projectId }: { projectId: string }) {
 
   if (project.isLoading) {
     return (
-      <div className="flex flex-1 items-center justify-center py-16 text-muted-foreground">
-        <Loader2 className="size-5 animate-spin" />
+      <div role="status" aria-label="Carregando cliente" className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 py-6">
+        <span className="sr-only">Carregando detalhes do cliente…</span>
+        <Skeleton className="h-5 w-24" />
+        <Skeleton className="h-8 w-56" />
+        <Skeleton className="h-4 w-2/3" />
+        <div aria-hidden="true" className="grid gap-3 sm:grid-cols-2">
+          <Skeleton className="h-28" />
+          <Skeleton className="h-28" />
+        </div>
+        <Skeleton className="h-4 w-24" />
+        <Skeleton className="h-10 w-64" />
+        <div aria-hidden="true" className="grid gap-3 sm:grid-cols-2">
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+        </div>
       </div>
     );
   }

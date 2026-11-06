@@ -5,6 +5,7 @@ import { ClientDetail } from "./client-detail";
 import { useProject } from "@/lib/hooks/use-projects";
 
 vi.mock("@/lib/hooks/use-projects", () => ({ useProject: vi.fn() }));
+vi.mock("@/lib/hooks/use-can", () => ({ useCan: () => false }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 
 const mockProject = vi.mocked(useProject);

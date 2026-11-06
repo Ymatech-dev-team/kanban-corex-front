@@ -12,6 +12,7 @@ import { dueState } from "@/lib/due";
 import { nextTasks, PRIORITY_LABEL } from "@/lib/focus";
 import { weekDaysMonday } from "@/lib/week";
 import { Button } from "@/components/ui/button";
+import { PendingActions } from "@/components/tasks/pending-actions";
 import { cn } from "@/lib/utils";
 
 const DAY = 86_400_000;
@@ -88,7 +89,7 @@ export default function HomePage() {
   }, [open, projectsById]);
 
   function openTask(t: Task) {
-    router.push(`/tarefas/${t.id}?from=${encodeURIComponent("/")}`);
+    router.push(`/tarefas/${t.id}?from=${encodeURIComponent("/")}`, { scroll: false });
   }
   function openClient(projectId: string) {
     router.push(`/clientes/${projectId}/projetos/${generalEngagementId(projectId)}`);
@@ -105,6 +106,8 @@ export default function HomePage() {
             {rangeFmt.format(week[0])} – {rangeFmt.format(week[6])}
           </p>
         </header>
+
+        <PendingActions />
 
         {mine.isLoading ? (
           <DashboardSkeleton />

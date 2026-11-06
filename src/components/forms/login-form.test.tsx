@@ -6,7 +6,7 @@ import { LoginForm } from "./login-form";
 describe("LoginForm", () => {
   it("renderiza os campos e o botão", () => {
     render(<LoginForm onSubmit={() => {}} />);
-    expect(screen.getByLabelText("Email")).toBeInTheDocument();
+    expect(screen.getByLabelText("E-mail")).toBeInTheDocument();
     expect(screen.getByLabelText("Senha")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Entrar" })).toBeInTheDocument();
   });
@@ -14,17 +14,17 @@ describe("LoginForm", () => {
   it("valida email inválido e NÃO chama onSubmit", async () => {
     const onSubmit = vi.fn();
     render(<LoginForm onSubmit={onSubmit} />);
-    await userEvent.type(screen.getByLabelText("Email"), "invalido");
+    await userEvent.type(screen.getByLabelText("E-mail"), "invalido");
     await userEvent.type(screen.getByLabelText("Senha"), "x");
     await userEvent.click(screen.getByRole("button", { name: "Entrar" }));
-    expect(await screen.findByText("Email inválido")).toBeInTheDocument();
+    expect(await screen.findByText("Informe um e-mail válido.")).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
   it("submete com dados válidos", async () => {
     const onSubmit = vi.fn();
     render(<LoginForm onSubmit={onSubmit} />);
-    await userEvent.type(screen.getByLabelText("Email"), "joao@x.com");
+    await userEvent.type(screen.getByLabelText("E-mail"), "joao@x.com");
     await userEvent.type(screen.getByLabelText("Senha"), "senha123");
     await userEvent.click(screen.getByRole("button", { name: "Entrar" }));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith({ email: "joao@x.com", password: "senha123" }));

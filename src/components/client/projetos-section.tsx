@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Pencil, Trash2, Users, Loader2, X, ChevronRight } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, X, ChevronRight } from "lucide-react";
 import { PERMISSIONS } from "@sistema-tasks/contracts";
 import type { Engagement } from "@/lib/types";
 import {
@@ -23,6 +23,7 @@ import { ConfirmDialog } from "@/components/admin/confirm-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Label } from "@/components/ui/label";
 import { initials } from "@/lib/initials";
 
@@ -284,8 +285,10 @@ function ConsultoresDialog({
         </DialogHeader>
 
         {consultores.isLoading ? (
-          <div className="flex justify-center py-6 text-muted-foreground">
-            <Loader2 className="size-5 animate-spin" />
+          <div role="status" aria-label="Carregando consultores" className="flex flex-col gap-3 py-2">
+            <span className="sr-only">Carregando consultores…</span>
+            <Skeleton className="h-8 w-full" />
+            <Skeleton className="h-8 w-4/5" />
           </div>
         ) : current.length === 0 ? (
           <p className="text-[13px] text-muted-foreground">Nenhum consultor neste projeto ainda.</p>
@@ -313,7 +316,11 @@ function ConsultoresDialog({
         <div className="mt-1 border-t border-border pt-3">
           <div className="mb-1.5 text-[11px] uppercase tracking-wide text-muted-foreground/70">Adicionar</div>
           {membersQuery.isLoading ? (
-            <p className="text-[12.5px] text-muted-foreground">Carregando membros…</p>
+            <div role="status" aria-label="Carregando membros" className="flex gap-2">
+              <span className="sr-only">Carregando membros…</span>
+              <Skeleton className="h-8 w-28" />
+              <Skeleton className="h-8 w-24" />
+            </div>
           ) : candidates.length === 0 ? (
             <p className="text-[12.5px] text-muted-foreground">
               Nenhum membro do cliente disponível. Conceda acesso ao cliente primeiro.

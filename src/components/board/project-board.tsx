@@ -86,7 +86,7 @@ export function ProjectBoard({
 
   // Abrir tarefa = navegar pra tela dedicada (o `from` faz o "voltar" retornar a este board). [tela-detalhe-tarefa]
   const boardPath = `/clientes/${clientId}/projetos/${engagementId}`;
-  const openTask = (id: string) => router.push(`/tarefas/${id}?from=${encodeURIComponent(boardPath)}`);
+  const openTask = (id: string) => router.push(`/tarefas/${id}?from=${encodeURIComponent(boardPath)}`, { scroll: false });
   // Deep-links legados `?task=` (initialTaskId) redirecionam pra nova rota, preservando o board de origem.
   useEffect(() => {
     if (initialTaskId) router.replace(`/tarefas/${initialTaskId}?from=${encodeURIComponent(boardPath)}`);

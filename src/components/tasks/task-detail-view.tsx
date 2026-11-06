@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
@@ -21,6 +21,7 @@ import type { CostState, Task } from "@/lib/types";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { dueTag, isDueUrgent } from "@/lib/due";
 import { AssigneesEditor } from "@/components/board/assignees-editor";
@@ -48,6 +49,9 @@ import { useProject } from "@/lib/hooks/use-projects";
 import { useProjectMembers } from "@/lib/hooks/use-members";
 import { useEngagements } from "@/lib/hooks/use-engagements";
 import { useTaskCost } from "@/lib/hooks/use-cost";
+import { TaskWorkflow } from "@/components/tasks/task-workflow";
+import { useWorkflow } from "@/lib/hooks/use-workflow";
+import { useMe } from "@/lib/hooks/use-me";
 import { httpStatus } from "@/lib/http-error";
 import { parseHoursToMinutes, minutesToHoursInput } from "@/lib/duration";
 import { formatBRL } from "@/lib/money";
@@ -101,11 +105,22 @@ function safeInternalPath(p: string | null): string | null {
   return p;
 }
 
-export function TaskDetailView({ taskId }: { taskId: string }) {
+export interface TaskDetailHandle { requestClose: () => void }
+
+export function TaskDetailView({ taskId, panel = false, onClose, closeRef }: {
+  taskId: string;
+  panel?: boolean;
+  onClose?: () => void;
+  closeRef?: Ref<TaskDetailHandle>;
+}) {
   const router = useRouter();
   const sp = useSearchParams();
   const fromParam = safeInternalPath(sp.get("from"));
 
+  const me = useMe();
+  const workflow = useWorkflow(taskId);
+  const [workflowDirty, setWorkflowDirty] = useState(false);
+  const [workflowView, setWorkflowView] = useState<"summary" | "review" | "history">("summary");
   const detail = useTaskDetail(taskId);
   const task = detail.data;
   const projectId = task?.projectId ?? "";
@@ -119,7 +134,10 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
   const clientName = project.data?.name;
   const engagementName = engagements.data?.find((e) => e.id === task?.engagementId)?.name;
 
-  const canEdit = useCan(PERMISSIONS.tarefas_editar);
+  const canEditPermission = useCan(PERMISSIONS.tarefas_editar);
+  const managed = !!workflow.data?.state;
+  const workflowUnavailable = workflow.isError && httpStatus(workflow.error) === 404;
+  const canEdit = canEditPermission && !workflowDirty && !managed && (workflowUnavailable || (!workflow.isLoading && !workflow.isError && !!workflow.data));
   const canDelete = useCan(PERMISSIONS.tarefas_excluir);
   const canDuplicate = useCan(PERMISSIONS.tarefas_criar);
 
@@ -152,6 +170,7 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
   }, [engagementTasks.data, task]);
 
   const [form, setForm] = useState<Form | null>(null);
+  const [formOwner, setFormOwner] = useState<string | null>(null);
   // Token de concorrência FIXO no seed — se usasse o updatedAt "ao vivo", o refetch-no-foco o avançaria
   // e o if-unmodified-since deixaria de proteger contra sobrescrever edição alheia. [rev-painel]
   const [seededUpdatedAt, setSeededUpdatedAt] = useState<string | undefined>();
@@ -159,16 +178,18 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
   const [tab, setTab] = useState<"detalhes" | "atividade">("detalhes");
   const [isLg, setIsLg] = useState(false);
   const [conflict, setConflict] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+  const saveInFlight = useRef(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const seededFor = useRef<string | null>(null);
   const freshTokenFor = useRef<string | null>(null); // token já corrigido do fetch fresco desta carga
   const descRef = useRef<HTMLTextAreaElement>(null);
   const titleRef = useRef<HTMLTextAreaElement>(null);
 
-  const draftKey = `sdt_taskdraft_${taskId}`;
+  const draftKey = me.data && !me.isError ? `sdt_taskdraft_${me.data.orgId}:${me.data.userId}:${taskId}` : null;
   function clearDraft() {
     try {
-      localStorage.removeItem(draftKey);
+      if (draftKey) localStorage.removeItem(draftKey);
     } catch {
       /* sem persistência, tudo bem */
     }
@@ -203,22 +224,29 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
   // Seed do form: restaura rascunho do localStorage (rede de segurança contra saída sem guarda),
   // senão parte do dado salvo. Fixa o token de concorrência do momento do carregamento. [rev-painel]
   useEffect(() => {
-    if (task && seededFor.current !== task.id) {
+    if (task && draftKey && seededFor.current !== draftKey) {
       let draft: Form | null = null;
       try {
-        const raw = localStorage.getItem(`sdt_taskdraft_${task.id}`);
+        const raw = localStorage.getItem(draftKey);
         const parsed: unknown = raw ? JSON.parse(raw) : null;
-        if (isForm(parsed)) draft = parsed;
+        if (!managed && isForm(parsed)) draft = parsed;
       } catch {
         draft = null;
       }
       setForm(draft ?? baselineFrom(task));
+      setFormOwner(draftKey);
       setSeededUpdatedAt(task.updatedAt); // provisório (pode vir de cache); corrigido pelo efeito abaixo
       setTab("detalhes");
-      seededFor.current = task.id;
+      seededFor.current = draftKey;
       freshTokenFor.current = null; // libera o re-semear do fetch fresco deste mount
     }
-  }, [task]);
+  }, [task, draftKey, managed]);
+
+  // Managed fields are read-only projections. Server transitions must not become a local edit.
+  // Keep any old local draft stored, but never apply it to a managed task.
+  useEffect(() => {
+    if (managed && task) setForm(baselineFrom(task));
+  }, [managed, task]);
 
   // Corrige o token de concorrência com o updatedAt FRESCO (o fetch DESTE mount), não o do cache velho —
   // senão o if-unmodified-since sai defasado e todo save dá 409 falso. Uma vez por carga: refetch-no-foco
@@ -235,6 +263,7 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
 
   const baseline = task ? baselineFrom(task) : null;
   const dirty =
+    !managed &&
     !!form &&
     !!baseline &&
     (form.title.trim() !== baseline.title ||
@@ -246,38 +275,46 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
 
   // Persiste/limpa o rascunho conforme o dirty (mesmo padrão do rascunho de comentário).
   useEffect(() => {
-    if (!form) return;
+    if (managed || !form || !draftKey || formOwner !== draftKey) return;
     try {
       if (dirty) localStorage.setItem(draftKey, JSON.stringify(form));
       else localStorage.removeItem(draftKey);
     } catch {
       /* sem persistência */
     }
-  }, [form, dirty, draftKey]);
+  }, [form, dirty, draftKey, formOwner, managed]);
 
   // Aviso nativo ao dar F5 / fechar aba / navegar pra fora com edição não salva.
   useEffect(() => {
-    if (!dirty) return;
+    if (!dirty && !workflowDirty) return;
     const h = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = "";
     };
     window.addEventListener("beforeunload", h);
     return () => window.removeEventListener("beforeunload", h);
-  }, [dirty]);
+  }, [dirty, workflowDirty]);
 
   const backPath = fromParam || (task ? `/clientes/${task.projectId}/projetos/${task.engagementId}` : "/tarefas");
 
+  function finishClose() {
+    if (onClose) onClose();
+    else router.push(backPath);
+  }
+
   function goBack() {
-    if (dirty) {
+    if (dirty || workflowDirty) {
       setConfirmLeave(true);
       return;
     }
-    router.push(backPath);
+    finishClose();
   }
 
+  // Escape, backdrop and header close all use the same unsaved-edit guard.
+  useImperativeHandle(closeRef, () => ({ requestClose: goBack }));
+
   async function save() {
-    if (!form || !task || !form.title.trim()) return;
+    if (!canEdit || !form || !task || !form.title.trim() || saveInFlight.current) return;
     const patch: UpdateTaskInput = {
       title: form.title.trim(),
       description: form.description.trim() === "" ? null : form.description.trim(),
@@ -287,6 +324,8 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
       // horas = insumo de custo: só entra no payload de quem tem custos.ver. [SEC-custo]
       ...(canSeeCost ? { estimatedMinutes: parseHoursToMinutes(form.estimated) } : {}),
     };
+    saveInFlight.current = true;
+    setSaveError(false);
     try {
       const updated = await update.mutateAsync({ id: task.id, patch, updatedAt: seededUpdatedAt });
       if (updated?.updatedAt) setSeededUpdatedAt(updated.updatedAt); // avança o token pro próximo save
@@ -295,13 +334,17 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
       // aqui descartaria uma edição feita logo após o save (e o token velho geraria CONFLITO falso). [rev-fase4]
     } catch (e) {
       if (errorCode(e) === "CONFLITO") setConflict(true);
-      // demais erros já viram toast no hook
+      else setSaveError(true);
+      // O hook mantém o toast; o erro local permite recuperar sem perder o rascunho.
+    } finally {
+      saveInFlight.current = false;
     }
   }
 
   function discard() {
     if (!baseline) return;
     setForm(baseline);
+    setSaveError(false);
     clearDraft();
   }
 
@@ -339,6 +382,7 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
 
   async function addSub(e: React.FormEvent) {
     e.preventDefault();
+    if (!canEdit) return;
     const t = newTitle.trim();
     if (!t) return;
     setNewTitle("");
@@ -353,7 +397,7 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
     try {
       await del.mutateAsync({ id, engagementId });
       clearDraft();
-      router.push(backPath);
+      finishClose();
       const msg = nSub > 0 ? `Tarefa e ${nSub} ${nSub === 1 ? "subtarefa" : "subtarefas"} excluídas` : "Tarefa excluída";
       undoToast(msg, () => restoreTask.mutate({ id, engagementId }));
     } catch {
@@ -392,41 +436,41 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
 
   // ---- estados de topo ----
   const status = httpStatus(detail.error);
+  if (workflow.isError && [401, 403].includes(httpStatus(workflow.error) ?? 0)) {
+    return <FullState title="Acesso indisponível" desc="Não foi possível confirmar seu acesso à tarefa." action={<Button variant="secondary" onClick={finishClose}>Voltar</Button>} />;
+  }
   if (detail.isError && (status === 404 || status === 403)) {
     return (
       <FullState
         title="Tarefa não encontrada"
         desc="Ela não existe ou você não tem acesso a ela."
-        action={<Button variant="secondary" onClick={() => router.push(fromParam || "/tarefas")}>Voltar</Button>}
+        action={<Button variant="secondary" onClick={finishClose}>Voltar</Button>}
       />
     );
   }
-  if (detail.isError) {
+  const refreshFailed = detail.isError && !!task && !!form && (status === undefined || status >= 500);
+  if (detail.isError && !refreshFailed) {
     return (
       <FullState
         title="Não foi possível carregar a tarefa"
         desc="Tente de novo em instantes."
-        action={<Button variant="secondary" onClick={() => detail.refetch()}>Tentar de novo</Button>}
+        action={<div className="flex gap-2"><Button variant="secondary" onClick={() => detail.refetch()}>Tentar de novo</Button><Button variant="ghost" onClick={finishClose}>Voltar</Button></div>}
       />
     );
   }
-  if (detail.isLoading || !task || !form) {
-    return (
-      <div className="flex flex-1 items-center justify-center py-16 text-muted-foreground">
-        <Loader2 className="size-5 animate-spin" />
-      </div>
-    );
+  if (detail.isLoading || !task || !form || !draftKey || formOwner !== draftKey) {
+    return <TaskDetailSkeleton onBack={finishClose} />;
   }
 
   const detailsPane = (
-    <div className={cn("flex flex-col gap-4", tab === "detalhes" ? "" : "hidden", "lg:flex")}>
-      <div className="sr-only">
+    <div className={cn("flex flex-col gap-4", managed || tab === "detalhes" ? "" : "hidden", !panel && "lg:flex")}>
+      {!managed && <div className="sr-only">
         <h1>{form.title || "Detalhe da tarefa"}</h1>
-      </div>
+      </div>}
       <span role="status" aria-live="polite" className="sr-only">
         {moveAnnounce}
       </span>
-      <Textarea
+      {!managed && <Textarea
         ref={titleRef}
         value={form.title}
         aria-label="Título da tarefa"
@@ -438,8 +482,12 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
         }}
         maxLength={200}
         className="min-h-0 resize-none overflow-hidden border-0 bg-transparent px-0 py-0 text-xl font-medium leading-tight tracking-tight shadow-none focus-visible:ring-0"
-      />
+      />}
 
+      {!managed && <fieldset disabled={dirty} className="min-w-0"><TaskWorkflow key={taskId} taskId={taskId} query={workflow} members={membersById} onDirtyChange={setWorkflowDirty} /></fieldset>}
+      {dirty && !managed && <p className="text-xs text-muted-foreground">Salve ou descarte a edição dos campos antes de alterar o fluxo.</p>}
+      {managed && <p className="text-xs text-muted-foreground">Esta tarefa usa revisão. Atualize a entrega pelo fluxo acima; os campos e anexos legados estão disponíveis para consulta.</p>}
+      {!managed && !workflowDirty && !canEdit && canEditPermission && !workflowUnavailable && <p className="text-xs text-muted-foreground">A edição ficará disponível quando o fluxo da tarefa for confirmado.</p>}
       <div className="flex flex-wrap gap-x-8 gap-y-3">
         <Field label="Status">
           <Segmented label="Status" value={form.status} options={STATUSES} disabled={!canEdit} onChange={(v) => setForm({ ...form, status: v })} />
@@ -548,6 +596,7 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
             <li key={s.id} className="group flex items-center gap-2.5 rounded-lg px-1 py-1">
               <button
                 type="button"
+                disabled={!canEdit}
                 aria-label={s.done ? "Desmarcar" : "Marcar como feita"}
                 onClick={() => toggle.mutate({ id: s.id, done: !s.done })}
                 className={cn(
@@ -560,6 +609,7 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
               <span className={cn("flex-1 text-[13px]", s.done && "text-muted-foreground line-through")}>{s.title}</span>
               <button
                 type="button"
+                disabled={!canEdit}
                 aria-label="Remover subtarefa"
                 onClick={() => removeSub.mutate(s.id)}
                 className="text-muted-foreground/0 transition-colors group-hover:text-muted-foreground hover:!text-amber"
@@ -571,11 +621,11 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
           {subs.length === 0 && <li className="px-1 py-1 text-[12.5px] text-muted-foreground">Nenhuma subtarefa ainda.</li>}
         </ul>
         <form onSubmit={addSub} className="mt-1 flex items-center gap-2">
-          <Input value={newTitle} aria-label="Nova subtarefa" onChange={(e) => setNewTitle(e.target.value)} placeholder="Adicionar subtarefa" maxLength={200} className="h-9" />
+          <Input disabled={!canEdit} value={newTitle} aria-label="Nova subtarefa" onChange={(e) => setNewTitle(e.target.value)} placeholder="Adicionar subtarefa" maxLength={200} className="h-9" />
           <button
             type="submit"
             aria-label="Adicionar"
-            disabled={!newTitle.trim() || add.isPending}
+            disabled={!canEdit || !newTitle.trim() || add.isPending}
             className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
           >
             <Plus className="size-4" />
@@ -588,11 +638,17 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
       <CostLine taskId={task.id} enabled={canSeeCost} />
 
       {canEdit && dirty && (
-        <div className="sticky bottom-0 z-10 -mx-1 mt-1 flex justify-end gap-2 border-t border-border bg-background px-1 py-3">
-          <Button type="button" variant="secondary" onClick={discard}>
+        <div className="sticky bottom-0 z-10 -mx-1 mt-1 flex flex-wrap items-center justify-end gap-2 border-t border-border bg-background px-1 py-3">
+          {saveError && (
+            <p role="alert" className="w-full text-sm text-destructive">
+              Não foi possível salvar. Suas alterações foram mantidas; tente novamente.
+            </p>
+          )}
+          <Button type="button" variant="secondary" onClick={discard} disabled={update.isPending}>
             Descartar
           </Button>
-          <Button type="button" onClick={save} disabled={!form.title.trim() || update.isPending}>
+          <Button type="button" onClick={save} aria-busy={update.isPending} disabled={!form.title.trim() || update.isPending}>
+            {update.isPending && <Loader2 className="size-4 animate-spin" aria-hidden />}
             {update.isPending ? "Salvando…" : "Salvar alterações"}
           </Button>
         </div>
@@ -601,9 +657,9 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
   );
 
   const activityPane = (
-    <div className={cn(tab === "atividade" ? "" : "hidden", "lg:block")}>
-      <span className="mb-3 hidden text-[11px] uppercase tracking-wide text-muted-foreground/80 lg:block">Atividade</span>
-      <ActivityTab taskId={task.id} membersById={membersById} enabled={isLg || tab === "atividade"} />
+    <div className={cn(tab === "atividade" ? "" : "hidden", !panel && "lg:block")}>
+      <span className={cn("mb-3 hidden text-[11px] uppercase tracking-wide text-muted-foreground/80", !panel && "lg:block")}>Atividade</span>
+      <ActivityTab taskId={task.id} membersById={membersById} enabled={(!panel && isLg) || tab === "atividade"} />
     </div>
   );
 
@@ -615,14 +671,14 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
           type="button"
           aria-label="Voltar"
           onClick={goBack}
-          className="inline-flex size-6 items-center justify-center rounded text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          className="inline-flex size-9 shrink-0 items-center justify-center rounded text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         >
           <ArrowLeft className="size-4" />
         </button>
         <nav aria-label="Trilha" className="flex min-w-0 items-center gap-1.5 text-[12.5px] text-muted-foreground">
-          {clientName ? <span className="truncate">{clientName}</span> : <span className="h-3 w-16 animate-pulse rounded bg-muted" />}
+          {clientName ? <span className="truncate">{clientName}</span> : <Skeleton className="h-3 w-16" />}
           <span className="text-muted-foreground/50">›</span>
-          {engagementName ? <span className="truncate">{engagementName}</span> : <span className="h-3 w-16 animate-pulse rounded bg-muted" />}
+          {engagementName ? <span className="truncate">{engagementName}</span> : <Skeleton className="h-3 w-16" />}
         </nav>
         <ActionsMenu
           label={`Ações da tarefa: ${task.title}`}
@@ -640,6 +696,17 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
 
       <div className="flex-1 overflow-auto">
         <div className="mx-auto max-w-5xl px-6 py-6">
+          {refreshFailed && (
+            <div role="status" className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card px-3.5 py-2.5">
+              <AlertTriangle className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+              <p className="min-w-0 flex-1 text-sm text-muted-foreground">
+                Não foi possível atualizar. Mantivemos os dados e suas edições nesta tela.
+              </p>
+              <Button variant="secondary" size="sm" disabled={detail.isFetching} aria-busy={detail.isFetching} onClick={() => detail.refetch()}>
+                {detail.isFetching ? "Atualizando…" : "Tentar de novo"}
+              </Button>
+            </div>
+          )}
           {conflict && (
             <div className="sticky top-0 z-20 mb-4 flex items-center gap-3 rounded-lg border border-amber/40 bg-card px-3.5 py-2.5">
               <AlertTriangle className="size-4 shrink-0 text-amber" aria-hidden />
@@ -653,8 +720,22 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
             </div>
           )}
 
+          {managed ? <>
+            <h1 className="mb-5 text-xl font-medium leading-snug tracking-tight">{task.title}</h1>
+            <div role="tablist" aria-label="Seções da tarefa" className="mb-5 flex gap-5 border-b border-border">
+              {([ ["summary", "Resumo"], ["review", "Revisão"], ["history", "Histórico"] ] as const).map(([value, label], index, items) => <button key={value} type="button" role="tab" id={`workflow-tab-${value}`} aria-controls="workflow-panel" aria-selected={workflowView === value} tabIndex={workflowView === value ? 0 : -1} onClick={() => setWorkflowView(value)} onKeyDown={(event) => {
+                const next = event.key === "ArrowRight" ? (index + 1) % items.length : event.key === "ArrowLeft" ? (index + items.length - 1) % items.length : event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : null;
+                if (next !== null) { event.preventDefault(); setWorkflowView(items[next][0]); document.getElementById(`workflow-tab-${items[next][0]}`)?.focus(); }
+              }} className={cn("border-b-2 px-1 pb-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring", workflowView === value ? "border-primary font-medium text-foreground" : "border-transparent text-muted-foreground hover:text-foreground")}>{label}</button>)}
+            </div>
+            <div role="tabpanel" id="workflow-panel" aria-labelledby={`workflow-tab-${workflowView}`}>
+              <TaskWorkflow key={taskId} taskId={taskId} query={workflow} members={membersById} view={workflowView} onDirtyChange={setWorkflowDirty} />
+              <div hidden={workflowView !== "history"} className="mt-6"><h2 className="mb-3 text-sm font-medium">Comentários e atividade</h2><ActivityTab taskId={task.id} membersById={membersById} enabled={workflowView === "history"} /></div>
+              <details hidden={workflowView !== "summary"} className="mt-6 border-t border-border pt-4"><summary className="cursor-pointer rounded text-sm text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">Dados da tarefa</summary><div className="pt-4">{detailsPane}</div></details>
+            </div>
+          </> : <>
           {/* Abas só no mobile */}
-          <div className="mb-4 flex gap-4 border-b border-border lg:hidden">
+          <div className={cn("mb-4 flex gap-4 border-b border-border", !panel && "lg:hidden")}>
             {(["detalhes", "atividade"] as const).map((t) => (
               <button
                 key={t}
@@ -671,10 +752,12 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
             ))}
           </div>
 
-          <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-8">
+          <div className={cn(!panel && "lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-8")}>
             {detailsPane}
             {activityPane}
           </div>
+          </>}
+
         </div>
       </div>
 
@@ -695,7 +778,7 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
               onClick={() => {
                 setConfirmLeave(false);
                 clearDraft();
-                router.push(backPath);
+                finishClose();
               }}
             >
               Descartar
@@ -703,6 +786,45 @@ export function TaskDetailView({ taskId }: { taskId: string }) {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+function TaskDetailSkeleton({ onBack }: { onBack: () => void }) {
+  return (
+    <div role="status" aria-label="Carregando tarefa" className="flex min-h-0 flex-1 flex-col">
+      <span className="sr-only">Carregando detalhes da tarefa…</span>
+      <div className="flex items-center gap-3 border-b border-border px-6 py-3.5">
+        <Button variant="ghost" size="icon" aria-label="Voltar" onClick={onBack}><ArrowLeft className="size-4" /></Button>
+        <Skeleton className="h-3 w-32" />
+      </div>
+      <div aria-hidden="true" className="mx-auto grid w-full max-w-5xl gap-8 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="flex flex-col gap-6">
+          <Skeleton className="h-8 w-4/5" />
+          <div className="flex flex-wrap gap-3">
+            <Skeleton className="h-9 w-48" />
+            <Skeleton className="h-9 w-36" />
+          </div>
+          <Skeleton className="h-9 w-56" />
+          <div className="flex flex-col gap-3">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-5/6" />
+            <Skeleton className="h-4 w-2/3" />
+          </div>
+          <div className="flex flex-col gap-3">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        </div>
+        <div className="hidden flex-col gap-4 lg:flex">
+          <Skeleton className="h-3 w-20" />
+          <Skeleton className="h-24 w-full" />
+          <Skeleton className="h-12 w-5/6" />
+          <Skeleton className="h-12 w-4/5" />
+        </div>
+      </div>
     </div>
   );
 }
@@ -760,7 +882,7 @@ function CostLine({ taskId, enabled }: { taskId: string; enabled: boolean }) {
     <div className="flex flex-col gap-1.5 border-t border-border pt-3">
       <span className="text-[11px] uppercase tracking-wide text-muted-foreground/80">Custo estimado</span>
       {cost.isLoading ? (
-        <span className="h-3.5 w-24 animate-pulse rounded bg-muted" />
+        <Skeleton className="h-3.5 w-24" />
       ) : cost.isError || !cost.data ? (
         <span className="text-[13px] text-muted-foreground">Não foi possível calcular agora.</span>
       ) : cost.data.state === "OK" ? (

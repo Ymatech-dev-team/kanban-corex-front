@@ -77,7 +77,7 @@ export function NotificationsBell() {
 
   function openTask(taskId: string, key: string) {
     markSeen([key]);
-    router.push(`/tarefas/${taskId}`);
+    router.push(`/tarefas/${taskId}`, { scroll: false });
   }
 
   function markAll() {

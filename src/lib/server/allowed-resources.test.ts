@@ -3,7 +3,7 @@ import { ALLOWED_RESOURCES, isAllowedResource } from "./allowed-resources";
 
 describe("allowlist do BFF", () => {
   it("libera todos os recursos de domínio (incl. engagements)", () => {
-    for (const r of ["me", "projects", "tasks", "subtasks", "members", "roles", "engagements"]) {
+    for (const r of ["me", "projects", "tasks", "subtasks", "members", "roles", "engagements", "mcp"]) {
       expect(isAllowedResource(r)).toBe(true);
     }
   });

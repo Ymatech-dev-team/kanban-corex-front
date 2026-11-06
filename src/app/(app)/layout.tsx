@@ -5,7 +5,7 @@ import { MobileBottomNav } from "@/components/shell/mobile-bottom-nav";
 
 /** Shell das páginas protegidas: no desktop, sidebar + conteúdo; no mobile (< lg), top bar +
  *  conteúdo + bottom-nav (em coluna e em fluxo, pra não cobrir o scroll das telas). [shell-mobile] */
-export default function AppLayout({ children }: { children: React.ReactNode }) {
+export default function AppLayout({ children, task }: { children: React.ReactNode; task?: React.ReactNode }) {
   return (
     <AuthGuard>
       <div className="flex h-[100dvh] overflow-hidden">
@@ -19,6 +19,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <MobileBottomNav />
         </div>
       </div>
+      {task}
     </AuthGuard>
   );
 }
