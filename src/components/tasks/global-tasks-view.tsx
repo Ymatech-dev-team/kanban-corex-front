@@ -58,7 +58,7 @@ export function GlobalTasksView() {
   const [addStatus, setAddStatus] = useState<TaskStatus | null>(null);
 
   const projects = useProjects();
-  const clients = projects.data ?? [];
+  const clients = useMemo(() => projects.data ?? [], [projects.data]);
   const engagements = useEngagements(filters.cliente ?? null);
   const accessibleMembers = useAccessibleMembers();
 

@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import Link from "next/link";
 import { describe, it, expect } from "vitest";
 import { Button, buttonVariants } from "./button";
 
@@ -17,7 +18,7 @@ describe("Button (design system)", () => {
   it("asChild compõe o elemento filho (Slot)", () => {
     render(
       <Button asChild>
-        <a href="/x">Ir</a>
+        <Link href="/x">Ir</Link>
       </Button>,
     );
     expect(screen.getByRole("link", { name: "Ir" })).toBeInTheDocument();

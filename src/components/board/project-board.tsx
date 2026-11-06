@@ -100,7 +100,7 @@ export function ProjectBoard({
 
   const tasks = useEngagementTasks(engagementId);
   const membersQuery = useProjectMembers(clientId);
-  const members = membersQuery.data ?? [];
+  const members = useMemo(() => membersQuery.data ?? [], [membersQuery.data]);
   const membersById = useMemo(() => Object.fromEntries(members.map((m) => [m.id, m.name])), [members]);
   const list = engagements.data ?? [];
   const current = list.find((e) => e.id === engagementId) ?? null;

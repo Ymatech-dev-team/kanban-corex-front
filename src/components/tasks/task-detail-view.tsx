@@ -128,7 +128,7 @@ export function TaskDetailView({ taskId, panel = false, onClose, closeRef }: {
   const project = useProject(projectId || null);
   const canSeeCost = project.data?.canSeeCost === true;
   const membersQuery = useProjectMembers(projectId || null);
-  const members = membersQuery.data ?? [];
+  const members = useMemo(() => membersQuery.data ?? [], [membersQuery.data]);
   const membersById = useMemo(() => Object.fromEntries(members.map((m) => [m.id, m.name])), [members]);
   const engagements = useEngagements(projectId || null);
   const clientName = project.data?.name;
