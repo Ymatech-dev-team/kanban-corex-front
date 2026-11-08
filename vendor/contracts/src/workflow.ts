@@ -33,6 +33,8 @@ export interface WorkflowReview {
   decision: "pending" | "changes_requested" | "approved" | "superseded";
   decidedBy?: string;
   decidedAt?: string;
+  decidedChannel?: WorkflowChannel;
+  decidedAgent?: string;
   reason?: string;
 }
 
@@ -91,6 +93,7 @@ export interface WorkflowExecution {
 export type ProgressSummary = Omit<WorkflowSummary, "updatedAt" | "updatedBy" | "channel">;
 
 export type WorkflowCommand =
+  | { type: "record_evidence"; summary: string; evidence: string[] }
   | { type: "transition"; to: WorkflowStage; reason?: string }
   | { type: "change_delivery"; reason: string; context?: string; criteria?: string[] }
   | { type: "start_execution"; executionId: string; agent: string; sessionReference?: string }

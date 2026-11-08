@@ -99,3 +99,21 @@ it("marks only unresolved blocking findings and hides new action on completed ta
   expect(screen.queryByRole("button", { name: "Solicitar ação" })).not.toBeInTheDocument();
   expect(screen.getByText("Abra a aba Revisão para concluir esta solicitação.")).toBeInTheDocument();
 });
+
+
+it.each(["Claude", "Codex", "<script>alert(1)</script>"])("attributes MCP completion to the recorded agent %s, not the latest execution", (agent) => {
+  const approved = { ...state.reviews[0], decision: "approved", decidedChannel: "MCP", decidedAgent: agent };
+  const { container } = view(query({ data: { ...query().data, state: { ...state, stage: "DONE", reviews: [approved], execution: { agent: "Agente posterior", status: "RUNNING", lastUpdatedAt: "2026-11-08T12:00:00Z" } } } }));
+  expect(screen.getByText(`Concluído por ${agent} via MCP`)).toBeInTheDocument();
+  expect(screen.queryByText("Concluído por Agente posterior via MCP")).not.toBeInTheDocument();
+  expect(container.querySelector("script")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Aprovar entrega" })).not.toBeInTheDocument();
+});
+it("uses a neutral assistant label when persisted MCP completion lacks agent name", () => {
+  view(query({ data: { ...query().data, state: { ...state, stage: "DONE", reviews: [{ ...state.reviews[0], decision: "approved", decidedChannel: "MCP" }] } } }));
+  expect(screen.getByText("Concluído por Assistente conectado via MCP")).toBeInTheDocument();
+});
+it.each([undefined, "WEB"])("does not invent assistant attribution for human or legacy approvals (%s)", (decidedChannel) => {
+  view(query({ data: { ...query().data, state: { ...state, stage: "DONE", reviews: [{ ...state.reviews[0], decision: "approved", decidedChannel, decidedAgent: "Claude" }] } } }));
+  expect(screen.queryByText(/Concluído por .* via MCP/)).not.toBeInTheDocument();
+});
