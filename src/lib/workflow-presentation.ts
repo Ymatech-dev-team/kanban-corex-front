@@ -7,7 +7,7 @@ export function workflowPresentation(state: WorkflowState) {
   const failed = review?.checks.filter(check => check.required && check.status === "failed").map(check => check.name) ?? [];
   const missing = required.filter(name => !review?.checks.some(check => check.name === name && check.required && check.status === "passed"));
   const blocking = state.findings.filter(finding => finding.blocking && (!(["validated", "waived"].includes(finding.state)) || finding.resolvedDeliveryRevision !== state.deliveryRevision));
-  if (state.stage === "DONE") return { label: review?.decidedChannel === "MCP" ? "Concluída pelo agente" : "Concluída", next: "Entrega concluída. Evidências e histórico disponíveis.", tone: "success" as const, agent: review?.decidedChannel === "MCP" ? review.decidedAgent?.trim() || "Assistente conectado" : null, blocking };
+  if (state.stage === "DONE") return { label: review?.reservation ? "Concluída com ressalvas" : review?.decidedChannel === "MCP" ? "Concluída pelo agente" : "Concluída", next: "Entrega concluída. Evidências e histórico disponíveis.", tone: "success" as const, agent: review?.decidedChannel === "MCP" ? review.decidedAgent?.trim() || "Assistente conectado" : null, blocking };
   if (state.stage === "IN_REVIEW") {
     if (review?.reviewMode !== "AGENT") {
       const mode = review?.reviewMode === "HUMAN" ? "Revisão humana" : "Revisão sem classificação";

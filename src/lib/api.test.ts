@@ -109,3 +109,24 @@ describe("onResponseError — auto-cura de sessão", () => {
     expect(window.location.href).toBe("");
   });
 });
+
+describe("concurrent refresh retry", () => {
+ afterEach(() => vi.useRealTimers());
+ it("retries only the refresh conflict using the original request and current cookies", async () => {
+  vi.useFakeTimers(); vi.resetModules(); const { api, onResponseError } = await import("./api");
+  const adapter=vi.fn(async config=>({status:200,statusText:"OK",headers:{},config,data:{ok:true}}));
+  const config={url:"/tasks/t1",method:"patch",data:{title:"x"},adapter};
+  const promise=onResponseError({response:{status:409,data:{error:{code:"REFRESH_EM_ANDAMENTO"}}},config});
+  await vi.runAllTimersAsync(); expect((await promise).data).toEqual({ok:true});expect(adapter).toHaveBeenCalledOnce();
+  expect(adapter.mock.calls[0][0]).toMatchObject({url:"/tasks/t1",method:"patch"});
+  expect(api.defaults.withCredentials).toBe(true);
+ });
+ it("never retries a business conflict or an exhausted refresh retry", async()=>{
+  const {onResponseError}=await import("./api");
+  const adapter=vi.fn();
+  const business={response:{status:409,data:{error:{code:"CONFLITO"}}},config:{url:"/tasks",adapter}};
+  await expect(onResponseError(business)).rejects.toBe(business);
+  const exhausted={response:{status:409,data:{error:{code:"REFRESH_EM_ANDAMENTO"}}},config:{url:"/tasks",adapter,sessionRefreshRetries:3}};
+  await expect(onResponseError(exhausted)).rejects.toBe(exhausted);expect(adapter).not.toHaveBeenCalled();
+ });
+});

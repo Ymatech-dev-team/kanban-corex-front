@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { CanceledError, type InternalAxiosRequestConfig } from "axios";
 import type { QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -46,11 +46,22 @@ function redirectToLogin() {
   }, 1200);
 }
 
-export function onResponseError(error: unknown) {
+export async function onResponseError(error: unknown) {
   const err = error as {
     response?: { status?: number; data?: { error?: { code?: string } } };
-    config?: { url?: string; method?: string };
+    config?: InternalAxiosRequestConfig & { sessionRefreshRetries?: number };
   };
+  // The backend rejected this request before domain execution: another response is rotating
+  // the shared cookie. Retry from the browser so the winner's Set-Cookie can be used.
+  if (err.response?.status === 409 && err.response.data?.error?.code === "REFRESH_EM_ANDAMENTO" && err.config) {
+    const attempts = err.config.sessionRefreshRetries ?? 0;
+    if (attempts < 3) {
+      if (err.config.signal?.aborted) throw new CanceledError();
+      await new Promise(resolve => setTimeout(resolve, 250 * (attempts + 1)));
+      if (err.config.signal?.aborted) throw new CanceledError();
+      return api.request({ ...err.config, sessionRefreshRetries: attempts + 1 } as InternalAxiosRequestConfig);
+    }
+  }
   const status = err?.response?.status;
   const code = err?.response?.data?.error?.code;
   const reqPath = (err?.config?.url ?? "").split("?")[0];

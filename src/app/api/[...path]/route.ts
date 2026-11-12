@@ -41,13 +41,21 @@ async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] 
   if (res.status === 401) {
     const rt = await getRefresh();
     if (rt) {
-      const refreshed = await refreshSession(rt);
+      let refreshed;
+      try {
+        refreshed = await refreshSession(rt);
+      } catch {
+        return NextResponse.json({ error: { code: "SESSAO_INDISPONIVEL", message: "Não foi possível renovar a sessão agora. Tente novamente." } }, { status: 503, headers: { "Cache-Control": "no-store" } });
+      }
       if (refreshed.status === 200) {
         const d = refreshed.data as { accessToken: string; refreshToken: string };
         await setSession(d.accessToken, d.refreshToken);
         res = await callApi(method, target, { body, accessToken: d.accessToken, extraHeaders });
       } else {
-        await clearSession();
+        // Only a definitive authentication failure ends the browser session.
+        // Concurrent refresh, rate limits and outages are recoverable; never return the old 401.
+        if (refreshed.status === 401) await clearSession();
+        res = refreshed;
       }
     }
   }

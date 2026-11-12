@@ -4,7 +4,7 @@ import { useWorkflowHistory } from "@/lib/hooks/use-workflow";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 const channels: Record<string, string> = { WEB: "Painel", MCP: "Assistente conectado", LOCAL_SYNC: "Sincronização local" };
-const labels: Record<string, string> = { initialize: "Fluxo ativado", adopt_agent_review: "Revisão assumida pelo agente", transition: "Etapa alterada", change_delivery: "Entrega atualizada", start_execution: "Execução iniciada", report_progress: "Progresso registrado", record_evidence: "Evidências da entrega registradas", submit_review: "Entrega enviada para revisão", record_finding: "Achado registrado", report_fix: "Correção informada", validate_finding: "Correção validada", waive_finding: "Achado dispensado", request_changes: "Ajustes solicitados", approve_review: "Entrega aprovada", request_action: "Decisão solicitada", resolve_action: "Solicitação respondida" };
+const labels: Record<string, string> = { initialize: "Fluxo ativado", adopt_agent_review: "Revisão assumida pelo agente", transition: "Etapa alterada", change_delivery: "Entrega atualizada", start_execution: "Execução iniciada", report_progress: "Progresso registrado", record_evidence: "Evidências da entrega registradas", submit_review: "Entrega enviada para revisão", record_finding: "Achado registrado", report_fix: "Correção informada", validate_finding: "Correção validada", waive_finding: "Achado dispensado", request_changes: "Ajustes solicitados", approve_review: "Entrega aprovada", approve_with_reservations: "Entrega aprovada com ressalvas", request_action: "Decisão solicitada", resolve_action: "Solicitação respondida" };
 function object(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
@@ -17,7 +17,7 @@ function historyDetails(payload: Record<string, unknown>): string[] {
   const list = (value: unknown, label: string) => { if (Array.isArray(value)) value.forEach((item) => add(item, label)); };
   for (const source of [payload, command]) for (const field of ["reason", "description", "question", "response"]) add(source[field]);
   add(action.question); add(action.response);
-  add(command.summary); list(command.evidence, "Evidência: ");
+  add(command.summary); list(command.evidence, "Evidência: "); list(command.checkNames, "Check aceito com falha: ");
   add(summary.objective, "Objetivo: "); list(summary.completed, "Feito: "); list(summary.remaining, "Falta fazer: ");
   list(summary.blockers, "Bloqueio: "); add(summary.nextStep, "Próximo passo: "); list(summary.references, "Referência: ");
   return [...new Set(result)];

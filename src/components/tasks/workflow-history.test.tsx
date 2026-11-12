@@ -50,3 +50,13 @@ it("renders appended delivery evidence as text in the same history", () => {
 });
 
 it("labels the audited legacy adoption without exposing an internal command", () => { fixture.channel = "MCP"; fixture.type = "adopt_agent_review"; fixture.payload = {}; render(<WorkflowHistory taskId="t" members={{ u: "João" }} expanded />); expect(screen.getByText("Revisão assumida pelo agente")).toBeInTheDocument(); expect(screen.queryByText("adopt_agent_review")).not.toBeInTheDocument(); });
+
+it("shows the human exception reason and accepted failed checks in the audit history", () => {
+  fixture.channel = "WEB"; fixture.type = "approve_with_reservations";
+  fixture.payload = { command: { reason: "Falha preexistente documentada", checkNames: ["lint", "test"] } };
+  render(<WorkflowHistory taskId="t" members={{ u: "João" }} expanded />);
+  expect(screen.getByText("Entrega aprovada com ressalvas")).toBeInTheDocument();
+  expect(screen.getByText("Falha preexistente documentada")).toBeInTheDocument();
+  expect(screen.getByText("Check aceito com falha: lint")).toBeInTheDocument();
+  expect(screen.getByText("Check aceito com falha: test")).toBeInTheDocument();
+});
