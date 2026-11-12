@@ -97,7 +97,7 @@ it("marks only unresolved blocking findings and hides new action on completed ta
   expect(screen.getByText("Validado")).toBeInTheDocument();
   expect(screen.getByText("Dispensado com justificativa")).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Solicitar ação" })).not.toBeInTheDocument();
-  expect(screen.getByText("Abra a aba Revisão para concluir esta solicitação.")).toBeInTheDocument();
+  expect(screen.getByText("Abra a aba Revisão para consultar o modo de revisão e o próximo passo.")).toBeInTheDocument();
 });
 
 
@@ -117,3 +117,25 @@ it.each([undefined, "WEB"])("does not invent assistant attribution for human or 
   view(query({ data: { ...query().data, state: { ...state, stage: "DONE", reviews: [{ ...state.reviews[0], decision: "approved", decidedChannel, decidedAgent: "Claude" }] } } }));
   expect(screen.queryByText(/Concluído por .* via MCP/)).not.toBeInTheDocument();
 });
+
+it("keeps autonomous review with the agent without a final acceptance button", () => {
+  view(query({ data: { ...query().data, state: { ...state, reviews: [{ ...state.reviews[0], reviewMode: "AGENT" }] } } }));
+  expect(screen.getByText(/Nenhum aceite final seu é necessário/)).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Aprovar entrega" })).not.toBeInTheDocument();
+  expect(screen.getByText(/A aprovação exige/)).toBeInTheDocument();
+});
+it("keeps the full technical report behind a disclosure", () => {
+  view(query({ data: { ...query().data, state: { ...state, reviews: [{ ...state.reviews[0], summary: "Relatório técnico extenso" }] } } }));
+  const report = screen.getByText("Relatório técnico extenso");
+  expect(report.closest("details")).not.toHaveAttribute("open");
+  fireEvent.click(screen.getByText("Relatório da revisão e evidências"));
+  expect(report).toBeInTheDocument();
+});
+it("renders compact question with task identity and preserves full text", () => {
+  mock.actions = { data: { pages: [{ actions: [{ id: "a", taskId: "t", taskTitle: "Decidir escopo", clientName: "Cliente", projectName: "Projeto", question: "Contexto longo ".repeat(500) }] }] } };
+  render(<PendingActions />);
+  expect(screen.getByText("Decidir escopo")).toBeInTheDocument();
+  expect(screen.getByText(/Contexto longo/)).toHaveClass("line-clamp-2");
+});
+
+it("keeps short human questions fully readable in task detail", () => { const question = "Confirmar a regra de arredondamento e as unidades afetadas antes de continuar com a mudança aprovada no plano."; view(query({ data: { ...query().data, actions: [{ id: "a", taskId: "t1", question, kind: "DECIDE", recipientId: "reviewer" }] } })); expect(screen.getByText(question)).not.toHaveClass("line-clamp-2"); });

@@ -48,3 +48,5 @@ it("renders appended delivery evidence as text in the same history", () => {
   expect(screen.getByText("Evidência: <img src=x onerror=alert(1)>")).toBeInTheDocument();
   expect(container.querySelector("img")).toBeNull();
 });
+
+it("labels the audited legacy adoption without exposing an internal command", () => { fixture.channel = "MCP"; fixture.type = "adopt_agent_review"; fixture.payload = {}; render(<WorkflowHistory taskId="t" members={{ u: "João" }} expanded />); expect(screen.getByText("Revisão assumida pelo agente")).toBeInTheDocument(); expect(screen.queryByText("adopt_agent_review")).not.toBeInTheDocument(); });

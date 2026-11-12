@@ -5,6 +5,9 @@ import { api } from "@/lib/api";
 
 export interface WorkflowAction {
   id: string;
+  taskTitle?: string;
+  clientName?: string;
+  projectName?: string;
   taskId: string;
   orgId: string;
   recipientId: string;
@@ -44,6 +47,26 @@ export function useMyWorkflowActions() {
   });
 }
 
+export interface WorkflowMonitoringItem {
+  taskId: string;
+  title: string;
+  clientName: string;
+  projectName: string;
+  updatedAt: string;
+  state: WorkflowState;
+}
+export const monitoringKey = ["workflow-monitoring", "mine"] as const;
+export function useWorkflowMonitoring() {
+  return useInfiniteQuery({
+    queryKey: monitoringKey,
+    initialPageParam: null as string | null,
+    queryFn: async ({ pageParam }) => (await api.get<{ items: WorkflowMonitoringItem[]; nextCursor: string | null }>("/tasks/workflows/mine", { params: { limit: 20, ...(pageParam ? { cursor: pageParam } : {}) } })).data,
+    getNextPageParam: page => page.nextCursor ?? undefined,
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: false,
+  });
+}
+
 export function workflowMessage(error: unknown): string {
   const status = (error as { response?: { status?: number } })?.response?.status;
   if (status === 400) {
@@ -77,7 +100,7 @@ export function useWorkflowWrite(taskId: string) {
       }
     },
     onSettled: async () => {
-      await Promise.all([cache.invalidateQueries({ queryKey: workflowKey(taskId) }), cache.invalidateQueries({ queryKey: myActionsKey }), cache.invalidateQueries({ queryKey: ["task", taskId] }), cache.invalidateQueries({ queryKey: ["tasks"] }), cache.invalidateQueries({ queryKey: ["eng-tasks"] })]);
+      await Promise.all([cache.invalidateQueries({ queryKey: workflowKey(taskId) }), cache.invalidateQueries({ queryKey: myActionsKey }), cache.invalidateQueries({ queryKey: monitoringKey }), cache.invalidateQueries({ queryKey: ["task", taskId] }), cache.invalidateQueries({ queryKey: ["tasks"] }), cache.invalidateQueries({ queryKey: ["eng-tasks"] })]);
     },
   });
 }
