@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ToggleButton, ToggleButtonGroup } from "@heroui/react";
 import { toast } from "@/components/ui/toast";
-import { ArrowLeft, ChevronDown, FolderX, ListChecks, ListFilter, Loader2, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, FolderX, ListChecks, Loader2, X } from "lucide-react";
 import { PERMISSIONS, type TaskStatus } from "@sistema-tasks/contracts";
 import { useProject, useProjects } from "@/lib/hooks/use-projects";
 import { generalEngagementId } from "@/lib/engagements";
@@ -13,7 +14,7 @@ import { useBoardSelection } from "@/lib/hooks/use-board-selection";
 import { useProjectMembers } from "@/lib/hooks/use-members";
 import { useCan } from "@/lib/hooks/use-can";
 import { httpStatus } from "@/lib/http-error";
-import { filterTasks, respToAssignee, type AssigneeFilter } from "@/lib/filter";
+import { filterTasks } from "@/lib/filter";
 import {
   type BoardFilters,
   EMPTY_BOARD_FILTERS,
@@ -25,18 +26,11 @@ import {
   writeAppliedPresetId,
 } from "@/lib/board-filters";
 import { useBoardPresets, type Preset } from "@/lib/hooks/use-board-filters";
-import {
-  FacetPills,
-  FacetsDropdown,
-  PresetDialogs,
-  PresetsControl,
-  PresetsSheet,
-  type PresetDialogState,
-} from "@/components/board/board-filters-ui";
+import { BoardFilterStrip, PresetDialogs, type PresetDialogState } from "@/components/board/board-filters-ui";
+import { LiveByTaskProvider } from "@/components/query-bar";
 import { KanbanBoard } from "@/components/board/kanban-board";
 import { TaskList } from "@/components/board/task-list";
 import { TaskCalendar } from "@/components/board/task-calendar";
-import { AssigneeFilter as AssigneeFilterControl } from "@/components/board/assignee-filter";
 import { CreateTaskDialog } from "@/components/board/create-task-dialog";
 import { BulkActionBar } from "@/components/board/bulk-action-bar";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
@@ -55,12 +49,8 @@ import { cn } from "@/lib/utils";
 
 type ViewKey = "kanban" | "lista" | "calendario" | "custo";
 
-/** AssigneeFilter (controle) → campo `resp` do BoardFilters. */
-function assigneeToResp(af: AssigneeFilter): string | undefined {
-  if (af.type === "all") return undefined;
-  if (af.type === "none") return "none";
-  return af.id;
-}
+/** Busca local por título (sem acento e sem diferenciar maiúsculas). */
+const normText = (s: string) => s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
 
 export function ProjectBoard({
   clientId,
@@ -78,6 +68,7 @@ export function ProjectBoard({
   const [addStatus, setAddStatus] = useState<TaskStatus | null>(null);
   const [addInitialTitle, setAddInitialTitle] = useState(""); // título vindo do quick-add ao "abrir completo"
   const [filters, setFilters] = useState<BoardFilters>(EMPTY_BOARD_FILTERS);
+  const [search, setSearch] = useState(""); // busca local por título (a faixa de filtros); não é salva nos presets
   const [view, setView] = useState<ViewKey>("kanban");
   const [sheetOpen, setSheetOpen] = useState(false); // sheet do header no mobile [shell-mobile]
   const [dialog, setDialog] = useState<PresetDialogState>({ kind: "none" });
@@ -107,6 +98,7 @@ export function ProjectBoard({
 
   // Criar rápido: quick-add inline na coluna (cria quieto, sem toast em série) + "abrir completo". [criar-mais-rapido]
   const canCreate = useCan(PERMISSIONS.tarefas_criar);
+  const canSeeGlobal = useCan(PERMISSIONS.tarefas_ver_globais); // fonte do estado vivo: feed da equipe ou /mine
   const createTask = useCreateEngagementTask(engagementId);
   const openCreate = (status: TaskStatus, initialTitle?: string) => {
     setAddInitialTitle(initialTitle ?? "");
@@ -116,17 +108,18 @@ export function ProjectBoard({
     const created = await createTask.mutateAsync({ title, status, quiet: true });
     // avisa só se a nova tarefa REALMENTE some pelo filtro atual (ex.: "Sem responsável"/"Média" a mantêm
     // visível). `id` fixo evita empilhar toasts na criação em série. [RF-11, review]
-    if (filterTasks([created], filters, { ignoreStatus: kanban }).length === 0) {
+    if (filterTasks([created], filters, { ignoreStatus: kanban }).length === 0 || (needle && !normText(created.title).includes(needle))) {
       toast.message("Tarefa criada, mas oculta pelo filtro atual.", { id: "quickadd-oculta" });
     }
   };
 
-  // No Kanban o Status é ignorado (as colunas já são o status). [RF-3]
+  // No Quadro a etapa (status) é ignorada (as colunas já são o status). [RF-3]
   const kanban = effectiveView === "kanban";
-  const visibleTasks = useMemo(
-    () => filterTasks(tasks.data ?? [], filters, { ignoreStatus: kanban }),
-    [tasks.data, filters, kanban],
-  );
+  const needle = normText(search.trim());
+  const visibleTasks = useMemo(() => {
+    const filtered = filterTasks(tasks.data ?? [], filters, { ignoreStatus: kanban });
+    return needle ? filtered.filter((t) => normText(t.title).includes(needle)) : filtered;
+  }, [tasks.data, filters, kanban, needle]);
 
   // Seleção múltipla + ações em massa (lógica extraída pro hook — comportamento idêntico). [T8]
   const {
@@ -218,7 +211,7 @@ export function ProjectBoard({
   if (clientNotFound || engNotFound) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-4 px-6 py-16 text-center">
-        <div className="flex size-12 items-center justify-center rounded-full border border-border bg-card text-muted-foreground">
+        <div className="flex size-12 items-center justify-center rounded-sm border border-border bg-card text-muted-foreground">
           <FolderX className="size-5" />
         </div>
         <div>
@@ -237,27 +230,30 @@ export function ProjectBoard({
 
   // ---- controles do header (compartilhados desktop + mobile) ----
   const VIEWS = [
-    { key: "kanban", label: "Kanban" },
+    { key: "kanban", label: "Quadro" },
     { key: "lista", label: "Lista" },
     { key: "calendario", label: "Calendário" },
     ...(canSeeCost ? [{ key: "custo", label: "Custo" } as const] : []),
   ] as { key: ViewKey; label: string }[];
   const renderTabs = (containerClass: string) => (
     <div className={containerClass}>
-      {VIEWS.map((v) => (
-        <Button variant="unstyled"
-          key={v.key}
-          type="button"
-          onClick={() => setView(v.key)}
-          aria-pressed={effectiveView === v.key}
-          className={cn(
-            "shrink-0 rounded-md px-3 py-1 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-            effectiveView === v.key ? "bg-surface-tertiary text-foreground" : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          {v.label}
-        </Button>
-      ))}
+      <ToggleButtonGroup
+        aria-label="Visualização"
+        selectionMode="single"
+        disallowEmptySelection
+        size="sm"
+        selectedKeys={new Set([effectiveView])}
+        onSelectionChange={(keys) => {
+          const key = [...keys][0];
+          if (key != null && key !== effectiveView) setView(String(key) as ViewKey);
+        }}
+      >
+        {VIEWS.map((v) => (
+          <ToggleButton key={v.key} id={v.key} className="min-h-9 px-3 text-[12.5px] font-semibold data-[selected=true]:bg-foreground data-[selected=true]:text-background max-md:min-h-11">
+            {v.label}
+          </ToggleButton>
+        ))}
+      </ToggleButtonGroup>
     </div>
   );
 
@@ -265,28 +261,11 @@ export function ProjectBoard({
   const filtering = visibleTasks.length !== total;
   const canSave = hasAnyBoardFilter(filters);
 
-  // Responsável encodado como string pro SheetSelect do mobile.
-  const respSelected = filters.resp === undefined ? "all" : filters.resp === "none" ? "none" : `user:${filters.resp}`;
-  const respOptions = [
-    { value: "all", label: "Todos" },
-    { value: "none", label: "Sem responsável" },
-    ...members.map((m) => ({ value: `user:${m.id}`, label: m.name })),
-  ];
-  const setResp = (v: string | undefined) =>
-    changeFilters((f) => ({ ...f, resp: !v || v === "all" ? undefined : v === "none" ? "none" : v.slice(5) }));
-
-  // Contagem de facets ativos aplicáveis (Status não conta no Kanban). Badge do botão "Filtros" no mobile.
-  const activeCount =
-    (filters.resp !== undefined ? 1 : 0) +
-    (filters.prio ? 1 : 0) +
-    (filters.prazo ? 1 : 0) +
-    (!kanban && filters.status ? 1 : 0);
-
   const clienteOptions = (clients.data ?? []).map((c) => ({ value: c.id, label: c.name }));
   const projetoOptions = list.map((e) => ({ value: e.id, label: e.name }));
 
   return (
-    <>
+    <LiveByTaskProvider canGlobal={canSeeGlobal}>
       {/* ---------- MOBILE header (< lg): voltar + breadcrumb/sheet + abas roláveis ---------- */}
       <header className="flex flex-col gap-2 border-b border-border px-4 py-2.5 lg:hidden">
         <div className="flex items-center gap-2">
@@ -294,35 +273,19 @@ export function ProjectBoard({
             type="button"
             aria-label="Voltar para o cliente"
             onClick={() => router.push(`/clientes/${clientId}`)}
-            className="flex size-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
           >
             <ArrowLeft className="size-4" />
           </Button>
           <Button variant="unstyled"
             type="button"
             onClick={() => setSheetOpen(true)}
-            className="flex h-10 min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-[12.5px] outline-none transition-colors hover:border-muted-foreground/40 focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex h-11 min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-[12.5px] outline-none transition-colors hover:border-muted-foreground/40 focus-visible:ring-2 focus-visible:ring-ring"
           >
             <span className="truncate">{project.data?.name ?? "Cliente"}</span>
             <span className="shrink-0 text-muted-foreground/60">›</span>
             <span className="truncate text-muted-foreground">{current?.name ?? "Projeto"}</span>
             <ChevronDown className="ml-auto size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-          </Button>
-          <Button variant="unstyled"
-            type="button"
-            aria-label="Filtros do quadro"
-            onClick={() => setSheetOpen(true)}
-            className={cn(
-              "flex h-10 shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-[12.5px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-              activeCount > 0 ? "border-muted-foreground/40 bg-surface-tertiary text-foreground" : "border-border bg-card text-muted-foreground hover:text-foreground",
-            )}
-          >
-            <ListFilter className="size-3.5" aria-hidden />
-            {activeCount > 0 && (
-              <span className="flex min-w-[15px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
-                {activeCount}
-              </span>
-            )}
           </Button>
           {canSelect && (
             <Button variant="unstyled"
@@ -331,7 +294,7 @@ export function ProjectBoard({
               aria-label={selectMode ? "Cancelar seleção" : "Selecionar tarefas"}
               onClick={enterOrExit}
               className={cn(
-                "flex size-10 shrink-0 items-center justify-center rounded-lg border outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
+                "flex size-11 shrink-0 items-center justify-center rounded-lg border outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
                 selectMode ? "border-primary bg-surface-tertiary text-primary" : "border-border bg-card text-muted-foreground hover:text-foreground",
               )}
             >
@@ -339,46 +302,23 @@ export function ProjectBoard({
             </Button>
           )}
         </div>
-        {renderTabs("flex gap-0.5 overflow-x-auto rounded-lg border border-border bg-card p-[3px] text-[12.5px]")}
+        {renderTabs("overflow-x-auto")}
       </header>
 
       <BottomSheet
         open={sheetOpen}
         onOpenChange={setSheetOpen}
-        title="Filtros do quadro"
+        title="Cliente e projeto"
         footer={
-          <>
-            {canSave && (
-              <Button variant="unstyled"
-                type="button"
-                onClick={() => changeFilters(EMPTY_BOARD_FILTERS)}
-                className="text-[12.5px] text-muted-foreground underline decoration-muted-foreground/40 underline-offset-2 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                Limpar filtros
-              </Button>
-            )}
-            <Button variant="unstyled"
-              type="button"
-              onClick={() => setSheetOpen(false)}
-              className="ml-auto inline-flex h-9 items-center rounded-lg bg-secondary px-4 text-[13px] font-medium text-secondary-foreground outline-none transition-colors hover:bg-secondary/80 focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              Ver {visibleTasks.length} {visibleTasks.length === 1 ? "tarefa" : "tarefas"}
-            </Button>
-          </>
+          <Button variant="unstyled"
+            type="button"
+            onClick={() => setSheetOpen(false)}
+            className="ml-auto inline-flex min-h-11 items-center rounded-md bg-secondary px-4 text-[13px] font-medium text-secondary-foreground outline-none transition-colors hover:bg-secondary/80 focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Fechar
+          </Button>
         }
       >
-        <PresetsSheet
-          presets={presets.data ?? []}
-          isLoading={presets.isLoading}
-          isError={presets.isError}
-          activeId={activePresetId}
-          canSave={canSave}
-          onApply={applyPreset}
-          onSave={() => { setSheetOpen(false); setDialog({ kind: "save" }); }}
-          onDelete={(p) => { setSheetOpen(false); setDialog({ kind: "delete", preset: p }); }}
-          onRetry={() => presets.refetch()}
-        />
-        <div className="h-px bg-border" />
         {(clients.data?.length ?? 0) > 1 && (
           <SheetSelect
             label="Cliente"
@@ -403,8 +343,6 @@ export function ProjectBoard({
             }
           }}
         />
-        <SheetSelect label="Responsável" selected={respSelected} options={respOptions} onSelect={setResp} />
-        <FacetPills filters={filters} onChange={changeFilters} showStatus={!kanban} />
       </BottomSheet>
 
       {/* ---------- DESKTOP header (≥ lg): barra atual ---------- */}
@@ -467,7 +405,7 @@ export function ProjectBoard({
           {filtering ? `${visibleTasks.length} de ${total}` : `${total} tarefas`}
         </span>
 
-        {renderTabs("ml-1 flex gap-0.5 rounded-lg border border-border bg-card p-[3px] text-[12.5px]")}
+        {renderTabs("ml-1")}
 
         <div className="ml-auto flex items-center gap-2">
           {canSelect && (
@@ -487,37 +425,29 @@ export function ProjectBoard({
               {selectMode ? "Cancelar" : "Selecionar"}
             </Button>
           )}
-          {canSave && (
-            <Button variant="unstyled"
-              type="button"
-              onClick={() => changeFilters(EMPTY_BOARD_FILTERS)}
-              className="text-[12px] text-muted-foreground underline decoration-muted-foreground/40 underline-offset-2 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              Limpar
-            </Button>
-          )}
-          <PresetsControl
-            presets={presets.data ?? []}
-            isLoading={presets.isLoading}
-            isError={presets.isError}
-            activeId={activePresetId}
-            canSave={canSave}
-            onApply={applyPreset}
-            onSave={() => setDialog({ kind: "save" })}
-            onRename={(p) => setDialog({ kind: "rename", preset: p })}
-            onDelete={(p) => setDialog({ kind: "delete", preset: p })}
-            onRetry={() => presets.refetch()}
-          />
-          <FacetsDropdown filters={filters} onChange={changeFilters} showStatus={!kanban} />
-          {members.length > 0 && (
-            <AssigneeFilterControl
-              members={members}
-              value={respToAssignee(filters.resp)}
-              onChange={(af) => changeFilters((f) => ({ ...f, resp: assigneeToResp(af) }))}
-            />
-          )}
         </div>
       </header>
+
+      {effectiveView !== "custo" && (
+        <BoardFilterStrip
+          presets={presets.data ?? []}
+          isLoading={presets.isLoading}
+          isError={presets.isError}
+          activeId={activePresetId}
+          canSave={canSave}
+          onApply={applyPreset}
+          onSave={() => setDialog({ kind: "save" })}
+          onRename={(p) => setDialog({ kind: "rename", preset: p })}
+          onDelete={(p) => setDialog({ kind: "delete", preset: p })}
+          onRetry={() => presets.refetch()}
+          filters={filters}
+          onChange={changeFilters}
+          showStatus={!kanban}
+          members={members}
+          search={search}
+          onSearchChange={setSearch}
+        />
+      )}
 
       {effectiveView === "custo" ? (
         <CostTab projectId={clientId} engagementId={engagementId} canSeeCost={canSeeCost} />
@@ -530,7 +460,7 @@ export function ProjectBoard({
       ) : visibleTasks.length === 0 && effectiveView !== "kanban" ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
           <p className="text-sm text-muted-foreground">Nenhuma tarefa para este filtro.</p>
-          <Button variant="secondary" onClick={() => changeFilters(EMPTY_BOARD_FILTERS)}>
+          <Button variant="secondary" onClick={() => { changeFilters(EMPTY_BOARD_FILTERS); setSearch(""); }}>
             Limpar filtros
           </Button>
         </div>
@@ -554,7 +484,7 @@ export function ProjectBoard({
           projectId={clientId}
           engagementId={engagementId}
           membersById={membersById}
-          dragDisabled={hasBoardFilterExceptStatus(filters) || selectMode}
+          dragDisabled={hasBoardFilterExceptStatus(filters) || needle !== "" || selectMode}
           onOpenTask={openTask}
           onAddTask={openCreate}
           canCreate={canCreate}
@@ -622,6 +552,6 @@ export function ProjectBoard({
           if (!o) setConfirmBulk(false);
         }}
       />
-    </>
+    </LiveByTaskProvider>
   );
 }

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { Dialog, DialogTrigger, DialogContent, DialogDescription, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Menu, X, LogOut, User } from "lucide-react";
@@ -19,6 +20,7 @@ import { cn } from "@/lib/utils";
 export function MobileTopBar() {
   const pathname = usePathname();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { admin } = useNavItems();
   const me = useMe();
   const accountName = me.data?.name?.trim() || "Minha conta";
@@ -36,7 +38,13 @@ export function MobileTopBar() {
   }, []);
 
   async function logout() {
-    await api.post("/auth/logout");
+    try {
+      await api.post("/auth/logout");
+    } catch {
+      // Falha de rede no logout: segue para o login; o servidor decide a sessão no próximo pedido.
+    }
+    // Cache é por navegador, não por usuário: limpar antes de sair evita mostrar dados da sessão anterior. [produto-telas S1]
+    queryClient.clear();
     router.push("/login");
   }
 

@@ -1,35 +1,23 @@
 "use client";
 import { Table } from "@heroui/react";
 
-import { User } from "lucide-react";
 import type { Task } from "@/lib/types";
-import type { TaskPriority, TaskStatus } from "@sistema-tasks/contracts";
-import { initials } from "@/lib/initials";
-import { dueTag, isDueUrgent } from "@/lib/due";
+import { dueTag } from "@/lib/due";
 import { STATUS_LABEL } from "@/lib/board-filters";
-import { TaskCard } from "@/components/board/task-card";
+import { initials } from "@/lib/initials";
+import { NowCell, PriorityMark, SignalCell, StepsCell, TaskCard, useTaskCardExtras, whoLabel } from "@/components/board/task-card";
 import { cn } from "@/lib/utils";
-const PRIO_LABEL: Record<TaskPriority, string> = { LOW: "Baixa", MEDIUM: "Média", HIGH: "Alta" };
-
-function StatusDot({ status }: { status: TaskStatus }) {
-  if (status === "TODO") return <span className="size-[8px] rounded-full border-[1.5px] border-muted-foreground" />;
-  if (status === "DONE") return <span className="size-[8px] rounded-full bg-surface-secondary-foreground/70" />;
-  return (
-    <span
-      className="size-[8px] rounded-full border-[1.5px] border-foreground"
-      style={{ background: "conic-gradient(var(--foreground) 0 50%, transparent 50% 100%)" }}
-    />
-  );
-}
 
 export interface EngagementLite {
   name: string;
   isGeneral: boolean;
 }
 
+const head = "border-b border-border bg-transparent px-2.5 pb-1.5 pt-2 text-left text-[11px] font-semibold uppercase tracking-[.06em] text-muted";
+
 /**
- * Tabela da visão global: reusa o layout da lista do board somando a coluna "Cliente · Projeto".
- * Ordem preservada do backend (dueDate asc, determinística). Coluna de contexto some quando 1 cliente+1 projeto fixos.
+ * Tabela da visão global (RF27, ≥ 1280 px): Quem, Tarefa (cliente › projeto), Agora, Passos, Último sinal, Prazo e Prioridade.
+ * Ordem preservada do backend (dueDate asc, determinística). O estado vivo chega pelo contexto do cartão.
  */
 export function GlobalTaskTable({
   tasks,
@@ -46,10 +34,11 @@ export function GlobalTaskTable({
   showContext: boolean;
   onOpenTask: (id: string) => void;
 }) {
+  const { live, now } = useTaskCardExtras();
   return (
     <>
-    {/* Mobile: lista de cards (um por tarefa). Reusa o TaskCard do board. [shell-mobile] */}
-    <ul className="flex flex-col gap-2.5 lg:hidden">
+    {/* Mobile: um cartão por tarefa (mesmo TaskCard do quadro). [shell-mobile] */}
+    <ul className="grid gap-2.5 md:grid-cols-2 xl:hidden">
       {tasks.map((t) => {
         const eng = t.engagementId ? engagementsById[t.engagementId] : undefined;
         const projectName = eng && !eng.isGeneral ? eng.name : undefined;
@@ -68,79 +57,62 @@ export function GlobalTaskTable({
       })}
     </ul>
 
-    {/* Desktop: tabela */}
-    <div className="hidden overflow-x-auto rounded-xl border border-border bg-card lg:block">
-      <Table><Table.ScrollContainer><Table.Content aria-label="Tarefas" className="w-full min-w-[720px] border-collapse text-[13px]">
+    {/* ≥ 1280 px: tabela plana, alinhada à esquerda como a Agora. Abaixo disso as colunas não cabem sem rolar: valem os cartões. */}
+    <div className="hidden xl:block">
+      <Table className="rounded-none border-0 bg-transparent shadow-none"><Table.ScrollContainer><Table.Content aria-label="Tarefas" className="w-full border-collapse text-[13px]">
         <Table.Header>
-            <Table.Column isRowHeader className="px-4 py-2.5 font-medium">Tarefa</Table.Column>
-            {showContext && <Table.Column className="px-4 py-2.5 font-medium">Cliente</Table.Column>}
-            <Table.Column className="px-4 py-2.5 font-medium">Status</Table.Column>
-            <Table.Column className="px-4 py-2.5 font-medium">Prioridade</Table.Column>
-            <Table.Column className="px-4 py-2.5 font-medium">Prazo</Table.Column>
-            <Table.Column className="px-4 py-2.5 font-medium">Responsável</Table.Column>
+            <Table.Column className={cn(head, "w-[110px]")}>Quem</Table.Column>
+            <Table.Column isRowHeader className={head}>Tarefa</Table.Column>
+            <Table.Column className={cn(head, "w-[190px]")}>Agora</Table.Column>
+            <Table.Column className={cn(head, "w-[130px]")}>Passos</Table.Column>
+            <Table.Column className={cn(head, "w-[110px]")}>Último sinal</Table.Column>
+            <Table.Column className={cn(head, "w-[96px]")}>Prazo</Table.Column>
+            <Table.Column className={cn(head, "w-[76px]")}>Prioridade</Table.Column>
           </Table.Header>
         <Table.Body>
           {tasks.map((t) => {
             const done = t.status === "DONE";
+            const lv = live?.[t.id];
             const due = dueTag(t.dueDate, t.status);
-            const attention = isDueUrgent(due.state); // âmbar só vencida+hoje (igual ao card) [review UX M2]
-            const ids = t.assigneeId
-              ? [t.assigneeId, ...(t.extraAssigneeIds ?? []).filter((id) => id !== t.assigneeId)]
-              : (t.extraAssigneeIds ?? []);
-            const firstName = ids[0] ? (membersById[ids[0]] ?? null) : null;
-            const moreCount = Math.max(0, ids.length - 1);
+            const who = whoLabel(t, membersById, lv);
             const subs = t.subtasks ?? [];
             const eng = t.engagementId ? engagementsById[t.engagementId] : undefined;
+            const client = showContext ? (clientsById[t.projectId] ?? "Cliente") : null;
+            const context = client ? (eng && !eng.isGeneral ? `${client} › ${eng.name}` : client) : null;
             return (
               <Table.Row
                 id={t.id}
                 key={t.id}
                 onAction={() => onOpenTask(t.id)}
-                className="cursor-pointer border-b border-border/60 transition-colors last:border-0 hover:bg-surface-tertiary"
+                className="cursor-pointer align-top outline-none transition-colors hover:bg-surface-secondary/60"
               >
-                <Table.Cell className="px-4 py-2.5">
-                  <span className={cn(done && "text-muted-foreground line-through")}>{t.title}</span>
-                  {subs.length > 0 && (
-                    <span className="ml-2 text-[11px] text-muted-foreground">
-                      {subs.filter((s) => s.done).length}/{subs.length}
+                <Table.Cell className="px-2.5 py-[11px] border-b border-border">
+                  {who.name ? (
+                    <span className="flex items-center gap-2">
+                      <span aria-hidden="true" className="flex size-[22px] shrink-0 items-center justify-center rounded-sm border border-border bg-surface-tertiary text-[10px] font-semibold text-foreground">{initials(who.name)}</span>
+                      <span className="truncate" title={who.name}>{who.name}</span>
+                      {who.extra > 0 && <span className="mono text-[11px] text-muted">+{who.extra}</span>}
                     </span>
+                  ) : (
+                    <span className="text-muted">—</span>
                   )}
                 </Table.Cell>
-                {showContext && (
-                  <Table.Cell className="px-4 py-2.5">
-                    <span className="block max-w-[200px] truncate" title={clientsById[t.projectId] ?? undefined}>
-                      {clientsById[t.projectId] ?? "Cliente"}
-                    </span>
-                    {eng && !eng.isGeneral && (
-                      <span className="block max-w-[200px] truncate text-[11px] text-muted-foreground" title={eng.name}>
-                        {eng.name}
-                      </span>
-                    )}
-                  </Table.Cell>
-                )}
-                <Table.Cell className="px-4 py-2.5">
-                  <span className="flex items-center gap-2 text-muted-foreground">
-                    <StatusDot status={t.status} />
-                    {STATUS_LABEL[t.status]}
-                  </span>
+                <Table.Cell className="px-2.5 py-[11px] border-b border-border">
+                  <span className={cn("line-clamp-2 font-semibold", done && "font-normal text-muted line-through")}>{t.title}</span>
+                  {context && <span className="mt-0.5 block max-w-[420px] truncate text-[12px] text-muted" title={context}>{context}</span>}
+                  {subs.length > 0 && (
+                    <span className="mono mt-0.5 block text-[11px] text-muted">{subs.filter((s) => s.done).length}/{subs.length} subtarefas</span>
+                  )}
                 </Table.Cell>
-                <Table.Cell className="px-4 py-2.5 text-muted-foreground">{PRIO_LABEL[t.priority]}</Table.Cell>
-                <Table.Cell className={cn("px-4 py-2.5", attention ? "text-amber" : "text-muted-foreground")}>
+                <Table.Cell className="px-2.5 py-[11px] border-b border-border">
+                  <NowCell live={lv} fallback={STATUS_LABEL[t.status]} />
+                </Table.Cell>
+                <Table.Cell className="px-2.5 py-[11px] border-b border-border"><StepsCell live={lv} /></Table.Cell>
+                <Table.Cell className="px-2.5 py-[11px] border-b border-border"><SignalCell live={lv} now={now} /></Table.Cell>
+                <Table.Cell className={cn("mono px-2.5 py-[11px] border-b border-border", due.state === "overdue" ? "font-medium text-warning" : due.state === "today" ? "text-foreground" : "text-muted")}>
                   {due.label || "—"}
                 </Table.Cell>
-                <Table.Cell className="px-4 py-2.5">
-                  {ids.length === 0 ? (
-                    <span className="text-muted-foreground/50">—</span>
-                  ) : (
-                    <span className="flex items-center gap-2">
-                      <span className="flex size-[22px] shrink-0 items-center justify-center rounded-full border border-muted-foreground/40 bg-surface-tertiary text-[10px] font-medium text-foreground">
-                        {firstName ? initials(firstName) : <User className="size-3 text-muted-foreground" />}
-                      </span>
-                      {firstName && <span className="text-muted-foreground">{firstName}</span>}
-                      {moreCount > 0 && <span className="text-[11px] text-muted-foreground/70">+{moreCount}</span>}
-                    </span>
-                  )}
-                </Table.Cell>
+                <Table.Cell className="px-2.5 py-[11px] border-b border-border">{done ? <span className="text-muted">—</span> : <PriorityMark priority={t.priority} />}</Table.Cell>
               </Table.Row>
             );
           })}

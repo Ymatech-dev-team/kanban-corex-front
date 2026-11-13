@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { LogOut, User, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useMe } from "@/lib/hooks/use-me";
 import { api } from "@/lib/api";
@@ -19,6 +20,7 @@ const STORAGE_KEY = "sdt_sidebar_collapsed";
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { primary, admin } = useNavItems();
   const me = useMe();
   const accountName = me.data?.name?.trim() || "Minha conta";
@@ -46,7 +48,13 @@ export function Sidebar() {
   }
 
   async function logout() {
-    await api.post("/auth/logout");
+    try {
+      await api.post("/auth/logout");
+    } catch {
+      // Falha de rede no logout: segue para o login; o servidor decide a sessão no próximo pedido.
+    }
+    // Cache é por navegador, não por usuário: limpar antes de sair evita mostrar dados da sessão anterior. [produto-telas S1]
+    queryClient.clear();
     router.push("/login");
   }
 

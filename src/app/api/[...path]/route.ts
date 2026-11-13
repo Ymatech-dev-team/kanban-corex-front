@@ -3,7 +3,7 @@ import { callApi } from "@/lib/server/api";
 import { getAccess, getRefresh, setSession, clearSession } from "@/lib/server/session";
 import { assertCsrf } from "@/lib/server/csrf";
 import { refreshSession } from "@/lib/server/refresh";
-import { isAllowedResource } from "@/lib/server/allowed-resources";
+import { isAllowedRoute } from "@/lib/server/allowed-resources";
 
 // Só proxia rotas de domínio — /auth/* e /internal/* NÃO passam por aqui. [SEC]
 const MUTATIONS = new Set(["POST", "PATCH", "DELETE"]);
@@ -13,7 +13,8 @@ const SAFE_SEGMENT = /^[A-Za-z0-9_-]+$/;
 async function handle(req: NextRequest, ctx: { params: Promise<{ path: string[] }> }) {
   const { path } = await ctx.params;
   // 1º segmento na allowlist E todos os segmentos no charset seguro (anti path-traversal).
-  if (path.length === 0 || !isAllowedResource(path[0]) || !path.every((s) => SAFE_SEGMENT.test(s))) {
+  // 1º segmento liberado + rotas só de leitura (ex.: tasks/workflows/team) só com GET/HEAD. [produto-telas RB1]
+  if (path.length === 0 || !isAllowedRoute(req.method, path) || !path.every((s) => SAFE_SEGMENT.test(s))) {
     return NextResponse.json({ error: { code: "NAO_ENCONTRADO", message: "Recurso não encontrado" } }, { status: 404 });
   }
 

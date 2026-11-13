@@ -1,14 +1,12 @@
 "use client";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Disclosure } from "@/components/ui/disclosure";
 
 import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Toolbar } from "@heroui/react";
 import {
   ArrowLeft,
   ArrowUp,
   ArrowDown,
-  CalendarClock,
   Check,
   Plus,
   Copy,
@@ -28,7 +26,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { dueTag, isDueUrgent } from "@/lib/due";
 import { AssigneesEditor } from "@/components/board/assignees-editor";
 import { AttachmentsSection } from "@/components/board/attachments-section";
-import { ActivityTab } from "@/components/board/activity-tab";
 import {
   useTaskDetail,
   useUpdateTask,
@@ -51,7 +48,8 @@ import { useProject } from "@/lib/hooks/use-projects";
 import { useProjectMembers } from "@/lib/hooks/use-members";
 import { useEngagements } from "@/lib/hooks/use-engagements";
 import { useTaskCost } from "@/lib/hooks/use-cost";
-import { TaskWorkflow } from "@/components/tasks/task-workflow";
+import { TaskSheet } from "@/components/task-sheet/task-sheet";
+import { CHANNEL_LABEL } from "@/components/task-sheet/channel";
 import { useWorkflow } from "@/lib/hooks/use-workflow";
 import { useMe } from "@/lib/hooks/use-me";
 import { httpStatus } from "@/lib/http-error";
@@ -76,6 +74,7 @@ const STATUSES: { value: TaskStatus; label: string }[] = [
   { value: "DOING", label: "Fazendo" },
   { value: "DONE", label: "Feito" },
 ];
+const dayMonth = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short" });
 
 interface Form {
   title: string;
@@ -101,10 +100,23 @@ function isForm(v: unknown): v is Form {
   return !!v && typeof v === "object" && typeof (v as Form).title === "string";
 }
 
-/** Só aceita caminho interno absoluto — evita open redirect via `?from` forjado. [rev-fase4 sec] */
-function safeInternalPath(p: string | null): string | null {
-  if (!p || !p.startsWith("/") || p.startsWith("//") || p.startsWith("/\\")) return null;
-  return p;
+/**
+ * Só aceita caminho interno do próprio app — evita open redirect via `?from` forjado. [rev-fase4 sec, S2]
+ * `searchParams.get` já decodifica (%09, %0A, %0D viram controle) e o parser de URL ignora tab/CR/LF e trata `\` como `/`,
+ * então `/\t/evil.com` viraria `https://evil.com/`. Por isso: rejeita qualquer controle ou barra invertida, exige o mesmo
+ * origin depois de resolver e devolve só `pathname+search+hash` do resultado.
+ */
+export function safeInternalPath(p: string | null): string | null {
+  if (!p || /[\u0000-\u001f\u007f\\]/.test(p) || !p.startsWith("/") || p.startsWith("//")) return null;
+  try {
+    const origin = typeof window === "undefined" ? "http://localhost" : window.location.origin;
+    const url = new URL(p, origin);
+    if (url.origin !== origin) return null;
+    const safe = url.pathname + url.search + url.hash;
+    return safe.startsWith("/") && !safe.startsWith("//") ? safe : null;
+  } catch {
+    return null;
+  }
 }
 
 export interface TaskDetailHandle { requestClose: () => void }
@@ -122,7 +134,6 @@ export function TaskDetailView({ taskId, panel = false, onClose, closeRef }: {
   const me = useMe();
   const workflow = useWorkflow(taskId);
   const [workflowDirty, setWorkflowDirty] = useState(false);
-  const [workflowView, setWorkflowView] = useState<"summary" | "review" | "history">("summary");
   const detail = useTaskDetail(taskId);
   const task = detail.data;
   const projectId = task?.projectId ?? "";
@@ -137,7 +148,8 @@ export function TaskDetailView({ taskId, panel = false, onClose, closeRef }: {
   const engagementName = engagements.data?.find((e) => e.id === task?.engagementId)?.name;
 
   const canEditPermission = useCan(PERMISSIONS.tarefas_editar);
-  const managed = !!workflow.data?.state;
+  const flowState = workflow.data?.state ?? null;
+  const managed = !!flowState;
   const workflowUnavailable = workflow.isError && httpStatus(workflow.error) === 404;
   const canEdit = canEditPermission && !workflowDirty && !managed && (workflowUnavailable || (!workflow.isLoading && !workflow.isError && !!workflow.data));
   const canDelete = useCan(PERMISSIONS.tarefas_excluir);
@@ -177,8 +189,9 @@ export function TaskDetailView({ taskId, panel = false, onClose, closeRef }: {
   // e o if-unmodified-since deixaria de proteger contra sobrescrever edição alheia. [rev-painel]
   const [seededUpdatedAt, setSeededUpdatedAt] = useState<string | undefined>();
   const [newTitle, setNewTitle] = useState("");
-  const [tab, setTab] = useState<"detalhes" | "atividade">("detalhes");
-  const [isLg, setIsLg] = useState(false);
+  // Ficha (RF34): recolhida com execução viva, aberta sem fluxo; a escolha do usuário vence o padrão.
+  const [fileChoice, setFileChoice] = useState<boolean | null>(null);
+  const fileOpen = fileChoice ?? (!workflow.isLoading && !(managed && flowState?.stage !== "DONE"));
   const [conflict, setConflict] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const saveInFlight = useRef(false);
@@ -197,22 +210,23 @@ export function TaskDetailView({ taskId, panel = false, onClose, closeRef }: {
     }
   }
 
+  // Título da aba na folha (drawer e página); volta ao anterior ao sair. [N5]
+  const taskTitle = task?.title;
   useEffect(() => {
-    const mq = window.matchMedia("(min-width: 1024px)");
-    const on = () => setIsLg(mq.matches);
-    on();
-    mq.addEventListener("change", on);
-    return () => mq.removeEventListener("change", on);
-  }, []);
+    if (!taskTitle) return;
+    const previous = document.title;
+    document.title = `${taskTitle} · Corex Tasks`;
+    return () => { document.title = previous; };
+  }, [taskTitle]);
 
-  // auto-resize da descrição
+  // auto-resize da descrição (só medindo com a Ficha aberta: recolhida, scrollHeight é 0)
   useEffect(() => {
     const el = descRef.current;
     if (el) {
       el.style.height = "auto";
-      el.style.height = `${el.scrollHeight}px`;
+      if (el.scrollHeight > 0) el.style.height = `${el.scrollHeight}px`;
     }
-  }, [form?.description]);
+  }, [form?.description, fileOpen]);
 
   // auto-resize do título — quebra em várias linhas em vez de clipar títulos longos. [fix impeccable]
   useEffect(() => {
@@ -238,7 +252,6 @@ export function TaskDetailView({ taskId, panel = false, onClose, closeRef }: {
       setForm(draft ?? baselineFrom(task));
       setFormOwner(draftKey);
       setSeededUpdatedAt(task.updatedAt); // provisório (pode vir de cache); corrigido pelo efeito abaixo
-      setTab("detalhes");
       seededFor.current = draftKey;
       freshTokenFor.current = null; // libera o re-semear do fetch fresco deste mount
     }
@@ -464,36 +477,88 @@ export function TaskDetailView({ taskId, panel = false, onClose, closeRef }: {
     return <TaskDetailSkeleton onBack={finishClose} />;
   }
 
-  const detailsPane = (
-    <div className={cn("flex flex-col gap-4", managed || tab === "detalhes" ? "" : "hidden", !panel && "lg:flex")}>
-      {!managed && <div className="sr-only">
-        <h1>{form.title || "Detalhe da tarefa"}</h1>
-      </div>}
+  // ---- cabeçalho da folha (RF29) ----
+  const dueInfo = dueTag(task.dueDate, task.status);
+  const dueText = dueInfo.label || (task.dueDate ? dayMonth.format(new Date(task.dueDate)).replace(".", "") : "sem prazo");
+  const responsibleName = flowState ? membersById[flowState.responsibleId] : task.assigneeId ? membersById[task.assigneeId] : undefined;
+  const execution = flowState?.execution;
+  const priorityLabel = PRIOS.find((p) => p.value === task.priority)?.label ?? "—";
+
+  const sheetHeader = (
+    <div className="space-y-3">
       <span role="status" aria-live="polite" className="sr-only">
         {moveAnnounce}
       </span>
-      {!managed && <Textarea
-        ref={titleRef}
-        value={form.title}
-        aria-label="Título da tarefa"
-        disabled={!canEdit}
-        rows={1}
-        onChange={(e) => setForm({ ...form, title: e.target.value })}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") e.preventDefault(); // título é uma linha lógica; não insere quebra
-        }}
-        maxLength={200}
-        className="min-h-0 resize-none overflow-hidden border-0 bg-transparent px-0 py-0 text-xl font-medium leading-tight tracking-tight shadow-none focus-visible:ring-0"
-      />}
+      {managed ? (
+        <h1 className="text-[26px] font-extrabold leading-tight tracking-tight">{task.title}</h1>
+      ) : (
+        <>
+          <div className="sr-only">
+            <h1>{form.title || "Detalhe da tarefa"}</h1>
+          </div>
+          <Textarea
+            ref={titleRef}
+            value={form.title}
+            aria-label="Título da tarefa"
+            disabled={!canEdit}
+            rows={1}
+            onChange={(e) => setForm({ ...form, title: e.target.value })}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.preventDefault(); // título é uma linha lógica; não insere quebra
+            }}
+            maxLength={200}
+            className="min-h-0 resize-none overflow-hidden border-0 bg-transparent px-0 py-0 text-[26px] font-extrabold leading-tight tracking-tight shadow-none focus-visible:ring-0"
+          />
+        </>
+      )}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px]">
+        <span className="text-muted">Responsável <b className="font-semibold text-foreground">{responsibleName ?? "Sem responsável"}</b></span>
+        {execution && <span className="text-muted">Executor <b className="font-semibold text-foreground">{execution.agent}</b> · {CHANNEL_LABEL[execution.channel]}</span>}
+        <span className="text-muted">Prazo <b className={cn("mono font-semibold", isDueUrgent(dueInfo.state) ? "text-warning" : "text-foreground")}>{dueText}</b></span>
+        <span className="text-muted">Prioridade <b className="font-semibold text-foreground">{priorityLabel}</b></span>
+        {flowState && <span className="text-muted">Entrega <b className="mono font-semibold text-foreground">{flowState.deliveryRevision} · v{flowState.version}</b></span>}
+        <Toolbar aria-label="Ações da tarefa" className="ml-auto flex items-center gap-2">
+          {!managed && (
+            <span className="inline-flex items-center gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-[.06em] text-muted">Mover etapa</span>
+              <Segmented label="Mover etapa" value={form.status} options={STATUSES} disabled={!canEdit} onChange={(v) => setForm({ ...form, status: v })} />
+            </span>
+          )}
+          <ActionsMenu
+            label={`Ações da tarefa: ${task.title}`}
+            items={[
+              ...(canDuplicate
+                ? [{ key: "dup", label: "Duplicar", icon: Copy, onSelect: onDuplicate }]
+                : []),
+              ...(canDelete
+                ? [{ key: "del", label: "Excluir", icon: Trash2, danger: true, onSelect: onDelete }]
+                : []),
+            ]}
+          />
+        </Toolbar>
+      </div>
+    </div>
+  );
 
-      {!managed && <fieldset disabled={dirty} className="min-w-0"><TaskWorkflow key={taskId} taskId={taskId} query={workflow} members={membersById} onDirtyChange={setWorkflowDirty} /></fieldset>}
-      {dirty && !managed && <p className="text-xs text-muted-foreground">Salve ou descarte a edição dos campos antes de alterar o fluxo.</p>}
-      {managed && <p className="text-xs text-muted-foreground">Esta tarefa usa revisão. Atualize a entrega pelo fluxo acima; os campos e anexos legados estão disponíveis para consulta.</p>}
-      {!managed && !workflowDirty && !canEdit && canEditPermission && !workflowUnavailable && <p className="text-xs text-muted-foreground">A edição ficará disponível quando o fluxo da tarefa for confirmado.</p>}
+  // ---- Ficha (RF34): campos e seções de sempre; edição, rascunho e exclusão não mudaram ----
+  const fileBody = (
+    <div className="flex flex-col gap-4">
+      {managed && flowState && (
+        <>
+          <p className="text-xs text-muted">Esta tarefa usa revisão. Atualize a entrega pelo fluxo (Agora e Revisão); os campos e anexos legados estão disponíveis para consulta.</p>
+          <Field label="Contexto"><p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{flowState.context}</p></Field>
+          <Field label="Critérios de aceite">
+            <ul className="flex flex-col gap-1.5">{flowState.criteria.map((criterion, index) => <li key={index} className="flex items-baseline gap-2 break-words text-sm"><span aria-hidden="true" className="inline-block size-2 shrink-0 border-[1.5px] border-muted" />{criterion}</li>)}</ul>
+          </Field>
+        </>
+      )}
+      {!managed && !workflowDirty && !canEdit && canEditPermission && !workflowUnavailable && <p className="text-xs text-muted">A edição ficará disponível quando o fluxo da tarefa for confirmado.</p>}
       <div className="flex flex-wrap gap-x-8 gap-y-3">
-        <Field label="Status">
-          <Segmented label="Status" value={form.status} options={STATUSES} disabled={!canEdit} onChange={(v) => setForm({ ...form, status: v })} />
-        </Field>
+        {managed && (
+          <Field label="Status">
+            <Segmented label="Status" value={form.status} options={STATUSES} disabled onChange={() => undefined} />
+          </Field>
+        )}
         {canEdit && column && column.total >= 2 && (
           <Field label="Posição na coluna">
             <div className="flex items-center gap-2.5">
@@ -504,7 +569,7 @@ export function TaskDetailView({ taskId, panel = false, onClose, closeRef }: {
                   aria-label="Mover uma posição para cima na coluna"
                   disabled={dirty || engagementTasks.isLoading || column.index <= 0}
                   onClick={() => moveInColumn(-1)}
-                  className="flex size-8 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors enabled:hover:text-foreground disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-ring"
+                  className="flex size-8 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors enabled:hover:text-foreground disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-ring max-md:size-11"
                 >
                   <ArrowUp className="size-4" />
                 </Button>
@@ -514,12 +579,12 @@ export function TaskDetailView({ taskId, panel = false, onClose, closeRef }: {
                   aria-label="Mover uma posição para baixo na coluna"
                   disabled={dirty || engagementTasks.isLoading || column.index < 0 || column.index >= column.total - 1}
                   onClick={() => moveInColumn(1)}
-                  className="flex size-8 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors enabled:hover:text-foreground disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-ring"
+                  className="flex size-8 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors enabled:hover:text-foreground disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-ring max-md:size-11"
                 >
                   <ArrowDown className="size-4" />
                 </Button>
               </div>
-              <span className="text-[12.5px] text-muted-foreground">
+              <span className="mono text-[12.5px] text-muted-foreground">
                 {column.index >= 0 ? `${column.index + 1} de ${column.total}` : `— de ${column.total}`}
               </span>
               {dirty && <span className="text-[12px] text-muted-foreground">Salve para reordenar</span>}
@@ -529,19 +594,8 @@ export function TaskDetailView({ taskId, panel = false, onClose, closeRef }: {
         <Field label="Prioridade">
           <Segmented label="Prioridade" value={form.priority} options={PRIOS} disabled={!canEdit} onChange={(v) => setForm({ ...form, priority: v })} />
         </Field>
-        <Field
-          label="Prazo"
-          extra={(() => {
-            const dt = dueTag(task.dueDate, task.status);
-            return isDueUrgent(dt.state) ? (
-              <span className="inline-flex items-center gap-1.5 rounded-md border border-amber/30 bg-amber/10 px-2 py-0.5 text-[11.5px] text-amber">
-                <CalendarClock className="size-3.5" aria-hidden />
-                {dt.label}
-              </span>
-            ) : null;
-          })()}
-        >
-          <Input type="date" aria-label="Prazo" value={form.due} disabled={!canEdit} onChange={(e) => setForm({ ...form, due: e.target.value })} className="h-9" />
+        <Field label="Prazo">
+          <Input type="date" aria-label="Prazo" value={form.due} disabled={!canEdit} onChange={(e) => setForm({ ...form, due: e.target.value })} className="h-9 max-md:h-11" />
         </Field>
         {canSeeCost && (
           <Field label="Horas estimadas">
@@ -552,7 +606,7 @@ export function TaskDetailView({ taskId, panel = false, onClose, closeRef }: {
               value={form.estimated}
               disabled={!canEdit}
               onChange={(e) => setForm({ ...form, estimated: e.target.value })}
-              className="h-9"
+              className="h-9 max-md:h-11"
             />
           </Field>
         )}
@@ -588,25 +642,30 @@ export function TaskDetailView({ taskId, panel = false, onClose, closeRef }: {
         <div className="flex items-center justify-between text-[13px]">
           <span className="font-medium">Subtarefas</span>
           {subs.length > 0 && (
-            <span className="text-muted-foreground">
+            <span className="mono text-muted-foreground">
               {doneCount}/{subs.length}
             </span>
           )}
         </div>
         <ul className="flex flex-col gap-1">
           {subs.map((s) => (
-            <li key={s.id} className="group flex items-center gap-2.5 rounded-lg px-1 py-1">
+            <li key={s.id} className="group flex items-center gap-2.5 rounded-sm px-1 py-1">
               <Button variant="unstyled"
                 type="button"
                 disabled={!canEdit}
                 aria-label={s.done ? "Desmarcar" : "Marcar como feita"}
                 onClick={() => toggle.mutate({ id: s.id, done: !s.done })}
-                className={cn(
-                  "flex size-[18px] shrink-0 items-center justify-center rounded-[6px] border transition-colors",
-                  s.done ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/50 text-transparent hover:border-foreground",
-                )}
+                className="flex size-[18px] shrink-0 items-center justify-center rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring max-md:size-11"
               >
-                <Check className="size-3" strokeWidth={3} />
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "flex size-[18px] items-center justify-center rounded-md border transition-colors",
+                    s.done ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/50 text-transparent hover:border-foreground",
+                  )}
+                >
+                  <Check className="size-3" strokeWidth={3} />
+                </span>
               </Button>
               <span className={cn("flex-1 text-[13px]", s.done && "text-muted-foreground line-through")}>{s.title}</span>
               <Button variant="unstyled"
@@ -614,7 +673,7 @@ export function TaskDetailView({ taskId, panel = false, onClose, closeRef }: {
                 disabled={!canEdit}
                 aria-label="Remover subtarefa"
                 onClick={() => removeSub.mutate(s.id)}
-                className="text-muted-foreground/0 transition-colors group-hover:text-muted-foreground hover:!text-amber"
+                className="flex size-6 items-center justify-center rounded-sm text-muted-foreground/0 outline-none transition-colors focus-visible:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring group-hover:text-muted-foreground hover:!text-amber max-md:size-11 max-md:text-muted-foreground"
               >
                 <Trash2 className="size-3.5" />
               </Button>
@@ -623,12 +682,12 @@ export function TaskDetailView({ taskId, panel = false, onClose, closeRef }: {
           {subs.length === 0 && <li className="px-1 py-1 text-[12.5px] text-muted-foreground">Nenhuma subtarefa ainda.</li>}
         </ul>
         <form onSubmit={addSub} className="mt-1 flex items-center gap-2">
-          <Input disabled={!canEdit} value={newTitle} aria-label="Nova subtarefa" onChange={(e) => setNewTitle(e.target.value)} placeholder="Adicionar subtarefa" maxLength={200} className="h-9" />
+          <Input disabled={!canEdit} value={newTitle} aria-label="Nova subtarefa" onChange={(e) => setNewTitle(e.target.value)} placeholder="Adicionar subtarefa" maxLength={200} className="h-9 max-md:h-11" />
           <Button variant="unstyled"
             type="submit"
             aria-label="Adicionar"
             disabled={!canEdit || !newTitle.trim() || add.isPending}
-            className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+            className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50 max-md:size-11"
           >
             <Plus className="size-4" />
           </Button>
@@ -638,42 +697,18 @@ export function TaskDetailView({ taskId, panel = false, onClose, closeRef }: {
       <AttachmentsSection taskId={task.id} disabled={!canEdit} />
 
       <CostLine taskId={task.id} enabled={canSeeCost} />
-
-      {canEdit && dirty && (
-        <div className="sticky bottom-0 z-10 -mx-1 mt-1 flex flex-wrap items-center justify-end gap-2 border-t border-border bg-background px-1 py-3">
-          {saveError && (
-            <p role="alert" className="w-full text-sm text-destructive">
-              Não foi possível salvar. Suas alterações foram mantidas; tente novamente.
-            </p>
-          )}
-          <Button type="button" variant="secondary" onClick={discard} disabled={update.isPending}>
-            Descartar
-          </Button>
-          <Button type="button" onClick={save} aria-busy={update.isPending} disabled={!form.title.trim() || update.isPending}>
-            {update.isPending && <Loader2 className="size-4 animate-spin" aria-hidden />}
-            {update.isPending ? "Salvando…" : "Salvar alterações"}
-          </Button>
-        </div>
-      )}
-    </div>
-  );
-
-  const activityPane = (
-    <div className={cn(tab === "atividade" ? "" : "hidden", !panel && "lg:block")}>
-      <span className={cn("mb-3 hidden text-[11px] uppercase tracking-wide text-muted-foreground/80", !panel && "lg:block")}>Atividade</span>
-      <ActivityTab taskId={task.id} membersById={membersById} enabled={(!panel && isLg) || tab === "atividade"} />
     </div>
   );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* Header */}
-      <header className="flex items-center gap-3 border-b border-border px-6 py-3.5">
+      {/* Barra de topo: voltar e trilha cliente › projeto */}
+      <header className="flex items-center gap-3 border-b border-border px-6 py-3.5 max-md:px-4">
         <Button variant="unstyled"
           type="button"
           aria-label="Voltar"
           onClick={goBack}
-          className="inline-flex size-9 shrink-0 items-center justify-center rounded text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          className="inline-flex size-9 shrink-0 items-center justify-center rounded text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring max-md:size-11"
         >
           <ArrowLeft className="size-4" />
         </Button>
@@ -682,24 +717,12 @@ export function TaskDetailView({ taskId, panel = false, onClose, closeRef }: {
           <span className="text-muted-foreground/50">›</span>
           {engagementName ? <span className="truncate">{engagementName}</span> : <Skeleton className="h-3 w-16" />}
         </nav>
-        <ActionsMenu
-          label={`Ações da tarefa: ${task.title}`}
-          className="ml-auto"
-          items={[
-            ...(canDuplicate
-              ? [{ key: "dup", label: "Duplicar", icon: Copy, onSelect: onDuplicate }]
-              : []),
-            ...(canDelete
-              ? [{ key: "del", label: "Excluir", icon: Trash2, danger: true, onSelect: onDelete }]
-              : []),
-          ]}
-        />
       </header>
 
       <div className="flex-1 overflow-auto">
-        <div className="mx-auto max-w-5xl px-6 py-6">
+        <div className="mx-auto max-w-5xl px-6 py-6 max-md:px-4">
           {refreshFailed && (
-            <div role="status" className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card px-3.5 py-2.5">
+            <div role="status" className="mb-4 flex flex-wrap items-center gap-3 rounded-sm border border-border bg-card px-3.5 py-2.5">
               <AlertTriangle className="size-4 shrink-0 text-muted-foreground" aria-hidden />
               <p className="min-w-0 flex-1 text-sm text-muted-foreground">
                 Não foi possível atualizar. Mantivemos os dados e suas edições nesta tela.
@@ -710,7 +733,7 @@ export function TaskDetailView({ taskId, panel = false, onClose, closeRef }: {
             </div>
           )}
           {conflict && (
-            <div className="sticky top-0 z-20 mb-4 flex items-center gap-3 rounded-lg border border-amber/40 bg-card px-3.5 py-2.5">
+            <div className="sticky top-0 z-20 mb-4 flex items-center gap-3 rounded-sm border border-amber/40 bg-card px-3.5 py-2.5">
               <AlertTriangle className="size-4 shrink-0 text-amber" aria-hidden />
               <span className="flex-1 text-[12.5px] text-muted-foreground">
                 Esta tarefa foi alterada por outra pessoa. Recarregue para ver a versão atual (suas edições não salvas serão descartadas).
@@ -722,45 +745,38 @@ export function TaskDetailView({ taskId, panel = false, onClose, closeRef }: {
             </div>
           )}
 
-          {managed ? <>
-            <h1 className="mb-5 text-xl font-medium leading-snug tracking-tight">{task.title}</h1>
-            <Tabs value={workflowView} onValueChange={(value) => setWorkflowView(value as typeof workflowView)}>
-              <TabsList aria-label="Seções da tarefa" className="mb-5">
-                <TabsTrigger value="summary">Resumo</TabsTrigger>
-                <TabsTrigger value="review">Revisão</TabsTrigger>
-                <TabsTrigger value="history">Histórico</TabsTrigger>
-              </TabsList>
-              <TabsContent value={workflowView} forceMount>
-              <TaskWorkflow key={taskId} taskId={taskId} query={workflow} members={membersById} view={workflowView} onDirtyChange={setWorkflowDirty} />
-              <div hidden={workflowView !== "history"} className="mt-6"><h2 className="mb-3 text-sm font-medium">Comentários e atividade</h2><ActivityTab taskId={task.id} membersById={membersById} enabled={workflowView === "history"} /></div>
-              <Disclosure hidden={workflowView !== "summary"} className="mt-6 border-t border-border pt-4" title="Dados da tarefa"><div className="pt-4">{detailsPane}</div></Disclosure>
-              </TabsContent>
-            </Tabs>
-          </> : <>
-          {/* Abas só no mobile */}
-          <div className={cn("mb-4 flex gap-4 border-b border-border", !panel && "lg:hidden")}>
-            {(["detalhes", "atividade"] as const).map((t) => (
-              <Button variant="unstyled"
-                key={t}
-                type="button"
-                onClick={() => setTab(t)}
-                aria-current={tab === t ? "page" : undefined}
-                className={cn(
-                  "px-1 pb-2 pt-1 text-[13.5px] outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  tab === t ? "border-b-2 border-primary font-medium text-foreground" : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {t === "detalhes" ? "Detalhes" : "Atividade"}
+          <TaskSheet
+            taskId={taskId}
+            taskTitle={task.title}
+            taskUpdatedAt={task.updatedAt}
+            workflow={workflow}
+            members={membersById}
+            panel={panel}
+            onWorkflowDirtyChange={setWorkflowDirty}
+            flowLocked={dirty}
+            header={sheetHeader}
+            file={fileBody}
+            fileOpen={fileOpen}
+            onFileOpenChange={setFileChoice}
+          />
+
+          {/* Salvar/descartar fica fora da Ficha: a edição pode nascer no cabeçalho (título, etapa) com a Ficha recolhida. */}
+          {canEdit && dirty && (
+            <div className="sticky bottom-0 z-10 -mx-1 mt-6 flex flex-wrap items-center justify-end gap-2 border-t border-border bg-background px-1 py-3">
+              {saveError && (
+                <p role="alert" className="w-full text-sm text-destructive">
+                  Não foi possível salvar. Suas alterações foram mantidas; tente novamente.
+                </p>
+              )}
+              <Button type="button" variant="secondary" onClick={discard} disabled={update.isPending}>
+                Descartar
               </Button>
-            ))}
-          </div>
-
-          <div className={cn(!panel && "lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-8")}>
-            {detailsPane}
-            {activityPane}
-          </div>
-          </>}
-
+              <Button type="button" onClick={save} aria-busy={update.isPending} disabled={!form.title.trim() || update.isPending}>
+                {update.isPending && <Loader2 className="size-4 animate-spin" aria-hidden />}
+                {update.isPending ? "Salvando…" : "Salvar alterações"}
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -801,16 +817,15 @@ function TaskDetailSkeleton({ onBack }: { onBack: () => void }) {
         <Button variant="ghost" size="icon" aria-label="Voltar" onClick={onBack}><ArrowLeft className="size-4" /></Button>
         <Skeleton className="h-3 w-32" />
       </div>
-      <div aria-hidden="true" className="mx-auto grid w-full max-w-5xl gap-8 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+      <div aria-hidden="true" className="mx-auto grid w-full max-w-5xl gap-8 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_168px]">
         <div className="flex flex-col gap-6">
           <Skeleton className="h-8 w-4/5" />
           <div className="flex flex-wrap gap-3">
-            <Skeleton className="h-9 w-48" />
-            <Skeleton className="h-9 w-36" />
+            <Skeleton className="h-4 w-32" />
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-4 w-28" />
           </div>
-          <Skeleton className="h-9 w-56" />
-          <div className="flex flex-col gap-3">
-            <Skeleton className="h-3 w-24" />
+          <div className="flex flex-col gap-2 border border-border p-4">
             <Skeleton className="h-4 w-full" />
             <Skeleton className="h-4 w-5/6" />
             <Skeleton className="h-4 w-2/3" />
@@ -821,11 +836,10 @@ function TaskDetailSkeleton({ onBack }: { onBack: () => void }) {
             <Skeleton className="h-10 w-full" />
           </div>
         </div>
-        <div className="hidden flex-col gap-4 lg:flex">
-          <Skeleton className="h-3 w-20" />
-          <Skeleton className="h-24 w-full" />
-          <Skeleton className="h-12 w-5/6" />
-          <Skeleton className="h-12 w-4/5" />
+        <div className="hidden flex-col gap-3 lg:flex">
+          <Skeleton className="h-4 w-16" />
+          <Skeleton className="h-4 w-20" />
+          <Skeleton className="h-4 w-14" />
         </div>
       </div>
     </div>
@@ -867,7 +881,7 @@ function Segmented<T extends string>({
           aria-pressed={value === o.value}
           onClick={() => onChange(o.value)}
           className={cn(
-            "whitespace-nowrap rounded-md px-3 py-1.5 text-[12.5px] transition-colors disabled:opacity-60",
+            "whitespace-nowrap rounded-md px-3 py-1.5 text-[12.5px] transition-colors disabled:opacity-60 max-md:min-h-11",
             value === o.value ? "bg-surface-tertiary text-foreground" : "text-muted-foreground enabled:hover:text-foreground",
           )}
         >
@@ -890,7 +904,7 @@ function CostLine({ taskId, enabled }: { taskId: string; enabled: boolean }) {
         <span className="text-[13px] text-muted-foreground">Não foi possível calcular agora.</span>
       ) : cost.data.state === "OK" ? (
         <div>
-          <span className="text-[15px] font-medium tabular-nums">{formatBRL(cost.data.cents ?? 0)}</span>
+          <span className="mono text-[15px] font-medium tabular-nums">{formatBRL(cost.data.cents ?? 0)}</span>
           <span className="ml-2 text-[12px] text-muted-foreground">a preço de hoje</span>
           <p className="mt-1 text-[12px] text-muted-foreground">
             Calculado pelo responsável principal e pelas horas estimadas. Salário mensal entra proporcional às horas.
@@ -909,7 +923,7 @@ function CostLine({ taskId, enabled }: { taskId: string; enabled: boolean }) {
 function FullState({ title, desc, action }: { title: string; desc: string; action: React.ReactNode }) {
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center">
-      <div className="flex size-12 items-center justify-center rounded-full border border-border bg-card text-muted-foreground">
+      <div className="flex size-12 items-center justify-center rounded-sm border border-border bg-card text-muted-foreground">
         <AlertTriangle className="size-5" />
       </div>
       <div>

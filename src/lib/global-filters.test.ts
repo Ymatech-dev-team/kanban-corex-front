@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   parseFilters,
   filtersToSearchParams,
@@ -8,6 +8,12 @@ import {
   prazoRange,
   readStoredClientProject,
   writeStoredClientProject,
+  readSavedViews,
+  writeSavedViews,
+  builtinViews,
+  matchView,
+  FLUXO_KINDS,
+  filterByFluxo,
   type GlobalFilters,
 } from "./global-filters";
 
@@ -118,5 +124,117 @@ describe("readStoredClientProject / writeStoredClientProject", () => {
   });
   it("ausente → vazio", () => {
     expect(readStoredClientProject()).toEqual({});
+  });
+});
+
+describe("q e fluxo (RF22/RF23)", () => {
+  it("URL ida e volta preserva q e fluxo", () => {
+    const f: GlobalFilters = { status: "ATIVAS", q: "contrato", fluxo: "voce", cliente: "c1" };
+    const sp = filtersToSearchParams(f);
+    expect(sp.get("q")).toBe("contrato");
+    expect(sp.get("fluxo")).toBe("voce");
+    expect(parseFilters(new URLSearchParams(sp.toString()))).toEqual(f);
+  });
+  it("q vazio ou só espaços não vai para a URL nem para a API", () => {
+    expect(parseFilters(new URLSearchParams("q=%20%20"))).toEqual({ status: "ATIVAS" });
+    expect(filtersToSearchParams({ status: "ATIVAS", q: "   " }).has("q")).toBe(false);
+    expect(filtersToQuery({ status: "ATIVAS", q: "   " })).toEqual({});
+  });
+  it("q é aparado e limitado a 100 caracteres (o backend responde 400 acima disso)", () => {
+    expect(parseFilters(new URLSearchParams("q=%20ab%20")).q).toBe("ab");
+    expect(parseFilters(new URLSearchParams(`q=${"x".repeat(150)}`)).q).toHaveLength(100);
+  });
+  it("q vai para a API; fluxo NÃO vai (filtro no cliente)", () => {
+    expect(filtersToQuery({ status: "ATIVAS", q: "login", fluxo: "rodando" })).toEqual({ q: "login" });
+  });
+  it("fluxo inválido é descartado", () => {
+    expect(parseFilters(new URLSearchParams("fluxo=lixo")).fluxo).toBeUndefined();
+  });
+  it("q e fluxo contam como filtro; fluxo conta como faceta do popover, q não", () => {
+    expect(hasAnyFilter({ status: "ATIVAS", q: "a" })).toBe(true);
+    expect(hasAnyFilter({ status: "ATIVAS", fluxo: "parado" })).toBe(true);
+    expect(activeFacetCount({ status: "ATIVAS", q: "a", fluxo: "parado" })).toBe(1);
+  });
+  it("cada fluxo cobre estados vivos distintos", () => {
+    expect(FLUXO_KINDS.rodando).toEqual(["running"]);
+    expect(FLUXO_KINDS.voce).toEqual(["you"]);
+    expect(FLUXO_KINDS.revisao).toEqual(["review"]);
+    expect(FLUXO_KINDS.parado).toEqual(expect.arrayContaining(["silent", "blocked", "paused", "changes"]));
+  });
+});
+
+describe("visões (RF19/RF24)", () => {
+  const KEY = "sdt_tarefas_visoes:u1";
+  beforeEach(() => localStorage.clear());
+
+  it("visões embutidas são conjuntos de params e a ativa é a que bate exatamente", () => {
+    const views = builtinViews("u1");
+    expect(views.map((v) => v.label)).toEqual(["Ativas", "Minhas", "Rodando", "Esperando você", "Atrasadas"]);
+    expect(matchView(views, { status: "ATIVAS" })?.id).toBe("ativas");
+    expect(matchView(views, { status: "ATIVAS", resp: "u1" })?.id).toBe("minhas");
+    expect(matchView(views, { status: "ATIVAS", fluxo: "rodando" })?.id).toBe("rodando");
+    expect(matchView(views, { status: "ATIVAS", fluxo: "voce" })?.id).toBe("voce");
+    expect(matchView(views, { status: "ATIVAS", prazo: "atrasadas" })?.id).toBe("atrasadas");
+    expect(matchView(views, { status: "ATIVAS", prio: "HIGH" })).toBeUndefined();
+  });
+  it("sem usuário conhecido, Minhas some", () => {
+    expect(builtinViews(undefined).some((v) => v.id === "minhas")).toBe(false);
+  });
+  it("round-trip das visões salvas no localStorage", () => {
+    expect(writeSavedViews("u1", [{ id: "v1", name: "IMA esta semana", params: "cliente=c1&prazo=semana" }])).toBe(true);
+    expect(readSavedViews("u1")).toEqual([{ id: "v1", name: "IMA esta semana", params: "cliente=c1&prazo=semana" }]);
+  });
+  it("storage corrompido ou com formato inválido → só as embutidas (lista vazia)", () => {
+    localStorage.setItem(KEY, "{lixo");
+    expect(readSavedViews("u1")).toEqual([]);
+    localStorage.setItem(KEY, JSON.stringify({ a: 1 }));
+    expect(readSavedViews("u1")).toEqual([]);
+    localStorage.setItem(KEY, JSON.stringify([{ id: 1, name: "x" }, { id: "ok", name: "Boa", params: "prio=HIGH" }]));
+    expect(readSavedViews("u1")).toEqual([{ id: "ok", name: "Boa", params: "prio=HIGH" }]);
+  });
+  it("storage que lança erro é tolerado na leitura e na escrita", () => {
+    const get = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new Error("blocked"); });
+    const set = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("blocked"); });
+    expect(readSavedViews("u1")).toEqual([]);
+    expect(writeSavedViews("u1", [{ id: "v", name: "n", params: "" }])).toBe(false);
+    get.mockRestore();
+    set.mockRestore();
+  });
+  it("cada usuário tem as suas visões; a chave antiga sem usuário é ignorada", () => {
+    writeSavedViews("u1", [{ id: "a", name: "Da Ana", params: "prio=HIGH" }]);
+    writeSavedViews("u2", [{ id: "b", name: "Do Caio", params: "cliente=c9" }]);
+    expect(readSavedViews("u1").map((v) => v.name)).toEqual(["Da Ana"]);
+    expect(readSavedViews("u2").map((v) => v.name)).toEqual(["Do Caio"]);
+    localStorage.setItem("sdt_tarefas_visoes", JSON.stringify([{ id: "old", name: "Legada", params: "" }]));
+    expect(readSavedViews("u3")).toEqual([]);
+  });
+  it("sem usuário não lê nem grava", () => {
+    writeSavedViews("u1", [{ id: "a", name: "Da Ana", params: "" }]);
+    expect(readSavedViews(undefined)).toEqual([]);
+    expect(writeSavedViews(undefined, [{ id: "x", name: "x", params: "" }])).toBe(false);
+    expect(localStorage.length).toBe(1);
+  });
+  it("visão salva é achada pelos mesmos params", () => {
+    const saved = [{ id: "v1", name: "Alta", params: "prio=HIGH" }];
+    expect(matchView([...builtinViews("u1"), ...saved.map((s) => ({ id: s.id, label: s.name, filters: parseFilters(new URLSearchParams(s.params)) }))], { status: "ATIVAS", prio: "HIGH" })?.id).toBe("v1");
+  });
+});
+
+describe("filterByFluxo (RF23)", () => {
+  const tasks = [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "d" }, { id: "manual" }];
+  const live = { a: { kind: "running" as const }, b: { kind: "you" as const }, c: { kind: "silent" as const }, d: { kind: "review" as const } };
+  it("sem fluxo ativo passa tudo, inclusive tarefas sem fluxo", () => {
+    expect(filterByFluxo(tasks, live)).toHaveLength(5);
+  });
+  it("com fluxo ativo, tarefa sem fluxo some", () => {
+    expect(filterByFluxo(tasks, live, "rodando").map((t) => t.id)).toEqual(["a"]);
+    expect(filterByFluxo(tasks, live, "voce").map((t) => t.id)).toEqual(["b"]);
+    expect(filterByFluxo(tasks, live, "revisao").map((t) => t.id)).toEqual(["d"]);
+  });
+  it("parado inclui sem sinal, bloqueada, pausada e ajustes pedidos", () => {
+    expect(filterByFluxo(tasks, live, "parado").map((t) => t.id)).toEqual(["c"]);
+  });
+  it("com fluxo ativo e sem nenhum fluxo conhecido, a lista fica vazia", () => {
+    expect(filterByFluxo(tasks, {}, "rodando")).toEqual([]);
   });
 });

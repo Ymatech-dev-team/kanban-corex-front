@@ -19,7 +19,7 @@ describe("workflow persisted history shapes", () => {
   });
 });
 
-it.each([["WEB", "Painel"], ["MCP", "Assistente conectado"], ["LOCAL_SYNC", "Sincronização local"]])("labels persisted channel %s", (channel, label) => {
+it.each([["WEB", "Painel"], ["MCP", "MCP"], ["LOCAL_SYNC", "Sincronização local"]])("labels persisted channel %s", (channel, label) => {
   fixture.channel = channel;
   fixture.payload = {};
   render(<WorkflowHistory taskId="t" members={{ u: "Revisor" }} expanded />);
@@ -31,7 +31,7 @@ it("identifies autonomous completion by the persisted event channel", () => {
   fixture.channel = "MCP"; fixture.type = "approve_review"; fixture.payload = {};
   render(<WorkflowHistory taskId="t" members={{ u: "João" }} expanded />);
   expect(screen.getByText("Concluído pelo assistente")).toBeInTheDocument();
-  expect(screen.getByText(/João.*Assistente conectado/)).toBeInTheDocument();
+  expect(screen.getByText(/João.*MCP/)).toBeInTheDocument();
 });
 it("keeps human approval label for WEB events", () => {
   fixture.channel = "WEB"; fixture.type = "approve_review"; fixture.payload = {};

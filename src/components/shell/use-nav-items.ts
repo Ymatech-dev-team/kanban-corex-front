@@ -47,7 +47,7 @@ export function useNavItems(): { primary: NavItem[]; admin: NavItem[] } {
   }, [pathname, searchParams]);
 
   const primary: NavItem[] = [
-    { href: "/", label: "Início", icon: Home },
+    { href: "/", label: "Agora", icon: Home },
     ...(canTarefasGlobais ? [{ href: tarefasHref, label: "Tarefas", icon: ListChecks }] : []),
     { href: "/clientes", label: "Clientes", icon: Building2 },
   ];

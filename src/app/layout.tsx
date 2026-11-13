@@ -15,6 +15,17 @@ const manrope = localFont({
   display: "swap",
 });
 
+// Plex Mono: horários, durações, IDs, nomes de checks e contagens. Arquivos OFL locais, sem CDN. [RF2]
+const plexMono = localFont({
+  src: [
+    { path: "../assets/fonts/IBMPlexMono-Regular.woff2", weight: "400", style: "normal" },
+    { path: "../assets/fonts/IBMPlexMono-Medium.woff2", weight: "500", style: "normal" },
+  ],
+  variable: "--font-plex-mono",
+  display: "swap",
+  fallback: ["ui-monospace", "monospace"],
+});
+
 const SITE_URL = "https://tasks.corexsistemas.com.br";
 const SITE_TITLE = "Tasks - Corex Sistemas";
 const SITE_DESC = "Organização de projetos e tarefas";
@@ -60,7 +71,7 @@ export default async function RootLayout({
   // Tema vem de cookie → o servidor já renderiza a classe certa (sem flash, sem mismatch de hidratação).
   const theme = (await cookies()).get("sdt-theme")?.value;
   const activeTheme = theme === "dark" ? "dark" : "light";
-  const className = `${manrope.variable} ${activeTheme}`;
+  const className = `${manrope.variable} ${plexMono.variable} ${activeTheme}`;
 
   return (
     <html lang="pt-BR" className={className} data-theme={activeTheme}>

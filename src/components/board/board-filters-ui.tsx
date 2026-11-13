@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Bookmark, ListFilter, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "@/components/ui/toast";
 import {
   type BoardFilters,
@@ -13,24 +13,21 @@ import {
   PRIO_OPTIONS,
   STATUS_LABEL,
   STATUS_OPTIONS,
+  EMPTY_BOARD_FILTERS,
   hasAnyBoardFilter,
+  hasBoardFilterExceptStatus,
   normPresetName,
 } from "@/lib/board-filters";
 import type { TaskPriority } from "@sistema-tasks/contracts";
 import type { PrazoPreset } from "@/lib/global-filters";
 import { type Preset, presetsKey, useSavePreset, useUpdatePreset, useDeletePreset } from "@/lib/hooks/use-board-filters";
 import { httpStatus } from "@/lib/http-error";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/admin/confirm-dialog";
-import { cn } from "@/lib/utils";
+import { FiltersControl, QueryField, ViewTabs, type FacetDef, type QueryChip, type QuerySuggestionGroup } from "@/components/query-bar";
+import type { Member } from "@/lib/types";
 
 // ---------- estado dos diálogos (vive no project-board, renderiza uma vez) ----------
 export type PresetDialogState =
@@ -39,164 +36,17 @@ export type PresetDialogState =
   | { kind: "rename"; preset: Preset }
   | { kind: "delete"; preset: Preset };
 
-// ================= FACETS (Status/Prioridade/Prazo) =================
+// ================= FAIXA DE FILTROS (visões + campo de consulta + filtros) =================
 
-export function facetCount(f: BoardFilters): number {
-  return (f.status ? 1 : 0) + (f.prio ? 1 : 0) + (f.prazo ? 1 : 0);
-}
+const ALL_VIEW = "__all";
+const CUSTOM_VIEW = "__custom";
+const NONE = "none"; // `resp: "none"` = sem responsável
 
-const trigBase =
-  "flex h-9 items-center gap-1.5 rounded-lg border px-2.5 text-[12.5px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring";
-const trigIdle = "border-border bg-card text-muted-foreground hover:text-foreground";
-const trigActive = "border-muted-foreground/40 bg-surface-tertiary text-foreground";
-
-/** Desktop: um dropdown "Filtros" com Status (fora do Kanban) + Prioridade + Prazo. */
-export function FacetsDropdown({
-  filters,
-  onChange,
-  showStatus,
-}: {
-  filters: BoardFilters;
-  onChange: (f: BoardFilters) => void;
-  showStatus: boolean;
-}) {
-  const n = (showStatus ? (filters.status ? 1 : 0) : 0) + (filters.prio ? 1 : 0) + (filters.prazo ? 1 : 0);
-  const set = (patch: Partial<BoardFilters>) => onChange({ ...filters, ...patch });
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger className={cn(trigBase, n > 0 ? trigActive : trigIdle)}>
-        <ListFilter className="size-3.5" aria-hidden />
-        Filtros
-        {n > 0 && (
-          <span className="flex min-w-[15px] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-semibold text-primary-foreground">
-            {n}
-          </span>
-        )}
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-[220px]">
-        {showStatus && (
-          <>
-            <SectionLabel>Status</SectionLabel>
-            <DropdownMenuItem active={!filters.status} onSelect={(e) => { e.preventDefault(); set({ status: undefined }); }}>
-              Todos
-            </DropdownMenuItem>
-            {STATUS_OPTIONS.map((s) => (
-              <DropdownMenuItem key={s} active={filters.status === s} onSelect={(e) => { e.preventDefault(); set({ status: s }); }}>
-                {STATUS_LABEL[s]}
-              </DropdownMenuItem>
-            ))}
-          </>
-        )}
-        <SectionLabel className={showStatus ? "mt-1 border-t border-border pt-2" : undefined}>Prioridade</SectionLabel>
-        <DropdownMenuItem active={!filters.prio} onSelect={(e) => { e.preventDefault(); set({ prio: undefined }); }}>
-          Todas
-        </DropdownMenuItem>
-        {PRIO_OPTIONS.map((p) => (
-          <DropdownMenuItem key={p} active={filters.prio === p} onSelect={(e) => { e.preventDefault(); set({ prio: p }); }}>
-            {PRIO_LABEL[p]}
-          </DropdownMenuItem>
-        ))}
-        <SectionLabel className="mt-1 border-t border-border pt-2">Prazo</SectionLabel>
-        <DropdownMenuItem active={!filters.prazo} onSelect={(e) => { e.preventDefault(); set({ prazo: undefined }); }}>
-          Qualquer
-        </DropdownMenuItem>
-        {PRAZO_OPTIONS.map((p) => (
-          <DropdownMenuItem key={p} active={filters.prazo === p} onSelect={(e) => { e.preventDefault(); set({ prazo: p }); }}>
-            {PRAZO_LABEL[p]}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-function SectionLabel({ children, className }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div className={cn("px-2.5 pb-1 pt-1.5 text-[10.5px] uppercase tracking-wide text-muted-foreground/70", className)}>
-      {children}
-    </div>
-  );
-}
-
-/** Mobile (bottom sheet): grupos de pills pra Status(fora do Kanban)/Prioridade/Prazo. */
-export function FacetPills({
-  filters,
-  onChange,
-  showStatus,
-}: {
-  filters: BoardFilters;
-  onChange: (f: BoardFilters) => void;
-  showStatus: boolean;
-}) {
-  const set = (patch: Partial<BoardFilters>) => onChange({ ...filters, ...patch });
-  return (
-    <>
-      {showStatus && (
-        <PillGroup<BoardStatus>
-          label="Status"
-          selected={filters.status}
-          options={[{ value: undefined, label: "Todos" }, ...STATUS_OPTIONS.map((s) => ({ value: s, label: STATUS_LABEL[s] }))]}
-          onSelect={(v) => set({ status: v })}
-        />
-      )}
-      <PillGroup<TaskPriority>
-        label="Prioridade"
-        selected={filters.prio}
-        options={[{ value: undefined, label: "Todas" }, ...PRIO_OPTIONS.map((p) => ({ value: p, label: PRIO_LABEL[p] }))]}
-        onSelect={(v) => set({ prio: v })}
-      />
-      <PillGroup<PrazoPreset>
-        label="Prazo"
-        selected={filters.prazo}
-        options={[{ value: undefined, label: "Qualquer" }, ...PRAZO_OPTIONS.map((p) => ({ value: p, label: PRAZO_LABEL[p] }))]}
-        onSelect={(v) => set({ prazo: v })}
-      />
-    </>
-  );
-}
-
-function PillGroup<T extends string>({
-  label,
-  selected,
-  options,
-  onSelect,
-}: {
-  label: string;
-  selected: T | undefined;
-  options: { value: T | undefined; label: string }[];
-  onSelect: (v: T | undefined) => void;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-[11px] text-muted-foreground">{label}</span>
-      <div role="radiogroup" aria-label={label} className="flex flex-wrap gap-2">
-        {options.map((o) => {
-          const active = o.value === selected;
-          return (
-            <Button variant="unstyled"
-              key={o.value ?? "_any"}
-              type="button"
-              role="radio"
-              aria-checked={active}
-              onClick={() => onSelect(o.value)}
-              className={cn(
-                "flex h-10 items-center rounded-lg border px-3.5 text-[12.5px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-                active ? "border-muted-foreground/40 bg-surface-tertiary text-foreground" : "border-border bg-card text-muted-foreground",
-              )}
-            >
-              {o.label}
-            </Button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ================= PRESETS =================
-
-/** Desktop: dropdown "Presets" — aplicar / renomear / excluir / salvar filtro atual. */
-export function PresetsControl({
+/**
+ * Faixa de filtros do quadro do projeto (RF19–RF21, RF24): as visões salvas no servidor (presets) como abas,
+ * o campo de consulta (busca local por título + fichas das facetas) e o botão Filtros. Estado em quem usa.
+ */
+export function BoardFilterStrip({
   presets,
   isLoading,
   isError,
@@ -207,6 +57,12 @@ export function PresetsControl({
   onRename,
   onDelete,
   onRetry,
+  filters,
+  onChange,
+  showStatus,
+  members,
+  search,
+  onSearchChange,
 }: {
   presets: Preset[];
   isLoading: boolean;
@@ -218,165 +74,99 @@ export function PresetsControl({
   onRename: (p: Preset) => void;
   onDelete: (p: Preset) => void;
   onRetry: () => void;
+  filters: BoardFilters;
+  onChange: (f: BoardFilters) => void;
+  /** Etapa (A fazer/Fazendo/Feito) só fora do Quadro (as colunas já são o status). */
+  showStatus: boolean;
+  members: Member[];
+  search: string;
+  onSearchChange: (text: string) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
-      <DropdownMenuTrigger className={cn(trigBase, activeId ? trigActive : trigIdle)}>
-        <Bookmark className="size-3.5" aria-hidden />
-        Presets
-        {presets.length > 0 && <span className="text-muted-foreground/70">{presets.length}</span>}
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-[248px] p-1.5">
-        <SectionLabel>Presets deste cliente</SectionLabel>
-        {isLoading ? (
-          <div className="flex items-center gap-2 px-2.5 py-2 text-[12.5px] text-muted-foreground">
-            <Loader2 className="size-3.5 animate-spin" /> Carregando…
-          </div>
-        ) : isError ? (
-          <div className="flex items-center justify-between gap-2 px-2.5 py-2 text-[12.5px] text-muted-foreground">
-            Não foi possível carregar.
-            <Button variant="unstyled"
-              type="button"
-              onClick={(e) => { e.preventDefault(); onRetry(); }}
-              className="text-foreground underline decoration-muted-foreground/40 underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              Tentar de novo
-            </Button>
-          </div>
-        ) : presets.length === 0 ? (
-          <div className="px-2.5 py-2 text-[12.5px] text-muted-foreground">
-            Nenhum preset ainda. Monte um filtro e salve para reusar.
-          </div>
-        ) : (
-          <div className="flex flex-col">
-            {presets.map((p) => (
-              <div
-                key={p.id}
-                className={cn(
-                  "group flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-surface-tertiary",
-                  activeId === p.id && "bg-surface-tertiary",
-                )}
-              >
-                <Button variant="unstyled"
-                  type="button"
-                  onClick={() => { onApply(p); setOpen(false); }}
-                  className="flex min-w-0 flex-1 items-center gap-2 text-left outline-none"
-                >
-                  <span className={cn("size-[6px] shrink-0 rounded-full", activeId === p.id ? "bg-primary" : "bg-surface-secondary-foreground/40")} />
-                  <span className="truncate text-[13px] text-foreground" title={p.name}>{p.name}</span>
-                  {activeId === p.id && <span className="shrink-0 text-[10.5px] text-primary">aplicado</span>}
-                </Button>
-                <Button variant="unstyled"
-                  type="button"
-                  aria-label={`Renomear ${p.name}`}
-                  onClick={() => { onRename(p); setOpen(false); }}
-                  className="shrink-0 text-muted-foreground opacity-0 outline-none transition hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
-                >
-                  <Pencil className="size-3.5" />
-                </Button>
-                <Button variant="unstyled"
-                  type="button"
-                  aria-label={`Excluir ${p.name}`}
-                  onClick={() => { onDelete(p); setOpen(false); }}
-                  className="shrink-0 text-muted-foreground opacity-0 outline-none transition hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
-                >
-                  <Trash2 className="size-3.5" />
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
-        <div className="mt-1 border-t border-border pt-1">
-          <DropdownMenuItem
-            disabled={!canSave}
-            onSelect={(e) => { e.preventDefault(); if (canSave) { onSave(); setOpen(false); } }}
-          >
-            <Plus className="size-3.5" /> Salvar filtro atual
-          </DropdownMenuItem>
-          {!canSave && <p className="px-2.5 pb-1 text-[11px] text-muted-foreground/70">Ative um filtro para salvar.</p>}
-        </div>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
+  const set = (patch: Partial<BoardFilters>) => onChange({ ...filters, ...patch });
+  const anyFilter = showStatus ? hasAnyBoardFilter(filters) : hasBoardFilterExceptStatus(filters);
+  const currentId = activeId ?? (anyFilter ? CUSTOM_VIEW : ALL_VIEW);
+  const views = [
+    { id: ALL_VIEW, label: "Todas" },
+    ...presets.map((p) => ({ id: p.id, label: p.name })),
+    ...(activeId === null && anyFilter ? [{ id: CUSTOM_VIEW, label: "Filtro atual" }] : []),
+  ];
 
-/** Mobile (bottom sheet): seção de presets — lista + salvar. */
-export function PresetsSheet({
-  presets,
-  isLoading,
-  isError,
-  activeId,
-  canSave,
-  onApply,
-  onSave,
-  onDelete,
-  onRetry,
-}: {
-  presets: Preset[];
-  isLoading: boolean;
-  isError: boolean;
-  activeId: string | null;
-  canSave: boolean;
-  onApply: (p: Preset) => void;
-  onSave: () => void;
-  onDelete: (p: Preset) => void;
-  onRetry: () => void;
-}) {
+  const respName = filters.resp === NONE ? "Sem responsável" : members.find((m) => m.id === filters.resp)?.name;
+  const chips: QueryChip[] = [];
+  if (filters.resp !== undefined) chips.push({ key: "resp", label: "responsável", value: respName ?? "…" });
+  if (showStatus && filters.status) chips.push({ key: "status", label: "etapa", value: STATUS_LABEL[filters.status] });
+  if (filters.prio) chips.push({ key: "prio", label: "prioridade", value: PRIO_LABEL[filters.prio] });
+  if (filters.prazo) chips.push({ key: "prazo", label: "prazo", value: PRAZO_LABEL[filters.prazo] });
+  const removeChip = (key: string) => {
+    if (key === "resp") set({ resp: undefined });
+    else if (key === "status") set({ status: undefined });
+    else if (key === "prio") set({ prio: undefined });
+    else if (key === "prazo") set({ prazo: undefined });
+  };
+
+  const respOptions = [{ value: NONE, label: "Sem responsável" }, ...members.map((m) => ({ value: m.id, label: m.name }))];
+  const groups: QuerySuggestionGroup[] = [
+    { prefix: "responsável", options: respOptions.map((o) => ({ id: o.value, label: o.label })) },
+    ...(showStatus ? [{ prefix: "etapa", options: STATUS_OPTIONS.map((s) => ({ id: s, label: STATUS_LABEL[s] })) }] : []),
+    { prefix: "prioridade", options: PRIO_OPTIONS.map((p) => ({ id: p, label: PRIO_LABEL[p] })) },
+    { prefix: "prazo", options: PRAZO_OPTIONS.map((p) => ({ id: p, label: PRAZO_LABEL[p] })) },
+  ];
+  const pick = (prefix: string, id: string) => {
+    if (prefix === "responsável") set({ resp: id });
+    else if (prefix === "etapa") set({ status: id as BoardStatus });
+    else if (prefix === "prioridade") set({ prio: id as TaskPriority });
+    else if (prefix === "prazo") set({ prazo: id as PrazoPreset });
+  };
+
+  const facets: FacetDef[] = [
+    { key: "resp", label: "Responsável", value: filters.resp, options: respOptions, onChange: (v) => set({ resp: v }), disabled: members.length === 0 && filters.resp === undefined, hint: "Sem membros neste cliente" },
+    ...(showStatus
+      ? [{ key: "status", label: "Etapa", kind: "segments" as const, value: filters.status, options: STATUS_OPTIONS.map((s) => ({ value: s, label: STATUS_LABEL[s] })), onChange: (v: string | undefined) => set({ status: v as BoardStatus | undefined }) }]
+      : []),
+    { key: "prio", label: "Prioridade", kind: "segments", value: filters.prio, options: PRIO_OPTIONS.map((p) => ({ value: p, label: PRIO_LABEL[p] })), onChange: (v) => set({ prio: v as TaskPriority | undefined }) },
+    { key: "prazo", label: "Prazo", kind: "segments", allLabel: "Qualquer", value: filters.prazo, options: PRAZO_OPTIONS.map((p) => ({ value: p, label: PRAZO_LABEL[p] })), onChange: (v) => set({ prazo: v as PrazoPreset | undefined }) },
+  ];
+  const activeCount = chips.length;
+  const presetById = (id: string) => presets.find((p) => p.id === id);
+
   return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <span className="text-[11px] text-muted-foreground">Presets</span>
-        <Button variant="unstyled"
-          type="button"
-          disabled={!canSave}
-          onClick={onSave}
-          className="inline-flex items-center gap-1 text-[12px] text-muted-foreground outline-none transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:text-muted-foreground/50 focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <Plus className="size-3.5" /> Salvar filtro atual
-        </Button>
+    <div className="border-b border-border px-4 pb-3 pt-1 lg:px-6">
+      <ViewTabs
+        ariaLabel="Visões salvas"
+        views={views}
+        activeId={currentId}
+        onSelect={(id) => {
+          if (id === ALL_VIEW) onChange(EMPTY_BOARD_FILTERS);
+          else {
+            const p = presetById(id);
+            if (p) onApply(p);
+          }
+        }}
+        onSave={onSave}
+        saveDisabled={!canSave || activeId !== null}
+        removableIds={presets.map((p) => p.id)}
+        onRename={(id) => { const p = presetById(id); if (p) onRename(p); }}
+        onRemove={(id) => { const p = presetById(id); if (p) onDelete(p); }}
+        trailing={
+          isLoading ? (
+            <span role="status" className="flex items-center gap-1 px-1 text-[12px] text-muted"><Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> Carregando visões…</span>
+          ) : isError ? (
+            <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-[12px] text-muted" onClick={onRetry}>Não foi possível carregar as visões. Tentar de novo</Button>
+          ) : undefined
+        }
+      />
+      <div className="mt-3 flex items-stretch gap-2">
+        <QueryField
+          value={search}
+          onValueChange={onSearchChange}
+          chips={chips}
+          onRemoveChip={removeChip}
+          groups={groups}
+          onPick={pick}
+          placeholder="Buscar pelo título ou digite responsável:, prazo:, prioridade:"
+        />
+        <FiltersControl facets={facets} activeCount={activeCount} onClear={() => onChange(EMPTY_BOARD_FILTERS)} />
       </div>
-      {isLoading ? (
-        <div className="flex items-center gap-2 py-1 text-[12.5px] text-muted-foreground">
-          <Loader2 className="size-3.5 animate-spin" /> Carregando…
-        </div>
-      ) : isError ? (
-        <div className="flex items-center gap-2 py-1 text-[12.5px] text-muted-foreground">
-          Não foi possível carregar.
-          <Button variant="unstyled"
-            type="button"
-            onClick={onRetry}
-            className="text-foreground underline decoration-muted-foreground/40 underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            Tentar de novo
-          </Button>
-        </div>
-      ) : presets.length === 0 ? (
-        <p className="text-[12.5px] text-muted-foreground">Nenhum preset ainda. Monte um filtro e salve para reusar.</p>
-      ) : (
-        <div className="flex flex-col gap-1">
-          {presets.map((p) => (
-            <div
-              key={p.id}
-              className={cn("flex items-center gap-2 rounded-lg border px-3 py-2.5", activeId === p.id ? "border-muted-foreground/40 bg-surface-tertiary" : "border-border bg-card")}
-            >
-              <Button variant="unstyled" type="button" onClick={() => onApply(p)} className="flex min-w-0 flex-1 items-center gap-2 text-left outline-none">
-                <span className={cn("size-[6px] shrink-0 rounded-full", activeId === p.id ? "bg-primary" : "bg-surface-secondary-foreground/40")} />
-                <span className="truncate text-[13px] text-foreground">{p.name}</span>
-                {activeId === p.id && <span className="shrink-0 text-[10.5px] text-primary">aplicado</span>}
-              </Button>
-              <Button variant="unstyled"
-                type="button"
-                aria-label={`Excluir ${p.name}`}
-                onClick={() => onDelete(p)}
-                className="shrink-0 text-muted-foreground outline-none transition hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <Trash2 className="size-4" />
-              </Button>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

@@ -19,3 +19,16 @@ export const ALLOWED_RESOURCES = new Set([
 export function isAllowedResource(segment: string): boolean {
   return ALLOWED_RESOURCES.has(segment);
 }
+
+/**
+ * Rotas somente de leitura dentro de um recurso já liberado. `tasks/workflows/team` (feed da equipe, RB1)
+ * só aceita GET/HEAD: nenhuma mutação existe nesse caminho e o BFF não deve repassar uma.
+ */
+const READ_ONLY_PATHS = ["tasks/workflows/team"];
+
+export function isAllowedRoute(method: string, segments: string[]): boolean {
+  if (segments.length === 0 || !isAllowedResource(segments[0])) return false;
+  const path = segments.join("/");
+  const readOnly = READ_ONLY_PATHS.some(p => path === p || path.startsWith(p + "/"));
+  return !readOnly || method === "GET" || method === "HEAD";
+}

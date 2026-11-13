@@ -4,12 +4,13 @@ import { useState } from "react";
 import { useWorkflowHistory } from "@/lib/hooks/use-workflow";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-const channels: Record<string, string> = { WEB: "Painel", MCP: "Assistente conectado", LOCAL_SYNC: "Sincronização local" };
-const labels: Record<string, string> = { board_move: "Tarefa movida no quadro", initialize: "Fluxo ativado", adopt_agent_review: "Revisão assumida pelo agente", transition: "Etapa alterada", change_delivery: "Entrega atualizada", start_execution: "Execução iniciada", report_progress: "Progresso registrado", record_evidence: "Evidências da entrega registradas", submit_review: "Entrega enviada para revisão", record_finding: "Achado registrado", report_fix: "Correção informada", validate_finding: "Correção validada", waive_finding: "Achado dispensado", request_changes: "Ajustes solicitados", approve_review: "Entrega aprovada", approve_anyway: "Entrega aprovada mesmo assim", approve_with_reservations: "Entrega aprovada com ressalvas", request_action: "Decisão solicitada", resolve_action: "Solicitação respondida" };
+import { CHANNEL_LABEL } from "@/components/task-sheet/channel";
+export const channels: Record<string, string> = CHANNEL_LABEL;
+export const labels: Record<string, string> ={ board_move: "Tarefa movida no quadro", initialize: "Fluxo ativado", adopt_agent_review: "Revisão assumida pelo agente", transition: "Etapa alterada", change_delivery: "Entrega atualizada", start_execution: "Execução iniciada", report_progress: "Progresso registrado", record_evidence: "Evidências da entrega registradas", submit_review: "Entrega enviada para revisão", record_finding: "Achado registrado", report_fix: "Correção informada", validate_finding: "Correção validada", waive_finding: "Achado dispensado", request_changes: "Ajustes solicitados", approve_review: "Entrega aprovada", approve_anyway: "Entrega aprovada mesmo assim", approve_with_reservations: "Entrega aprovada com ressalvas", request_action: "Decisão solicitada", resolve_action: "Solicitação respondida" };
 function object(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
 }
-function historyDetails(payload: Record<string, unknown>): string[] {
+export function historyDetails(payload: Record<string, unknown>): string[] {
   const command = object(payload.command);
   const action = object(payload.action);
   const summary = object(command.summary);
@@ -24,6 +25,10 @@ function historyDetails(payload: Record<string, unknown>): string[] {
   add(summary.objective, "Objetivo: "); list(summary.completed, "Feito: "); list(summary.remaining, "Falta fazer: ");
   list(summary.blockers, "Bloqueio: "); add(summary.nextStep, "Próximo passo: "); list(summary.references, "Referência: ");
   return [...new Set(result)];
+}
+/** Título legível de um evento do fluxo (mesmo texto do histórico em lista e do Diário da folha). */
+export function historyTitle(event: { type: string; channel: string }): string {
+  return event.type === "approve_review" && event.channel === "MCP" ? "Concluído pelo assistente" : labels[event.type] ?? "Atualização registrada";
 }
 export function WorkflowHistory({ taskId, members, expanded = false }: { taskId: string; members: Record<string, string>; expanded?: boolean }) {
   const [open, setOpen] = useState(false);
