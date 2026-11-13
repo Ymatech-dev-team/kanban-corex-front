@@ -1,7 +1,7 @@
 // Service worker mínimo do PWA. NÃO cacheia a app (nada de chunk hasheado do Next → sem stale
 // pós-deploy) nem rotas autenticadas. Só precacheia a página offline + ícones, e serve /offline
 // quando uma NAVEGAÇÃO falha por rede. Tudo o mais passa direto. [PWA / painel]
-const CACHE_NAME = "sdt-shell-v1";
+const CACHE_NAME = "corex-shell-rebrand-v2";
 const OFFLINE_URL = "/offline";
 // Só a /offline: é o único recurso que o fetch handler serve de volta. Manter a lista mínima evita
 // que um 404 futuro de outro asset derrube o install atômico (cache.addAll) inteiro. [lente]

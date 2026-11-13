@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { AxiosError } from "axios";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/toast";
 import type { CreateTaskInput, UpdateTaskInput, TaskStatus } from "@sistema-tasks/contracts";
 import { api } from "@/lib/api";
 import { projectCostKey, taskCostKey } from "@/lib/hooks/use-cost";

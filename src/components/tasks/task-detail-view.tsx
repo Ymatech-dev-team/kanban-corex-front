@@ -1,4 +1,6 @@
 "use client";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Disclosure } from "@/components/ui/disclosure";
 
 import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -15,7 +17,7 @@ import {
   AlertTriangle,
   RefreshCw,
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/toast";
 import { PERMISSIONS, type TaskPriority, type TaskStatus, type UpdateTaskInput } from "@sistema-tasks/contracts";
 import type { CostState, Task } from "@/lib/types";
 import { Input } from "@/components/ui/input";
@@ -496,7 +498,7 @@ export function TaskDetailView({ taskId, panel = false, onClose, closeRef }: {
           <Field label="Posição na coluna">
             <div className="flex items-center gap-2.5">
               <div role="group" aria-label="Posição na coluna" className="inline-flex w-fit gap-0.5 rounded-lg border border-border bg-card p-[3px]">
-                <button
+                <Button variant="unstyled"
                   ref={upRef}
                   type="button"
                   aria-label="Mover uma posição para cima na coluna"
@@ -505,8 +507,8 @@ export function TaskDetailView({ taskId, panel = false, onClose, closeRef }: {
                   className="flex size-8 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors enabled:hover:text-foreground disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <ArrowUp className="size-4" />
-                </button>
-                <button
+                </Button>
+                <Button variant="unstyled"
                   ref={downRef}
                   type="button"
                   aria-label="Mover uma posição para baixo na coluna"
@@ -515,7 +517,7 @@ export function TaskDetailView({ taskId, panel = false, onClose, closeRef }: {
                   className="flex size-8 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors enabled:hover:text-foreground disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <ArrowDown className="size-4" />
-                </button>
+                </Button>
               </div>
               <span className="text-[12.5px] text-muted-foreground">
                 {column.index >= 0 ? `${column.index + 1} de ${column.total}` : `— de ${column.total}`}
@@ -594,7 +596,7 @@ export function TaskDetailView({ taskId, panel = false, onClose, closeRef }: {
         <ul className="flex flex-col gap-1">
           {subs.map((s) => (
             <li key={s.id} className="group flex items-center gap-2.5 rounded-lg px-1 py-1">
-              <button
+              <Button variant="unstyled"
                 type="button"
                 disabled={!canEdit}
                 aria-label={s.done ? "Desmarcar" : "Marcar como feita"}
@@ -605,9 +607,9 @@ export function TaskDetailView({ taskId, panel = false, onClose, closeRef }: {
                 )}
               >
                 <Check className="size-3" strokeWidth={3} />
-              </button>
+              </Button>
               <span className={cn("flex-1 text-[13px]", s.done && "text-muted-foreground line-through")}>{s.title}</span>
-              <button
+              <Button variant="unstyled"
                 type="button"
                 disabled={!canEdit}
                 aria-label="Remover subtarefa"
@@ -615,21 +617,21 @@ export function TaskDetailView({ taskId, panel = false, onClose, closeRef }: {
                 className="text-muted-foreground/0 transition-colors group-hover:text-muted-foreground hover:!text-amber"
               >
                 <Trash2 className="size-3.5" />
-              </button>
+              </Button>
             </li>
           ))}
           {subs.length === 0 && <li className="px-1 py-1 text-[12.5px] text-muted-foreground">Nenhuma subtarefa ainda.</li>}
         </ul>
         <form onSubmit={addSub} className="mt-1 flex items-center gap-2">
           <Input disabled={!canEdit} value={newTitle} aria-label="Nova subtarefa" onChange={(e) => setNewTitle(e.target.value)} placeholder="Adicionar subtarefa" maxLength={200} className="h-9" />
-          <button
+          <Button variant="unstyled"
             type="submit"
             aria-label="Adicionar"
             disabled={!canEdit || !newTitle.trim() || add.isPending}
             className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
           >
             <Plus className="size-4" />
-          </button>
+          </Button>
         </form>
       </div>
 
@@ -667,14 +669,14 @@ export function TaskDetailView({ taskId, panel = false, onClose, closeRef }: {
     <div className="flex min-h-0 flex-1 flex-col">
       {/* Header */}
       <header className="flex items-center gap-3 border-b border-border px-6 py-3.5">
-        <button
+        <Button variant="unstyled"
           type="button"
           aria-label="Voltar"
           onClick={goBack}
           className="inline-flex size-9 shrink-0 items-center justify-center rounded text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         >
           <ArrowLeft className="size-4" />
-        </button>
+        </Button>
         <nav aria-label="Trilha" className="flex min-w-0 items-center gap-1.5 text-[12.5px] text-muted-foreground">
           {clientName ? <span className="truncate">{clientName}</span> : <Skeleton className="h-3 w-16" />}
           <span className="text-muted-foreground/50">›</span>
@@ -722,22 +724,23 @@ export function TaskDetailView({ taskId, panel = false, onClose, closeRef }: {
 
           {managed ? <>
             <h1 className="mb-5 text-xl font-medium leading-snug tracking-tight">{task.title}</h1>
-            <div role="tablist" aria-label="Seções da tarefa" className="mb-5 flex gap-5 border-b border-border">
-              {([ ["summary", "Resumo"], ["review", "Revisão"], ["history", "Histórico"] ] as const).map(([value, label], index, items) => <button key={value} type="button" role="tab" id={`workflow-tab-${value}`} aria-controls="workflow-panel" aria-selected={workflowView === value} tabIndex={workflowView === value ? 0 : -1} onClick={() => setWorkflowView(value)} onKeyDown={(event) => {
-                const next = event.key === "ArrowRight" ? (index + 1) % items.length : event.key === "ArrowLeft" ? (index + items.length - 1) % items.length : event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : null;
-                if (next !== null) { event.preventDefault(); setWorkflowView(items[next][0]); document.getElementById(`workflow-tab-${items[next][0]}`)?.focus(); }
-              }} className={cn("border-b-2 px-1 pb-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring", workflowView === value ? "border-primary font-medium text-foreground" : "border-transparent text-muted-foreground hover:text-foreground")}>{label}</button>)}
-            </div>
-            <div role="tabpanel" id="workflow-panel" aria-labelledby={`workflow-tab-${workflowView}`}>
+            <Tabs value={workflowView} onValueChange={(value) => setWorkflowView(value as typeof workflowView)}>
+              <TabsList aria-label="Seções da tarefa" className="mb-5">
+                <TabsTrigger value="summary">Resumo</TabsTrigger>
+                <TabsTrigger value="review">Revisão</TabsTrigger>
+                <TabsTrigger value="history">Histórico</TabsTrigger>
+              </TabsList>
+              <TabsContent value={workflowView} forceMount>
               <TaskWorkflow key={taskId} taskId={taskId} query={workflow} members={membersById} view={workflowView} onDirtyChange={setWorkflowDirty} />
               <div hidden={workflowView !== "history"} className="mt-6"><h2 className="mb-3 text-sm font-medium">Comentários e atividade</h2><ActivityTab taskId={task.id} membersById={membersById} enabled={workflowView === "history"} /></div>
-              <details hidden={workflowView !== "summary"} className="mt-6 border-t border-border pt-4"><summary className="cursor-pointer rounded text-sm text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">Dados da tarefa</summary><div className="pt-4">{detailsPane}</div></details>
-            </div>
+              <Disclosure hidden={workflowView !== "summary"} className="mt-6 border-t border-border pt-4" title="Dados da tarefa"><div className="pt-4">{detailsPane}</div></Disclosure>
+              </TabsContent>
+            </Tabs>
           </> : <>
           {/* Abas só no mobile */}
           <div className={cn("mb-4 flex gap-4 border-b border-border", !panel && "lg:hidden")}>
             {(["detalhes", "atividade"] as const).map((t) => (
-              <button
+              <Button variant="unstyled"
                 key={t}
                 type="button"
                 onClick={() => setTab(t)}
@@ -748,7 +751,7 @@ export function TaskDetailView({ taskId, panel = false, onClose, closeRef }: {
                 )}
               >
                 {t === "detalhes" ? "Detalhes" : "Atividade"}
-              </button>
+              </Button>
             ))}
           </div>
 
@@ -857,7 +860,7 @@ function Segmented<T extends string>({
   return (
     <div role="group" aria-label={label} className="inline-flex w-fit gap-0.5 rounded-lg border border-border bg-card p-[3px]">
       {options.map((o) => (
-        <button
+        <Button variant="unstyled"
           key={o.value}
           type="button"
           disabled={disabled}
@@ -865,11 +868,11 @@ function Segmented<T extends string>({
           onClick={() => onChange(o.value)}
           className={cn(
             "whitespace-nowrap rounded-md px-3 py-1.5 text-[12.5px] transition-colors disabled:opacity-60",
-            value === o.value ? "bg-accent text-foreground" : "text-muted-foreground enabled:hover:text-foreground",
+            value === o.value ? "bg-surface-tertiary text-foreground" : "text-muted-foreground enabled:hover:text-foreground",
           )}
         >
           {o.label}
-        </button>
+        </Button>
       ))}
     </div>
   );

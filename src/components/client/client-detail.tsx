@@ -54,13 +54,13 @@ function CostSection({ projectId }: { projectId: string }) {
       ) : cost.isError ? (
         <div className="rounded-xl border border-border bg-card p-4 text-[13px] text-muted-foreground">
           Não foi possível carregar o custo.{" "}
-          <button
+          <Button variant="unstyled"
             type="button"
             onClick={() => cost.refetch()}
             className="rounded-sm text-foreground underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             Tentar de novo
-          </button>
+          </Button>
         </div>
       ) : !cost.data ||
         (cost.data.porPessoa.length === 0 &&
@@ -94,13 +94,13 @@ function MembersSection({ projectId }: { projectId: string }) {
       ) : members.isError ? (
         <div className="rounded-xl border border-border bg-card p-4 text-[13px] text-muted-foreground">
           Não foi possível carregar os membros.{" "}
-          <button
+          <Button variant="unstyled"
             type="button"
             onClick={() => members.refetch()}
             className="rounded-sm text-foreground underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             Tentar de novo
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
@@ -112,19 +112,19 @@ function MembersSection({ projectId }: { projectId: string }) {
               key={m.id}
               className="flex items-center gap-2 rounded-full border border-border bg-card py-[3px] pl-[3px] pr-2.5 text-[13px]"
             >
-              <span className="flex size-6 items-center justify-center rounded-full border border-muted-foreground/40 bg-accent text-[10px] font-medium text-foreground">
+              <span className="flex size-6 items-center justify-center rounded-full border border-muted-foreground/40 bg-surface-tertiary text-[10px] font-medium text-foreground">
                 {m.name ? initials(m.name) : <User className="size-3 text-muted-foreground" />}
               </span>
               {m.name}
               {canManage && (
-                <button
+                <Button variant="unstyled"
                   type="button"
                   aria-label={`Remover acesso de ${m.name}`}
                   onClick={() => setRevoking({ id: m.id, name: m.name })}
                   className="text-muted-foreground/70 outline-none transition-colors hover:text-amber focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <X className="size-3.5" />
-                </button>
+                </Button>
               )}
             </span>
           ))}
@@ -195,7 +195,7 @@ function AddAccessControl({ projectId, currentIds }: { projectId: string; curren
         ) : (
           candidates.map((u) => (
             <DropdownMenuItem key={u.id} onSelect={() => grant.mutate(u.id)}>
-              <span className="flex size-[22px] shrink-0 items-center justify-center rounded-full border border-muted-foreground/40 bg-accent text-[10px] font-medium text-foreground">
+              <span className="flex size-[22px] shrink-0 items-center justify-center rounded-full border border-muted-foreground/40 bg-surface-tertiary text-[10px] font-medium text-foreground">
                 {initials(u.name)}
               </span>
               {u.name}
@@ -353,14 +353,14 @@ export function ClientDetail({ projectId }: { projectId: string }) {
     <div className="flex-1 overflow-y-auto">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-8 p-6">
       <div>
-        <button
+        <Button variant="unstyled"
           type="button"
           onClick={() => router.push("/clientes")}
           className="mb-3 inline-flex items-center gap-1.5 rounded text-[12.5px] text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         >
           <ArrowLeft className="size-3.5" />
           Clientes
-        </button>
+        </Button>
         {/* Mobile: empilha (nome inteiro em cima, ações numa linha abaixo). Desktop: lado a lado. */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
           <div className="min-w-0">

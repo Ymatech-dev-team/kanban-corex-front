@@ -38,7 +38,7 @@ export function ConfirmDialog({
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
         {reversible && (
-          <div className="flex items-start gap-2 rounded-r-lg border-l-2 border-primary bg-accent/50 py-2 pl-3 pr-3 text-[12.5px] text-foreground/90">
+          <div className="flex items-start gap-2 rounded-r-lg border-l-2 border-primary bg-surface-tertiary/50 py-2 pl-3 pr-3 text-[12.5px] text-foreground/90">
             <RotateCcw className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden />
             <span>
               Você poderá <span className="text-primary">desfazer</span> por alguns segundos depois de excluir.

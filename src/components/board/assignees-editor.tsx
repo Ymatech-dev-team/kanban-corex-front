@@ -1,5 +1,7 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+
 import { useState } from "react";
 import { Loader2, Plus, Star, User, X } from "lucide-react";
 import type { UseMutationResult } from "@tanstack/react-query";
@@ -18,7 +20,7 @@ function Avatar({ name, primary }: { name: string | null; primary?: boolean }) {
   return (
     <span
       className={cn(
-        "flex size-[22px] shrink-0 items-center justify-center rounded-full bg-accent text-[10px] font-medium text-foreground",
+        "flex size-[22px] shrink-0 items-center justify-center rounded-full bg-surface-tertiary text-[10px] font-medium text-foreground",
         primary ? "ring-2 ring-primary" : "border border-muted-foreground/40",
       )}
     >
@@ -85,7 +87,7 @@ export function AssigneesEditor({
           !disabled && (
             <>
               {!primary && (
-                <button
+                <Button variant="unstyled"
                   type="button"
                   aria-label={`Tornar ${name ?? "responsável"} principal`}
                   title="Tornar principal"
@@ -94,9 +96,9 @@ export function AssigneesEditor({
                   className="text-muted-foreground/70 transition-colors hover:text-amber disabled:opacity-40"
                 >
                   <Star className="size-3.5" />
-                </button>
+                </Button>
               )}
-              <button
+              <Button variant="unstyled"
                 type="button"
                 aria-label={`Remover ${name ?? "responsável"}`}
                 disabled={anyPending}
@@ -104,7 +106,7 @@ export function AssigneesEditor({
                 className="text-muted-foreground/70 transition-colors hover:text-amber disabled:opacity-40"
               >
                 <X className="size-3.5" />
-              </button>
+              </Button>
             </>
           )
         )}

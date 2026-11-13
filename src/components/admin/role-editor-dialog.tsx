@@ -124,13 +124,13 @@ export function RoleEditorDialog({ open, role, onOpenChange }: Props) {
                     {selectedInGroup}/{group.items.length}
                   </span>
                   {grantable.length > 0 && (
-                    <button
+                    <Button variant="unstyled"
                       type="button"
                       onClick={() => toggleGroup(grantable, allGrantableSelected)}
                       className="ml-auto text-[11px] text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       {allGrantableSelected ? "Limpar área" : "Selecionar tudo"}
-                    </button>
+                    </Button>
                   )}
                 </div>
                 {group.items.map((item) => {
@@ -141,7 +141,7 @@ export function RoleEditorDialog({ open, role, onOpenChange }: Props) {
                     ? "Você não pode alterar esta permissão — não pode concedê-la."
                     : "Você não pode conceder esta permissão.";
                   return (
-                    <button
+                    <Button variant="unstyled"
                       key={item.perm}
                       type="button"
                       aria-disabled={!canGrant || undefined}
@@ -151,7 +151,7 @@ export function RoleEditorDialog({ open, role, onOpenChange }: Props) {
                       onClick={() => canGrant && toggle(item.perm)}
                       className={cn(
                         "flex items-start gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors",
-                        checked ? "border-muted-foreground/40 bg-accent" : "border-border",
+                        checked ? "border-muted-foreground/40 bg-surface-tertiary" : "border-border",
                         canGrant ? "hover:border-muted-foreground/30" : "cursor-not-allowed opacity-60",
                       )}
                     >
@@ -177,7 +177,7 @@ export function RoleEditorDialog({ open, role, onOpenChange }: Props) {
                         </span>
                         {item.hint && <span className="block text-[11.5px] text-muted-foreground">{item.hint}</span>}
                       </span>
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
@@ -188,13 +188,13 @@ export function RoleEditorDialog({ open, role, onOpenChange }: Props) {
         {/* rodapé fixo: confirmação de admin + erro + ações (sempre visíveis) */}
         <div className="flex flex-col gap-3 border-t border-border p-4">
           {addsMeta && (
-            <button
+            <Button variant="unstyled"
               type="button"
               role="checkbox"
               aria-checked={confirmMeta}
               aria-label="Confirmo que este perfil passa a conceder permissões de administração"
               onClick={() => setConfirmMeta((v) => !v)}
-              className="flex items-start gap-2.5 rounded-r-md border-l-2 border-primary bg-accent/40 py-2 pl-2.5 pr-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="flex items-start gap-2.5 rounded-r-md border-l-2 border-primary bg-surface-tertiary/40 py-2 pl-2.5 pr-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <span
                 className={cn(
@@ -210,7 +210,7 @@ export function RoleEditorDialog({ open, role, onOpenChange }: Props) {
                 Este perfil passa a conceder <span className="text-foreground">permissões de administração</span>.
                 Confirmo a mudança.
               </span>
-            </button>
+            </Button>
           )}
 
           {err && (

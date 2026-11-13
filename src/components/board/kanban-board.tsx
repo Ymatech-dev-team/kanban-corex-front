@@ -1,4 +1,7 @@
 "use client";
+import { Checkbox } from "@heroui/react";
+
+import { Button } from "@/components/ui/button";
 
 import { useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -38,7 +41,7 @@ const COLUMNS: { status: TaskStatus; label: string; dot: "todo" | "doing" | "don
 function Dot({ kind }: { kind: "todo" | "doing" | "done" }) {
   if (kind === "todo")
     return <span className="size-[9px] shrink-0 rounded-full border-[1.5px] border-muted-foreground" />;
-  if (kind === "done") return <span className="size-[9px] shrink-0 rounded-full bg-muted-foreground/70" />;
+  if (kind === "done") return <span className="size-[9px] shrink-0 rounded-full bg-surface-secondary-foreground/70" />;
   return (
     <span
       className="size-[9px] shrink-0 rounded-full border-[1.5px] border-foreground"
@@ -76,34 +79,10 @@ function SortableCard({
   if (selectMode) {
     return (
       <div ref={setNodeRef} style={{ transform: CSS.Translate.toString(transform), transition }} className="scroll-my-2">
-        <div
-          role="checkbox"
-          tabIndex={0}
-          aria-checked={selected}
-          aria-label={`Selecionar tarefa: ${task.title}`}
-          onClick={() => onToggleSelect?.(task.id)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              onToggleSelect?.(task.id);
-            }
-          }}
-          className={cn(
-            "relative cursor-pointer select-none rounded-xl outline-none transition focus-visible:ring-2 focus-visible:ring-ring",
-            selected && "ring-2 ring-primary",
-          )}
-        >
+        <Checkbox isSelected={!!selected} onChange={() => onToggleSelect?.(task.id)} aria-label={`Selecionar tarefa: ${task.title}`} className={cn("relative block w-full", selected && "rounded-xl ring-2 ring-primary")}><Checkbox.Content className="block w-full">
           <TaskCard task={task} membersById={membersById} clientName={clientName} />
-          <span
-            aria-hidden
-            className={cn(
-              "absolute right-2 top-2 flex size-5 items-center justify-center rounded-md border transition-colors",
-              selected ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/50 bg-card/90",
-            )}
-          >
-            {selected && <Check className="size-3.5" />}
-          </span>
-        </div>
+          <Checkbox.Control className="absolute right-2 top-2"><Checkbox.Indicator /></Checkbox.Control>
+        </Checkbox.Content></Checkbox>
       </div>
     );
   }
@@ -111,11 +90,11 @@ function SortableCard({
     <div ref={setNodeRef} style={{ transform: CSS.Translate.toString(transform), transition }}
       className={cn("group relative scroll-my-2 select-none", isDragging && "opacity-20")}>
       <TaskCard task={task} onOpen={onOpen} membersById={membersById} clientName={clientName} asButton dragHandleSpace />
-      {<button disabled={dragDisabled} ref={setActivatorNodeRef} type="button" {...attributes} {...listeners}
+      {<Button variant="unstyled" disabled={dragDisabled} ref={setActivatorNodeRef} type="button" {...attributes} {...listeners}
         aria-label={`Mover tarefa: ${task.title}`} onClick={event => event.stopPropagation()}
         className="absolute right-2 top-2 flex size-8 touch-none items-center justify-center rounded-md bg-card text-muted-foreground shadow-sm outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing cursor-grab disabled:cursor-default disabled:opacity-40">
         <GripVertical className="size-4" aria-hidden="true" />
-      </button>}
+      </Button>}
     </div>
   );
 }
@@ -351,7 +330,7 @@ function Column({
           {items.length}
         </span>
         {selectMode && items.length > 0 && (
-          <button
+          <Button variant="unstyled"
             type="button"
             role="checkbox"
             aria-checked={colAllSelected}
@@ -369,10 +348,10 @@ function Column({
               {colAllSelected && <Check className="size-3" />}
             </span>
             Coluna
-          </button>
+          </Button>
         )}
         {canCreate && (
-          <button
+          <Button variant="unstyled"
             ref={triggerRef}
             type="button"
             aria-label={`Nova tarefa em ${label}`}
@@ -380,7 +359,7 @@ function Column({
             className="ml-auto flex size-6 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-card hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
           >
             <Plus className="size-4" />
-          </button>
+          </Button>
         )}
       </div>
       <div
@@ -421,13 +400,13 @@ function Column({
         )}
 
         {canCreate && items.length === 0 && !composerOpen && (
-          <button
+          <Button variant="unstyled"
             type="button"
             onClick={trigger}
             className="flex items-center gap-1.5 px-1 py-2 text-xs text-muted-foreground/50 transition-colors hover:text-muted-foreground"
           >
             <Plus className="size-3.5" /> Adicionar tarefa
-          </button>
+          </Button>
         )}
       </div>
     </section>

@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 
 function Avatar({ name }: { name: string }) {
   return (
-    <span className="flex size-[22px] shrink-0 items-center justify-center rounded-full border border-muted-foreground/40 bg-accent text-[10px] font-medium text-foreground">
+    <span className="flex size-[22px] shrink-0 items-center justify-center rounded-full border border-muted-foreground/40 bg-surface-tertiary text-[10px] font-medium text-foreground">
       {initials(name)}
     </span>
   );

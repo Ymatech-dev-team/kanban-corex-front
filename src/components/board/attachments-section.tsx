@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Plus, X, Loader2, FileText, FileArchive, FileImage, Paperclip } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/toast";
 import {
   useAttachments,
   useDeleteAttachment,
@@ -123,16 +123,16 @@ export function AttachmentsSection({ taskId, disabled }: { taskId: string; disab
           {items.map((a) => (
             <div key={a.id} className="group relative overflow-hidden rounded-xl border border-border bg-card">
               {!disabled && a.canRemove && (
-                <button
+                <Button variant="unstyled"
                   type="button"
                   aria-label={`Remover ${a.fileName}`}
                   onClick={() => setDeleting(a)}
                   className="absolute right-1 top-1 z-10 flex size-6 items-center justify-center rounded-md bg-background/80 text-muted-foreground opacity-100 outline-none backdrop-blur transition hover:text-amber focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring lg:opacity-0 lg:group-hover:opacity-100"
                 >
                   <X className="size-3.5" />
-                </button>
+                </Button>
               )}
-              <button
+              <Button variant="unstyled"
                 type="button"
                 onClick={() => onOpen(a)}
                 disabled={!!opening}
@@ -158,7 +158,7 @@ export function AttachmentsSection({ taskId, disabled }: { taskId: string; disab
                     {fmtSize(a.size)} · {a.uploaderName}
                   </div>
                 </div>
-              </button>
+              </Button>
             </div>
           ))}
 
@@ -179,7 +179,7 @@ export function AttachmentsSection({ taskId, disabled }: { taskId: string; disab
           ))}
 
           {!disabled && (
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={() => fileRef.current?.click()}
               className={cn(
@@ -188,7 +188,7 @@ export function AttachmentsSection({ taskId, disabled }: { taskId: string; disab
             >
               <Plus className="size-5" />
               <span className="text-[11.5px]">Adicionar</span>
-            </button>
+            </Button>
           )}
         </div>
       )}

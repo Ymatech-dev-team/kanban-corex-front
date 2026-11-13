@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Toaster } from "sonner";
+import { Toast } from "@heroui/react";
 import { setApiQueryClient } from "@/lib/api";
 import { is4xx } from "@/lib/http-error";
 
@@ -25,19 +25,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={client}>
       {children}
-      <Toaster
-        theme="dark"
-        position="bottom-right"
-        // no mobile o toast (e o "Desfazer") sobe pra não ficar atrás da bottom-nav. [review UX]
-        mobileOffset={{ bottom: "calc(80px + env(safe-area-inset-bottom))" }}
-        toastOptions={{
-          style: {
-            background: "var(--color-card)",
-            border: "1px solid var(--color-border)",
-            color: "var(--color-foreground)",
-          },
-        }}
-      />
+      <Toast.Provider placement="bottom end" className="corex-toast-region" />
     </QueryClientProvider>
   );
 }

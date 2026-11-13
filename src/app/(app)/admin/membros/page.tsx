@@ -1,10 +1,11 @@
 "use client";
 
+import { Table } from "@heroui/react";
 import { useMemo, useState } from "react";
 import { Plus, Pencil, Loader2, AlertTriangle } from "lucide-react";
 import type { AxiosError } from "axios";
 import { PERMISSIONS } from "@sistema-tasks/contracts";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/toast";
 import { useMe } from "@/lib/hooks/use-me";
 import { useCan } from "@/lib/hooks/use-can";
 import { useMembers, useRoles, useResetPassword, useDeleteMember, type AdminMember } from "@/lib/hooks/use-admin";
@@ -166,25 +167,24 @@ export default function MembrosPage() {
 
             {/* Desktop: tabela */}
             <div className="hidden overflow-hidden rounded-xl border border-border bg-card lg:block">
-              <table className="w-full min-w-[620px] border-collapse text-[13px]">
-                <thead>
-                  <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground/70">
-                    <th className="px-4 py-2.5 font-medium">Membro</th>
-                    <th className="px-4 py-2.5 font-medium">Perfil</th>
-                    {canManage && <th className="px-4 py-2.5 font-medium">Remuneração</th>}
-                    <th className="px-4 py-2.5 font-medium">Situação</th>
-                    <th className="px-4 py-2.5" />
-                  </tr>
-                </thead>
-                <tbody>
+              <Table variant="secondary"><Table.ScrollContainer><Table.Content aria-label="Membros da equipe" className="w-full min-w-[620px] border-collapse text-[13px]">
+                <Table.Header>
+                    <Table.Column id="column-1" isRowHeader className="px-4 py-2.5 font-medium">Membro</Table.Column>
+                    <Table.Column id="column-2" className="px-4 py-2.5 font-medium">Perfil</Table.Column>
+                    {canManage && <Table.Column id="column-3" className="px-4 py-2.5 font-medium">Remuneração</Table.Column>}
+                    <Table.Column id="column-4" className="px-4 py-2.5 font-medium">Situação</Table.Column>
+                    <Table.Column id="column-5" aria-label="Ações" className="px-4 py-2.5" />
+                  </Table.Header>
+                <Table.Body>
                   {sorted.map((m) => {
                     const isSelf = m.id === me.data?.userId;
                     return (
-                      <tr
+                      <Table.Row
                         key={m.id}
-                        className="border-b border-border/60 transition-colors last:border-0 hover:bg-accent/30"
+                        id={m.id}
+                        className="border-b border-border/60 transition-colors last:border-0 hover:bg-surface-tertiary/30"
                       >
-                        <td className="px-4 py-3">
+                        <Table.Cell className="px-4 py-3">
                           <div className="flex items-center gap-3">
                             <Avatar name={m.name} size="sm" />
                             <div className="leading-tight">
@@ -197,8 +197,8 @@ export default function MembrosPage() {
                               <div className="text-[12px] text-muted-foreground">{m.email}</div>
                             </div>
                           </div>
-                        </td>
-                        <td className="px-4 py-3">
+                        </Table.Cell>
+                        <Table.Cell className="px-4 py-3">
                           {roles.isSuccess ? (
                             <RoleChip roleName={roleLabel(m.roleId, rolesById)} extraCount={m.extraPermissions.length} />
                           ) : roles.isError ? (
@@ -206,33 +206,33 @@ export default function MembrosPage() {
                           ) : (
                             <span className="inline-block h-4 w-20 animate-pulse rounded bg-border" />
                           )}
-                        </td>
+                        </Table.Cell>
                         {canManage && (
-                          <td className="px-4 py-3">
+                          <Table.Cell className="px-4 py-3">
                             <Compensation type={m.compensationType} cents={m.compensationCents} />
-                          </td>
+                          </Table.Cell>
                         )}
-                        <td className="px-4 py-3 text-[12px]">
+                        <Table.Cell className="px-4 py-3 text-[12px]">
                           <MemberStatus mustChangePassword={m.mustChangePassword} />
-                        </td>
-                        <td className="px-4 py-3 text-right">
+                        </Table.Cell>
+                        <Table.Cell className="px-4 py-3 text-right">
                           {canManage && (
-                            <button
+                            <Button variant="unstyled"
                               type="button"
                               onClick={() => setEditMember(m)}
                               aria-label={`Editar ${m.name}`}
                               title="Editar"
-                              className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                              className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-surface-tertiary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
                             >
                               <Pencil className="size-4" />
-                            </button>
+                            </Button>
                           )}
-                        </td>
-                      </tr>
+                        </Table.Cell>
+                      </Table.Row>
                     );
                   })}
-                </tbody>
-              </table>
+                </Table.Body>
+              </Table.Content></Table.ScrollContainer></Table>
             </div>
           </>
         )}
@@ -321,15 +321,15 @@ function MemberCard({
           <div className="truncate text-[12px] text-muted-foreground">{m.email}</div>
         </div>
         {canManage && (
-          <button
+          <Button variant="unstyled"
             type="button"
             onClick={onEdit}
             aria-label={`Editar ${m.name}`}
             title="Editar"
-            className="flex size-10 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex size-10 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:bg-surface-tertiary hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
           >
             <Pencil className="size-4" />
-          </button>
+          </Button>
         )}
       </div>
 

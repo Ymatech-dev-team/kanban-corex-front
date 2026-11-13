@@ -1,7 +1,8 @@
 "use client";
+import { Table, Checkbox } from "@heroui/react";
 
 import { useRef } from "react";
-import { Check, User } from "lucide-react";
+import { User } from "lucide-react";
 import type { Task } from "@/lib/types";
 import type { TaskPriority, TaskStatus } from "@sistema-tasks/contracts";
 import { initials } from "@/lib/initials";
@@ -14,7 +15,7 @@ const PRIO_LABEL: Record<TaskPriority, string> = { LOW: "Baixa", MEDIUM: "Média
 
 function StatusDot({ status }: { status: TaskStatus }) {
   if (status === "TODO") return <span className="size-[8px] rounded-full border-[1.5px] border-muted-foreground" />;
-  if (status === "DONE") return <span className="size-[8px] rounded-full bg-muted-foreground/70" />;
+  if (status === "DONE") return <span className="size-[8px] rounded-full bg-surface-secondary-foreground/70" />;
   return (
     <span
       className="size-[8px] rounded-full border-[1.5px] border-foreground"
@@ -50,6 +51,7 @@ export function TaskList({
   );
 
   // Âncora do Shift+clique (índice da última linha clicada). [RF-5]
+  const shiftPressed = useRef(false);
   const lastIndexRef = useRef<number | null>(null);
   const activateRow = (idx: number, id: string, shiftKey: boolean) => {
     if (!selectMode) {
@@ -66,7 +68,7 @@ export function TaskList({
   };
 
   return (
-    <div className={cn("flex-1 overflow-auto p-6", selectMode && "pb-28")}>
+    <div onPointerDownCapture={(event) => { shiftPressed.current = event.shiftKey; }} onKeyDownCapture={(event) => { shiftPressed.current = event.shiftKey; }} className={cn("flex-1 overflow-auto p-6", selectMode && "pb-28")}>
       {/* Mobile: cards (um por tarefa, mesma ordem da tabela). Reusa o TaskCard. [shell-mobile] */}
       <ul className="flex flex-col gap-2.5 lg:hidden">
         {rows.map((t, idx) => {
@@ -74,34 +76,10 @@ export function TaskList({
           if (selectMode) {
             return (
               <li key={t.id}>
-                <div
-                  role="checkbox"
-                  tabIndex={0}
-                  aria-checked={sel}
-                  aria-label={`Selecionar tarefa: ${t.title}`}
-                  onClick={(e) => activateRow(idx, t.id, e.shiftKey)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      activateRow(idx, t.id, e.shiftKey);
-                    }
-                  }}
-                  className={cn(
-                    "relative cursor-pointer select-none rounded-xl outline-none transition focus-visible:ring-2 focus-visible:ring-ring",
-                    sel && "ring-2 ring-primary",
-                  )}
-                >
+                <Checkbox slot={null} isSelected={!!sel} onChange={() => activateRow(idx, t.id, shiftPressed.current)} aria-label={`Selecionar tarefa: ${t.title}`} className={cn("relative block w-full", sel && "rounded-xl ring-2 ring-primary")}><Checkbox.Content className="block w-full">
                   <TaskCard task={t} membersById={membersById} />
-                  <span
-                    aria-hidden
-                    className={cn(
-                      "absolute right-2 top-2 flex size-5 items-center justify-center rounded-md border transition-colors",
-                      sel ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/50 bg-card/90",
-                    )}
-                  >
-                    {sel && <Check className="size-3.5" />}
-                  </span>
-                </div>
+                  <Checkbox.Control className="absolute right-2 top-2"><Checkbox.Indicator /></Checkbox.Control>
+                </Checkbox.Content></Checkbox>
               </li>
             );
           }
@@ -115,40 +93,20 @@ export function TaskList({
 
       {/* Desktop: tabela */}
       <div className="hidden overflow-x-auto rounded-xl border border-border bg-card lg:block">
-        <table className="w-full min-w-[640px] border-collapse text-[13px]">
-          <thead>
-            <tr className="border-b border-border text-left text-[11px] uppercase tracking-wide text-muted-foreground/70">
+        <Table><Table.ScrollContainer><Table.Content aria-label="Tarefas" className="w-full min-w-[640px] border-collapse text-[13px]">
+          <Table.Header>
               {selectMode && (
-                <th className="w-10 px-4 py-2.5 font-medium">
-                  <span
-                    role="checkbox"
-                    aria-checked={allSelected}
-                    aria-label={allSelected ? "Desmarcar todas" : "Selecionar todas"}
-                    tabIndex={0}
-                    onClick={() => onToggleAll?.()}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        onToggleAll?.();
-                      }
-                    }}
-                    className={cn(
-                      "flex size-5 cursor-pointer items-center justify-center rounded-md border outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-                      allSelected ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/50 bg-card",
-                    )}
-                  >
-                    {allSelected && <Check className="size-3.5" />}
-                  </span>
-                </th>
+                <Table.Column className="w-10 px-4 py-2.5 font-medium">
+                  <Checkbox slot={null} isSelected={!!allSelected} onChange={() => onToggleAll?.()} aria-label={allSelected ? "Desmarcar todas" : "Selecionar todas"}><Checkbox.Content><Checkbox.Control><Checkbox.Indicator /></Checkbox.Control></Checkbox.Content></Checkbox>
+                </Table.Column>
               )}
-              <th className="px-4 py-2.5 font-medium">Tarefa</th>
-              <th className="px-4 py-2.5 font-medium">Status</th>
-              <th className="px-4 py-2.5 font-medium">Prioridade</th>
-              <th className="px-4 py-2.5 font-medium">Prazo</th>
-              <th className="px-4 py-2.5 font-medium">Responsável</th>
-            </tr>
-          </thead>
-          <tbody>
+              <Table.Column isRowHeader className="px-4 py-2.5 font-medium">Tarefa</Table.Column>
+              <Table.Column className="px-4 py-2.5 font-medium">Status</Table.Column>
+              <Table.Column className="px-4 py-2.5 font-medium">Prioridade</Table.Column>
+              <Table.Column className="px-4 py-2.5 font-medium">Prazo</Table.Column>
+              <Table.Column className="px-4 py-2.5 font-medium">Responsável</Table.Column>
+            </Table.Header>
+          <Table.Body>
             {rows.map((t, idx) => {
               const done = t.status === "DONE";
               const sel = isSelected?.(t.id);
@@ -162,73 +120,56 @@ export function TaskList({
               const moreCount = Math.max(0, ids.length - 1);
               const subs = t.subtasks ?? [];
               return (
-                <tr
+                <Table.Row
+                  id={t.id}
                   key={t.id}
-                  onClick={(e) => activateRow(idx, t.id, e.shiftKey)}
+                  onAction={() => activateRow(idx, t.id, shiftPressed.current)}
                   className={cn(
                     "cursor-pointer border-b border-border/60 transition-colors last:border-0 hover:bg-card",
                     sel && "bg-primary/10",
                   )}
                 >
                   {selectMode && (
-                    <td className="px-4 py-2.5" onClick={(e) => e.stopPropagation()}>
-                      <span
-                        role="checkbox"
-                        aria-checked={sel}
-                        aria-label={`Selecionar tarefa: ${t.title}`}
-                        tabIndex={0}
-                        onClick={(e) => activateRow(idx, t.id, e.shiftKey)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault();
-                            activateRow(idx, t.id, e.shiftKey);
-                          }
-                        }}
-                        className={cn(
-                          "flex size-5 cursor-pointer items-center justify-center rounded-md border outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-                          sel ? "border-primary bg-primary text-primary-foreground" : "border-muted-foreground/50 bg-card",
-                        )}
-                      >
-                        {sel && <Check className="size-3.5" />}
-                      </span>
-                    </td>
+                    <Table.Cell className="px-4 py-2.5">
+                      <Checkbox slot={null} isSelected={!!sel} onChange={() => activateRow(idx, t.id, shiftPressed.current)} aria-label={`Selecionar tarefa: ${t.title}`}><Checkbox.Content><Checkbox.Control><Checkbox.Indicator /></Checkbox.Control></Checkbox.Content></Checkbox>
+                    </Table.Cell>
                   )}
-                  <td className="px-4 py-2.5">
+                  <Table.Cell className="px-4 py-2.5">
                     <span className={cn(done && "text-muted-foreground line-through")}>{t.title}</span>
                     {subs.length > 0 && (
                       <span className="ml-2 text-[11px] text-muted-foreground">
                         {subs.filter((s) => s.done).length}/{subs.length}
                       </span>
                     )}
-                  </td>
-                  <td className="px-4 py-2.5">
+                  </Table.Cell>
+                  <Table.Cell className="px-4 py-2.5">
                     <span className="flex items-center gap-2 text-muted-foreground">
                       <StatusDot status={t.status} />
                       {STATUS_LABEL[t.status]}
                     </span>
-                  </td>
-                  <td className="px-4 py-2.5 text-muted-foreground">{PRIO_LABEL[t.priority]}</td>
-                  <td className={cn("px-4 py-2.5", attention ? "text-amber" : "text-muted-foreground")}>
+                  </Table.Cell>
+                  <Table.Cell className="px-4 py-2.5 text-muted-foreground">{PRIO_LABEL[t.priority]}</Table.Cell>
+                  <Table.Cell className={cn("px-4 py-2.5", attention ? "text-amber" : "text-muted-foreground")}>
                     {due.label || "—"}
-                  </td>
-                  <td className="px-4 py-2.5">
+                  </Table.Cell>
+                  <Table.Cell className="px-4 py-2.5">
                     {ids.length === 0 ? (
                       <span className="text-muted-foreground/50">—</span>
                     ) : (
                       <span className="flex items-center gap-2">
-                        <span className="flex size-[22px] shrink-0 items-center justify-center rounded-full border border-muted-foreground/40 bg-accent text-[10px] font-medium text-foreground">
+                        <span className="flex size-[22px] shrink-0 items-center justify-center rounded-full border border-muted-foreground/40 bg-surface-tertiary text-[10px] font-medium text-foreground">
                           {firstName ? initials(firstName) : <User className="size-3 text-muted-foreground" />}
                         </span>
                         <span className="text-muted-foreground">{firstName ?? "Sem acesso"}</span>
                         {moreCount > 0 && <span className="text-[11px] text-muted-foreground/70">+{moreCount}</span>}
                       </span>
                     )}
-                  </td>
-                </tr>
+                  </Table.Cell>
+                </Table.Row>
               );
             })}
-          </tbody>
-        </table>
+          </Table.Body>
+        </Table.Content></Table.ScrollContainer></Table>
       </div>
     </div>
   );

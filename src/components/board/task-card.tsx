@@ -1,3 +1,5 @@
+import { Avatar, Card, ProgressBar } from "@heroui/react";
+import { Button } from "@/components/ui/button";
 import { User } from "lucide-react";
 import type { Task } from "@/lib/types";
 import type { TaskPriority } from "@sistema-tasks/contracts";
@@ -30,16 +32,16 @@ function AvatarStack({ ids, membersById }: { ids: string[]; membersById: Record<
       {shown.map((id, i) => {
         const name = membersById[id];
         return (
-          <span
+          <Avatar
             key={id}
             title={name ?? "Sem acesso ao cliente"}
             className={cn(
-              "flex size-[22px] items-center justify-center rounded-full border border-background bg-accent text-[10px] font-medium text-foreground ring-1 ring-muted-foreground/30",
+              "flex size-[22px] items-center justify-center rounded-full border border-background bg-surface-tertiary text-[10px] font-medium text-foreground ring-1 ring-muted-foreground/30",
               i > 0 && "-ml-2",
             )}
           >
-            {name ? initials(name) : <User className="size-3 text-muted-foreground" />}
-          </span>
+            <Avatar.Fallback>{name ? initials(name) : <User className="size-3 text-muted-foreground" />}</Avatar.Fallback>
+          </Avatar>
         );
       })}
       {extra > 0 && (
@@ -76,29 +78,13 @@ export function TaskCard({
   const subDone = subs.filter((s) => s.done).length;
   const kicker = clientName ? (projectName ? `${clientName} · ${projectName}` : clientName) : undefined;
 
-  return (
-    <article
-      onClick={onOpen}
-      role={asButton ? "button" : undefined}
-      tabIndex={asButton ? 0 : undefined}
-      aria-label={asButton ? task.title : undefined}
-      onKeyDown={
-        asButton
-          ? (e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onOpen?.();
-              }
-            }
-          : undefined
-      }
-      className={cn(
-        "rounded-xl border border-border bg-card p-3 transition-colors hover:border-muted-foreground/40",
-        onOpen && "cursor-pointer",
-        asButton && "outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        urgent && "rounded-l-none border-l-[3px] border-l-amber",
-      )}
-    >
+  const className = cn(
+    "block w-full rounded-xl border border-border bg-card p-3.5 text-left shadow-none transition-[border-color,box-shadow] hover:border-primary/35",
+    onOpen && "cursor-pointer",
+    asButton && "outline-none focus-visible:ring-2 focus-visible:ring-ring",
+    urgent && "border-amber/45",
+  );
+  const content = <>
       {kicker && (
         <div className={cn("mb-1 truncate text-[11px] text-muted-foreground", dragHandleSpace && "pr-8")} title={kicker}>
           {kicker}
@@ -114,7 +100,7 @@ export function TaskCard({
               {bars.map((h, i) => (
                 <i
                   key={i}
-                  className={cn("block w-[3px] rounded-sm bg-muted-foreground", task.priority === "HIGH" && "bg-foreground")}
+                  className={cn("block w-[3px] rounded-sm bg-surface-secondary-foreground", task.priority === "HIGH" && "bg-foreground")}
                   style={{ height: h }}
                 />
               ))}
@@ -140,10 +126,8 @@ export function TaskCard({
         <AvatarStack ids={assigneeIdsOf(task)} membersById={membersById} />
       </div>
       {subs.length > 0 && !done && (
-        <div className="mt-2.5 h-1 overflow-hidden rounded-full bg-border">
-          <i className="block h-full bg-muted-foreground" style={{ width: `${(subDone / subs.length) * 100}%` }} />
-        </div>
+        <ProgressBar aria-label="Subtarefas concluídas" value={subDone} maxValue={subs.length} className="mt-3" size="sm"><ProgressBar.Track className="h-1 bg-border"><ProgressBar.Fill className="bg-primary" /></ProgressBar.Track></ProgressBar>
       )}
-    </article>
-  );
+    </>;
+  return asButton ? <Button variant="unstyled" aria-label={task.title} onClick={onOpen} className={className}>{content}</Button> : <Card className={className}>{content}</Card>;
 }

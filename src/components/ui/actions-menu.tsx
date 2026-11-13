@@ -1,4 +1,5 @@
 "use client";
+import { Button } from "./button";
 
 import * as React from "react";
 import { MoreVertical } from "lucide-react";
@@ -43,12 +44,12 @@ export function ActionsMenu({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button
+        <Button variant="unstyled"
           type="button"
           aria-label={label}
           onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
-          onKeyDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => { if (!("continuePropagation" in e)) e.stopPropagation(); }}
           className={cn(
             "relative flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
             className,
@@ -57,7 +58,7 @@ export function ActionsMenu({
           {/* área de toque 44px sem inflar o ícone */}
           <span aria-hidden className="absolute -inset-2" />
           <MoreVertical className="size-[17px]" />
-        </button>
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[10rem]">
         {ordered.map((item, i) => {
@@ -71,7 +72,7 @@ export function ActionsMenu({
                 <DropdownMenuItem
                   aria-disabled="true"
                   onSelect={(e) => e.preventDefault()}
-                  className="cursor-default flex-col items-start gap-0.5 text-muted-foreground/60 focus:bg-accent/40 focus:text-muted-foreground/60"
+                  className="cursor-default flex-col items-start gap-0.5 text-muted-foreground/60 focus:bg-surface-tertiary/40 focus:text-muted-foreground/60"
                 >
                   <span className="flex items-center gap-2">
                     <Icon className="size-4" />

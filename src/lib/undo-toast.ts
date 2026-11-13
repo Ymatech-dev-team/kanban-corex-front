@@ -1,4 +1,4 @@
-import { toast } from "sonner";
+import { toast } from "@/components/ui/toast";
 
 /**
  * Toast de "Desfazer" pós-exclusão (soft-delete + undo). Janela de 8s (maior que o default do sonner

@@ -1,3 +1,4 @@
+import { Card, Table } from "@heroui/react";
 import { AlertTriangle } from "lucide-react";
 import { formatBRL } from "@/lib/money";
 import { formatMinutesAsHours } from "@/lib/duration";
@@ -5,11 +6,11 @@ import type { ProjectCost } from "@/lib/types";
 
 function CostCard({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-border bg-card p-4">
+    <Card className="gap-2 border border-border bg-card p-4">
       <div className="text-[12px] text-muted-foreground">{label}</div>
       <div className="text-2xl font-medium tracking-tight tabular-nums">{value}</div>
       <div className="text-[12px] text-muted-foreground">{hint}</div>
-    </div>
+    </Card>
   );
 }
 
@@ -66,29 +67,26 @@ export function CostSummary({ data }: { data: ProjectCost }) {
         <>
           <div className="mb-2 text-[13px] font-medium text-muted-foreground">Por pessoa</div>
           <div className="overflow-x-auto rounded-xl border border-border bg-card">
-            <table className="w-full min-w-[560px] border-collapse text-[13px]">
-              <caption className="sr-only">Custo por pessoa</caption>
-              <thead>
-                <tr className="border-b border-border text-[11px] uppercase tracking-wide text-muted-foreground/70">
-                  <th scope="col" className="px-4 py-2.5 text-left font-medium">Pessoa</th>
-                  <th scope="col" className="px-4 py-2.5 text-right font-medium">Realizado</th>
-                  <th scope="col" className="px-4 py-2.5 text-right font-medium">Planejado</th>
-                  <th scope="col" className="px-4 py-2.5 text-right font-medium">Horas em aberto</th>
-                </tr>
-              </thead>
-              <tbody>
+            <Table variant="secondary"><Table.ScrollContainer><Table.Content aria-label="Custo por pessoa" className="w-full min-w-[560px] border-collapse text-[13px]">
+              <Table.Header>
+                  <Table.Column id="column-1" isRowHeader className="px-4 py-2.5 text-left font-medium">Pessoa</Table.Column>
+                  <Table.Column id="column-2" className="px-4 py-2.5 text-right font-medium">Realizado</Table.Column>
+                  <Table.Column id="column-3" className="px-4 py-2.5 text-right font-medium">Planejado</Table.Column>
+                  <Table.Column id="column-4" className="px-4 py-2.5 text-right font-medium">Horas em aberto</Table.Column>
+                </Table.Header>
+              <Table.Body>
                 {data.porPessoa.map((p) => (
-                  <tr key={p.userId} className="border-b border-border/60 last:border-0">
-                    <th scope="row" className="px-4 py-2.5 text-left font-normal">{p.name}</th>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{formatBRL(p.realizadoCents)}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums">{formatBRL(p.planejadoCents)}</td>
-                    <td className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">
+                  <Table.Row id={p.userId} key={p.userId} className="border-b border-border/60 last:border-0">
+                    <Table.Cell className="px-4 py-2.5 text-left">{p.name}</Table.Cell>
+                    <Table.Cell className="px-4 py-2.5 text-right tabular-nums">{formatBRL(p.realizadoCents)}</Table.Cell>
+                    <Table.Cell className="px-4 py-2.5 text-right tabular-nums">{formatBRL(p.planejadoCents)}</Table.Cell>
+                    <Table.Cell className="px-4 py-2.5 text-right tabular-nums text-muted-foreground">
                       {formatMinutesAsHours(p.horasAbertoMin)}
-                    </td>
-                  </tr>
+                    </Table.Cell>
+                  </Table.Row>
                 ))}
-              </tbody>
-            </table>
+              </Table.Body>
+            </Table.Content></Table.ScrollContainer></Table>
           </div>
         </>
       )}

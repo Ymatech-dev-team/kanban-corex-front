@@ -1,5 +1,7 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { Task } from "@/lib/types";
@@ -64,30 +66,30 @@ export function TaskCalendar({
           {title}
         </h2>
         <div className="flex items-center gap-0.5">
-          <button
+          <Button variant="unstyled"
             type="button"
             aria-label="Mês anterior"
             onClick={() => goToMonth(-1)}
             className="flex size-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-card hover:text-foreground lg:size-7"
           >
             <ChevronLeft className="size-4" />
-          </button>
-          <button
+          </Button>
+          <Button variant="unstyled"
             type="button"
             aria-label="Próximo mês"
             onClick={() => goToMonth(1)}
             className="flex size-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-card hover:text-foreground lg:size-7"
           >
             <ChevronRight className="size-4" />
-          </button>
+          </Button>
         </div>
-        <button
+        <Button variant="unstyled"
           type="button"
           onClick={() => setCursor(firstOfThisMonth())}
           className="flex h-10 items-center rounded-md border border-border bg-card px-3 text-[12px] text-muted-foreground transition-colors hover:text-foreground lg:h-auto lg:px-2.5 lg:py-1"
         >
           Hoje
-        </button>
+        </Button>
       </div>
 
       {/* ===== Desktop: grade do mês (inalterada) ===== */}
@@ -126,7 +128,7 @@ export function TaskCalendar({
                   const done = t.status === "DONE";
                   const overdue = !done && t.dueDate != null && new Date(t.dueDate).getTime() < now;
                   return (
-                    <button
+                    <Button variant="unstyled"
                       key={t.id}
                       type="button"
                       onClick={() => onOpenTask(t.id)}
@@ -138,7 +140,7 @@ export function TaskCalendar({
                       )}
                     >
                       {t.title}
-                    </button>
+                    </Button>
                   );
                 })}
                 {dayTasks.length > 3 && (
@@ -161,13 +163,13 @@ export function TaskCalendar({
           <div className="flex h-full flex-col items-center justify-center gap-1 text-center">
             <p className="text-[13px] text-muted-foreground">Nenhuma tarefa com prazo em {title}.</p>
             {!cursorIsCurrentMonth && (
-              <button
+              <Button variant="unstyled"
                 type="button"
                 onClick={() => setCursor(firstOfThisMonth())}
                 className="text-[12px] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
               >
                 Voltar para o mês atual
-              </button>
+              </Button>
             )}
           </div>
         ) : (
@@ -176,13 +178,13 @@ export function TaskCalendar({
               <div className="flex flex-col items-start gap-1">
                 <p className="text-[13px] text-muted-foreground">Nenhuma tarefa com prazo em {title}.</p>
                 {!cursorIsCurrentMonth && (
-                  <button
+                  <Button variant="unstyled"
                     type="button"
                     onClick={() => setCursor(firstOfThisMonth())}
                     className="text-[12px] text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
                   >
                     Voltar para o mês atual
-                  </button>
+                  </Button>
                 )}
               </div>
             ) : (

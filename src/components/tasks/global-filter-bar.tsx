@@ -1,5 +1,7 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+
 import { useState } from "react";
 import { ChevronDown, ChevronRight, ListFilter, X } from "lucide-react";
 import type { TaskPriority } from "@sistema-tasks/contracts";
@@ -47,7 +49,7 @@ const PRAZO_LABEL = (p: PrazoPreset) => PRAZO_OPTS.find((o) => o.v === p)?.label
 const trigBase =
   "flex h-9 items-center gap-1.5 rounded-lg border px-2.5 text-[12.5px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50";
 const trigIdle = "border-border bg-card text-muted-foreground hover:text-foreground";
-const trigActive = "border-muted-foreground/40 bg-accent text-foreground";
+const trigActive = "border-muted-foreground/40 bg-surface-tertiary text-foreground";
 
 const VIEW_OPTS: { v: TaskView; label: string }[] = [
   { v: "kanban", label: "Kanban" },
@@ -59,18 +61,18 @@ function ViewSwitcher({ view, onView }: { view: TaskView; onView: (v: TaskView) 
   return (
     <div className="flex h-9 items-center gap-0.5 rounded-lg border border-border bg-card p-1 text-[12.5px]">
       {VIEW_OPTS.map((o) => (
-        <button
+        <Button variant="unstyled"
           key={o.v}
           type="button"
           onClick={() => onView(o.v)}
           aria-pressed={view === o.v}
           className={cn(
             "flex h-full items-center rounded-md px-3 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-            view === o.v ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground",
+            view === o.v ? "bg-surface-tertiary text-foreground" : "text-muted-foreground hover:text-foreground",
           )}
         >
           {o.label}
-        </button>
+        </Button>
       ))}
     </div>
   );
@@ -105,14 +107,14 @@ function Facet({
         </DropdownMenuContent>
       </DropdownMenu>
       {active && onClear && (
-        <button
+        <Button variant="unstyled"
           type="button"
           aria-label={`Limpar ${label}`}
           onClick={onClear}
-          className="flex h-9 items-center rounded-r-lg border border-l-0 border-muted-foreground/40 bg-accent pl-1 pr-2 text-muted-foreground transition-colors hover:text-foreground"
+          className="flex h-9 items-center rounded-r-lg border border-l-0 border-muted-foreground/40 bg-surface-tertiary pl-1 pr-2 text-muted-foreground transition-colors hover:text-foreground"
         >
           <X className="size-3.5" />
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -123,19 +125,19 @@ function Chip({ k, v, onRemove }: { k: string; v: string; onRemove: () => void }
     <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card py-1 pl-2.5 pr-1 text-[11.5px]">
       <span className="text-muted-foreground">{k}:</span>
       {v}
-      <button
+      <Button variant="unstyled"
         type="button"
         aria-label={`Remover filtro ${k}`}
         onClick={onRemove}
-        className="flex size-[15px] items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+        className="flex size-[15px] items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-surface-tertiary hover:text-foreground"
       >
         <X className="size-3" />
-      </button>
+      </Button>
     </span>
   );
 }
 
-/** Grupo de pills de escolha única (Status/Prioridade/Prazo) no sheet. Ativo = neutro (bg-accent). */
+/** Grupo de pills de escolha única (Status/Prioridade/Prazo) no sheet. Ativo = neutro (bg-surface-tertiary). */
 function PillGroup<T extends string>({
   label,
   selected,
@@ -154,7 +156,7 @@ function PillGroup<T extends string>({
         {options.map((o) => {
           const active = o.value === selected;
           return (
-            <button
+            <Button variant="unstyled"
               key={o.value ?? "_any"}
               type="button"
               role="radio"
@@ -162,11 +164,11 @@ function PillGroup<T extends string>({
               onClick={() => onSelect(o.value)}
               className={cn(
                 "flex h-10 items-center rounded-lg border px-3.5 text-[12.5px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-                active ? "border-muted-foreground/40 bg-accent text-foreground" : "border-border bg-card text-muted-foreground",
+                active ? "border-muted-foreground/40 bg-surface-tertiary text-foreground" : "border-border bg-card text-muted-foreground",
               )}
             >
               {o.label}
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -229,7 +231,7 @@ export function GlobalFilterBar({
       {/* ---------- MOBILE (< lg): view switcher + botão Filtros → bottom sheet ---------- */}
       <div className="flex items-center gap-2 px-4 py-2.5 lg:hidden">
         <ViewSwitcher view={view} onView={onView} />
-        <button
+        <Button variant="unstyled"
           type="button"
           onClick={() => setSheetOpen(true)}
           className={cn(trigBase, "ml-auto", mobileCount > 0 ? trigActive : trigIdle)}
@@ -241,7 +243,7 @@ export function GlobalFilterBar({
               {mobileCount}
             </span>
           )}
-        </button>
+        </Button>
       </div>
       <BottomSheet
         open={sheetOpen}
@@ -250,16 +252,16 @@ export function GlobalFilterBar({
         footer={
           <>
             {hasAnyFilter(filters) && (
-              <button
+              <Button variant="unstyled"
                 type="button"
                 onClick={() => onChange({ ...DEFAULT_FILTERS })}
                 className="text-[12.5px] text-muted-foreground underline decoration-muted-foreground/40 underline-offset-2 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
               >
                 Limpar filtros
-              </button>
+              </Button>
             )}
             {showOpenBoard && (
-              <button
+              <Button variant="unstyled"
                 type="button"
                 onClick={() => {
                   setSheetOpen(false);
@@ -269,15 +271,15 @@ export function GlobalFilterBar({
               >
                 Abrir projeto
                 <ChevronRight className="size-3.5" aria-hidden />
-              </button>
+              </Button>
             )}
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={() => setSheetOpen(false)}
               className="ml-auto inline-flex h-9 items-center rounded-lg bg-secondary px-4 text-[13px] font-medium text-secondary-foreground outline-none transition-colors hover:bg-secondary/80 focus-visible:ring-2 focus-visible:ring-ring"
             >
               {countLabel ? `Ver ${countLabel}` : "Fechar"}
-            </button>
+            </Button>
           </>
         }
       >
@@ -414,14 +416,14 @@ export function GlobalFilterBar({
           <div className="ml-auto flex items-center gap-3">
             <span className="text-[11.5px] text-muted-foreground" aria-live="polite">{countLabel}</span>
             {showOpenBoard && (
-              <button
+              <Button variant="unstyled"
                 type="button"
                 onClick={onOpenBoard}
                 className="inline-flex items-center gap-1 rounded-lg border border-border px-2.5 py-1.5 text-[12px] text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
               >
                 Abrir projeto
                 <ChevronRight className="size-3.5" aria-hidden />
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -433,13 +435,13 @@ export function GlobalFilterBar({
             {filters.prio && <Chip k="Prioridade" v={PRIO_LABEL(filters.prio)} onRemove={() => set({ prio: undefined })} />}
             {filters.prazo && <Chip k="Prazo" v={PRAZO_LABEL(filters.prazo)} onRemove={() => set({ prazo: undefined })} />}
             {hasAnyFilter(filters) && (
-              <button
+              <Button variant="unstyled"
                 type="button"
                 onClick={() => onChange({ ...DEFAULT_FILTERS })}
                 className="text-[11.5px] text-muted-foreground underline decoration-muted-foreground/40 underline-offset-2 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
               >
                 Limpar filtros
-              </button>
+              </Button>
             )}
           </div>
         )}

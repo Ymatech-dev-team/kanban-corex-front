@@ -1,5 +1,7 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+
 import { ChevronDown, Loader2, Trash2, X } from "lucide-react";
 import type { TaskStatus } from "@sistema-tasks/contracts";
 import {
@@ -53,7 +55,7 @@ export function BulkActionBar({
           <DropdownMenu>
             <DropdownMenuTrigger
               disabled={pending}
-              className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-[12.5px] text-foreground outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+              className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-[12.5px] text-foreground outline-none transition-colors hover:bg-surface-tertiary focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
             >
               Mover para
               <ChevronDown className="size-3.5 text-muted-foreground" aria-hidden />
@@ -69,19 +71,19 @@ export function BulkActionBar({
         )}
 
         {canDelete && (
-          <button
+          <Button variant="unstyled"
             type="button"
             disabled={pending}
             onClick={onDelete}
-            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12.5px] text-foreground outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+            className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[12.5px] text-foreground outline-none transition-colors hover:bg-surface-tertiary focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
           >
             <Trash2 className="size-3.5 text-muted-foreground" aria-hidden />
             Excluir
-          </button>
+          </Button>
         )}
 
         <span className="h-5 w-px bg-border" aria-hidden />
-        <button
+        <Button variant="unstyled"
           type="button"
           aria-label="Limpar seleção"
           disabled={pending}
@@ -90,7 +92,7 @@ export function BulkActionBar({
         >
           <X className="size-3.5" aria-hidden />
           Limpar
-        </button>
+        </Button>
       </div>
     </div>
   );

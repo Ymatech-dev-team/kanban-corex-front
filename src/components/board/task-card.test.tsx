@@ -1,5 +1,6 @@
+import userEvent from "@testing-library/user-event";
 import { render, screen } from "@testing-library/react";
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { TaskCard } from "./task-card";
 import type { Task } from "@/lib/types";
 
@@ -43,4 +44,13 @@ describe("TaskCard", () => {
     expect(screen.getByText("AL")).toBeInTheDocument(); // principal (iniciais)
     expect(screen.getByText("+1")).toBeInTheDocument(); // 4 responsáveis, mostra 3 + "+1"
   });
+});
+
+it("opens the task with the keyboard through the HeroUI button", async () => {
+  const open = vi.fn();
+  render(<TaskCard task={base} membersById={{}} onOpen={open} asButton />);
+  await userEvent.tab();
+  expect(screen.getByRole("button", {name: base.title})).toHaveFocus();
+  await userEvent.keyboard("{Enter}");
+  expect(open).toHaveBeenCalledTimes(1);
 });

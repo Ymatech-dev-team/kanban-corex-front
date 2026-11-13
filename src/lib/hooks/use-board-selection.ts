@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/toast";
 import { PERMISSIONS, type TaskStatus } from "@sistema-tasks/contracts";
 import type { Task } from "@/lib/types";
 import { useCan } from "@/lib/hooks/use-can";

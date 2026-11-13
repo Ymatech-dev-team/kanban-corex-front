@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Plus, Loader2, AlertTriangle, ShieldPlus } from "lucide-react";
 import type { AxiosError } from "axios";
 import { PERMISSIONS } from "@sistema-tasks/contracts";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/toast";
 import { useCan } from "@/lib/hooks/use-can";
 import { useRoles, useMembers, useDeleteRole, type AdminRole } from "@/lib/hooks/use-admin";
 import { Button } from "@/components/ui/button";
@@ -108,7 +108,7 @@ export default function PerfisPage() {
             ))}
             {/* Estado vazio: nenhum perfil personalizado ainda (o de sistema sempre existe). CTA se puder criar. */}
             {canManage && !(roles.data ?? []).some((r) => !r.isSystem) && (
-              <button
+              <Button variant="unstyled"
                 type="button"
                 onClick={openCreate}
                 className="flex min-h-[120px] flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-border p-4 text-center outline-none transition-colors hover:border-muted-foreground/40 focus-visible:ring-2 focus-visible:ring-ring"
@@ -118,7 +118,7 @@ export default function PerfisPage() {
                 <span className="text-[11.5px] text-muted-foreground/60">
                   Crie um perfil pra reaproveitar em vários membros
                 </span>
-              </button>
+              </Button>
             )}
           </div>
         )}

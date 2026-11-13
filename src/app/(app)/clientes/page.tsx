@@ -94,13 +94,13 @@ function ClientesTab({
   return (
     <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
       {clients.map((c) => (
-        <button
+        <Button variant="unstyled"
           key={c.id}
           type="button"
           onClick={() => onOpen(c.id)}
           className="group flex items-start gap-3 rounded-xl border border-border bg-card p-4 text-left transition-colors hover:border-muted-foreground/40"
         >
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-accent text-muted-foreground">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border bg-surface-tertiary text-muted-foreground">
             <Building2 className="size-[18px]" strokeWidth={1.8} />
           </span>
           <span className="min-w-0 flex-1">
@@ -110,7 +110,7 @@ function ClientesTab({
             </span>
           </span>
           <ChevronRight className="mt-1 size-4 shrink-0 text-muted-foreground/50 transition-colors group-hover:text-foreground" />
-        </button>
+        </Button>
       ))}
     </div>
   );

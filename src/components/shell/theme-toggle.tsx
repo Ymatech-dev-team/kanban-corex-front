@@ -1,24 +1,31 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { Sun, Moon } from "lucide-react";
 
 type Theme = "dark" | "light";
 
 /** Alterna claro/escuro. O tema inicial já foi aplicado pelo script anti-flash no <head>. */
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<Theme>("dark");
+  const [theme, setTheme] = useState<Theme>("light");
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
-    setTheme(document.documentElement.classList.contains("light") ? "light" : "dark");
+    const sync = () => setTheme(document.documentElement.classList.contains("dark") ? "dark" : "light");
+    sync();
+    const observer = new MutationObserver(sync);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
   }, []);
 
   function toggle() {
-    const next: Theme = theme === "dark" ? "light" : "dark";
+    const next: Theme = document.documentElement.classList.contains("dark") ? "light" : "dark";
     setTheme(next);
     document.documentElement.classList.toggle("light", next === "light");
+    document.documentElement.classList.toggle("dark", next === "dark");
+    document.documentElement.dataset.theme = next;
     // Cookie (não localStorage): o servidor lê e já renderiza o tema certo no próximo SSR.
     document.cookie = `sdt-theme=${next}; path=/; max-age=31536000; samesite=lax`;
   }
@@ -26,7 +33,7 @@ export function ThemeToggle() {
   const label = theme === "dark" ? "Ativar modo claro" : "Ativar modo escuro";
 
   return (
-    <button
+    <Button variant="unstyled"
       type="button"
       onClick={toggle}
       aria-label={label}
@@ -41,6 +48,6 @@ export function ThemeToggle() {
       ) : (
         <Moon className="size-[18px]" strokeWidth={1.8} />
       )}
-    </button>
+    </Button>
   );
 }

@@ -10,10 +10,10 @@ describe("workflow persisted history shapes", () => {
     [{ command: { summary: { objective: "Objetivo anterior", completed: ["Implementado"], remaining: ["Falta revisar"], blockers: ["Depende de decisão"], nextStep: "Retomar revisão", references: ["commit anterior"] } } }, ["Objetivo anterior", "Implementado", "Falta revisar", "Depende de decisão", "Retomar revisão", "commit anterior"]],
   ])("renders persisted user content without dumping raw JSON", async (payload, expected) => {
     fixture.payload = payload as Record<string, unknown>;
-    const { container } = render(<WorkflowHistory taskId="t" members={{ u: "Revisor" }} />);
-    const details = container.querySelector("details")!;
-    details.open = true;
-    fireEvent(details, new Event("toggle"));
+    render(<WorkflowHistory taskId="t" members={{ u: "Revisor" }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Histórico do fluxo" }));
+    expect(screen.getByRole("button", { name: "Histórico do fluxo" })).toHaveAttribute("aria-expanded", "true");
+    fireEvent.click(await screen.findByRole("button", { name: "Ver registro completo" }));
     for (const text of expected as string[]) expect(await screen.findByText(text, { exact: false })).toBeInTheDocument();
     expect(screen.queryByText(/\{"command"/)).not.toBeInTheDocument();
   });

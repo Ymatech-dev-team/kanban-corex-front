@@ -1,6 +1,8 @@
 "use client";
+import { Button } from "./button";
+import { Input } from "./input";
 
-import { useRef, useState, type KeyboardEvent, type FocusEvent } from "react";
+import { useRef, useState, useEffect, type KeyboardEvent, type FocusEvent } from "react";
 import { Loader2, Maximize2 } from "lucide-react";
 
 /**
@@ -26,6 +28,8 @@ export function QuickAddInput({
   const [value, setValue] = useState("");
   const [pending, setPending] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const restoreInputFocus = useRef(false);
+  useEffect(() => {if (!pending && restoreInputFocus.current) {restoreInputFocus.current = false;inputRef.current?.focus();}}, [pending]);
 
   async function submit() {
     const v = value.trim();
@@ -34,7 +38,7 @@ export function QuickAddInput({
     try {
       await onSubmit(v);
       setValue(""); // limpa e mantém o foco pra criar a próxima em série
-      inputRef.current?.focus();
+      restoreInputFocus.current = true;
     } catch {
       // mantém o texto pra reenvio; o erro já vira toast no hook
     } finally {
@@ -65,7 +69,7 @@ export function QuickAddInput({
       className="flex flex-col gap-1.5 rounded-xl border border-primary/60 bg-card p-2 ring-1 ring-primary/20"
     >
       <div className="flex items-center gap-1.5">
-        <input
+        <Input
           ref={inputRef}
           value={value}
           autoFocus
@@ -80,7 +84,7 @@ export function QuickAddInput({
         />
         {pending && <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" aria-hidden />}
         {onExpand && (
-          <button
+          <Button variant="unstyled"
             type="button"
             aria-label="Abrir completo"
             disabled={pending}
@@ -88,7 +92,7 @@ export function QuickAddInput({
             className="shrink-0 rounded p-1.5 text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
           >
             <Maximize2 className="size-4" />
-          </button>
+          </Button>
         )}
       </div>
       <div className="flex items-center justify-between border-t border-border pt-1.5">
@@ -96,14 +100,14 @@ export function QuickAddInput({
           <span className="text-foreground/80">Enter</span> cria e continua ·{" "}
           <span className="text-foreground/80">Esc</span> fecha
         </span>
-        <button
+        <Button variant="unstyled"
           type="button"
           onClick={submit}
           disabled={!value.trim() || pending}
           className="rounded-md bg-primary px-3 py-1 text-[11.5px] font-medium text-primary-foreground outline-none transition-colors hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
         >
           Criar
-        </button>
+        </Button>
       </div>
     </div>
   );

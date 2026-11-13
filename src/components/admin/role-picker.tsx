@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { useRef } from "react";
 import { Check } from "lucide-react";
 import type { AdminRole } from "@/lib/hooks/use-admin";
@@ -45,7 +46,7 @@ export function RolePicker({
       {options.map((opt, i) => {
         const selected = value === opt.id;
         return (
-          <button
+          <Button variant="unstyled"
             key={opt.id ?? "none"}
             ref={(el) => {
               refs.current[i] = el;
@@ -57,7 +58,7 @@ export function RolePicker({
             onClick={() => onChange(opt.id)}
             className={cn(
               "flex items-center justify-between rounded-lg border px-3 py-2.5 text-left text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-              selected ? "border-muted-foreground/40 bg-accent" : "border-border hover:border-muted-foreground/30",
+              selected ? "border-muted-foreground/40 bg-surface-tertiary" : "border-border hover:border-muted-foreground/30",
             )}
           >
             <span>
@@ -65,7 +66,7 @@ export function RolePicker({
               <span className="ml-2 text-muted-foreground">{opt.hint}</span>
             </span>
             {selected && <Check className="size-4 text-primary" aria-hidden="true" />}
-          </button>
+          </Button>
         );
       })}
     </div>

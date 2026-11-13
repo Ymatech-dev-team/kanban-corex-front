@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/toast";
 import { api } from "@/lib/api";
 import { errorCode, tasksKey } from "@/lib/hooks/use-tasks";
 import type { Project } from "@/lib/types";

@@ -189,13 +189,13 @@ export function ActivityTab({
         ) : q.isError ? (
           <div className="rounded-lg border border-border bg-card p-4 text-[13px] text-muted-foreground">
             Não foi possível carregar a atividade.{" "}
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={() => q.refetch()}
               className="rounded-sm text-foreground underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               Tentar de novo
-            </button>
+            </Button>
           </div>
         ) : items.length === 0 ? (
           <p className="py-6 text-center text-[13px] text-muted-foreground">Sem atividade ainda. Comente abaixo.</p>
@@ -205,7 +205,7 @@ export function ActivityTab({
             {items.map((e) =>
               e.type === "COMMENT" ? (
                 <div key={e.id} role="article" className="relative mb-3.5 last:mb-0">
-                  <span className="absolute -left-[26px] flex size-[22px] items-center justify-center rounded-full bg-accent text-[10px] font-medium text-foreground">
+                  <span className="absolute -left-[26px] flex size-[22px] items-center justify-center rounded-full bg-surface-tertiary text-[10px] font-medium text-foreground">
                     {initials(e.actorName)}
                   </span>
                   <div className="rounded-lg border border-border bg-card px-3 py-2">
@@ -221,22 +221,22 @@ export function ActivityTab({
                       </time>
                       {e.canManage && e.body !== null && editing?.id !== e.id && (
                         <span className="ml-auto flex gap-1">
-                          <button
+                          <Button variant="unstyled"
                             type="button"
                             aria-label="Editar comentário"
                             onClick={() => setEditing({ id: e.id, body: e.body ?? "" })}
                             className="rounded-sm text-muted-foreground/70 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
                           >
                             <Pencil className="size-3.5" />
-                          </button>
-                          <button
+                          </Button>
+                          <Button variant="unstyled"
                             type="button"
                             aria-label="Remover comentário"
                             onClick={() => setConfirmDel(e.id)}
                             className="rounded-sm text-muted-foreground/70 outline-none transition-colors hover:text-amber focus-visible:ring-2 focus-visible:ring-ring"
                           >
                             <Trash2 className="size-3.5" />
-                          </button>
+                          </Button>
                         </span>
                       )}
                     </div>
@@ -266,7 +266,7 @@ export function ActivityTab({
                     {confirmDel === e.id && (
                       <div className="mt-2 flex items-center gap-2 text-[12px] text-muted-foreground">
                         Remover este comentário?
-                        <button
+                        <Button variant="unstyled"
                           type="button"
                           disabled={del.isPending}
                           onClick={() => {
@@ -276,14 +276,14 @@ export function ActivityTab({
                           className="rounded-sm font-medium text-destructive outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
                         >
                           Remover
-                        </button>
-                        <button
+                        </Button>
+                        <Button variant="unstyled"
                           type="button"
                           onClick={() => setConfirmDel(null)}
                           className="rounded-sm outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
                         >
                           Cancelar
-                        </button>
+                        </Button>
                       </div>
                     )}
                   </div>
@@ -307,14 +307,14 @@ export function ActivityTab({
 
             {q.hasNextPage && (
               <div className="mt-3 text-center">
-                <button
+                <Button variant="unstyled"
                   type="button"
                   onClick={() => q.fetchNextPage()}
                   disabled={q.isFetchingNextPage}
                   className="rounded-md border border-border px-3 py-1.5 text-[12.5px] text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
                 >
                   {q.isFetchingNextPage ? "Carregando…" : "Carregar mais"}
-                </button>
+                </Button>
               </div>
             )}
           </div>

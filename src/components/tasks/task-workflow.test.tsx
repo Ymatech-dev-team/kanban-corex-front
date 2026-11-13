@@ -1,3 +1,4 @@
+import userEvent from "@testing-library/user-event";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TaskWorkflow } from "./task-workflow";
@@ -56,7 +57,8 @@ it("freezes request action version while user composes a question", async () => 
   mock.write.mockResolvedValue({});
   const { rerender } = view();
   fireEvent.click(screen.getByRole("button", { name: "Solicitar ação" }));
-  fireEvent.change(screen.getByLabelText("Destinatário"), { target: { value: "reviewer" } });
+  await userEvent.click(screen.getByRole("button", { name: /Destinatário/ }));
+  await userEvent.click(await screen.findByRole("option", { name: "Revisor" }));
   fireEvent.change(screen.getByLabelText("Pergunta e contexto"), { target: { value: "Qual direção?" } });
   rerender(<TaskWorkflow taskId="t1" query={query({ data: { ...query().data, state: { ...state, version: 9 } } })} members={{ executor: "Executor", reviewer: "Revisor" }} onDirtyChange={dirty} />);
   fireEvent.click(screen.getByRole("button", { name: /^Registrar$/ }));
@@ -127,7 +129,7 @@ it("keeps autonomous review with the agent without a final acceptance button", (
 it("keeps the full technical report behind a disclosure", () => {
   view(query({ data: { ...query().data, state: { ...state, reviews: [{ ...state.reviews[0], summary: "Relatório técnico extenso" }] } } }));
   const report = screen.getByText("Relatório técnico extenso");
-  expect(report.closest("details")).not.toHaveAttribute("open");
+  expect(screen.getByRole("button", { name: "Relatório da revisão e evidências" })).toHaveAttribute("aria-expanded", "false");
   fireEvent.click(screen.getByText("Relatório da revisão e evidências"));
   expect(report).toBeInTheDocument();
 });
@@ -196,4 +198,17 @@ it("hands agent execution back to autonomous review without selecting a human re
   await waitFor(()=>expect(mock.write).toHaveBeenCalled());
   const command=mock.write.mock.calls[0][0].command;
   expect(command.reviewMode).toBe("AGENT"); expect(command).not.toHaveProperty("reviewerId");
+});
+
+it("labels the blocking finding checkbox and preserves the selected boolean in the command", async () => {
+  mock.write.mockResolvedValue({}); view();
+  await userEvent.click(screen.getByRole("button", {name: "Registrar achado"}));
+  const checkbox = screen.getByRole("checkbox", {name: "Bloqueia aprovação"});
+  expect(checkbox).toBeChecked();
+  await userEvent.click(screen.getByText("Bloqueia aprovação"));
+  expect(checkbox).not.toBeChecked();
+  fireEvent.change(screen.getByLabelText("O que precisa ser corrigido"), {target: {value: "Ajuste visual"}});
+  fireEvent.change(screen.getByLabelText("Critério afetado"), {target: {value: "Interface legível"}});
+  await userEvent.click(screen.getByRole("button", {name: /^Registrar$/}));
+  await waitFor(() => expect(mock.write).toHaveBeenCalledWith(expect.objectContaining({command: expect.objectContaining({type: "record_finding", blocking: false})})));
 });

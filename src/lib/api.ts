@@ -1,6 +1,6 @@
 import axios, { CanceledError, type InternalAxiosRequestConfig } from "axios";
 import type { QueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/toast";
 
 let queryClient: QueryClient | null = null;
 export function setApiQueryClient(client: QueryClient) {

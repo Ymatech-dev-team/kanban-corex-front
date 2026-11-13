@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AxiosError } from "axios";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/toast";
 import { Camera, Loader2, Trash2, UserRound, ShieldCheck, AlertTriangle } from "lucide-react";
 import { PERMISSIONS } from "@sistema-tasks/contracts";
 import { useMe } from "@/lib/hooks/use-me";
@@ -117,7 +117,7 @@ function ProfileHeader({
       <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:gap-5 sm:text-left">
         <div className="relative shrink-0" aria-busy={busy}>
           <span
-            className="flex size-24 items-center justify-center overflow-hidden rounded-full border border-muted-foreground/25 bg-accent text-2xl font-medium text-foreground sm:size-28"
+            className="flex size-24 items-center justify-center overflow-hidden rounded-full border border-muted-foreground/25 bg-surface-tertiary text-2xl font-medium text-foreground sm:size-28"
             aria-label={avatarUrl ? `Foto de ${name}` : `Iniciais de ${name}`}
           >
             {avatarUrl ? (
@@ -134,7 +134,7 @@ function ProfileHeader({
             </span>
           )}
 
-          <button
+          <Button variant="unstyled"
             type="button"
             onClick={() => fileRef.current?.click()}
             disabled={busy}
@@ -142,7 +142,7 @@ function ProfileHeader({
             className="absolute -bottom-0.5 -right-0.5 flex size-9 items-center justify-center rounded-full border-2 border-card bg-primary text-primary-foreground outline-none transition hover:bg-primary/90 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60"
           >
             <Camera className="size-4" />
-          </button>
+          </Button>
           <input
             ref={fileRef}
             type="file"
@@ -159,17 +159,17 @@ function ProfileHeader({
           <div className="truncate text-lg font-medium">{name}</div>
           <div className="truncate text-[13px] text-muted-foreground">{email}</div>
           <div className="mt-2 flex flex-wrap items-center justify-center gap-2 sm:justify-start">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-accent px-2.5 py-0.5 text-[11.5px] text-foreground">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-surface-tertiary px-2.5 py-0.5 text-[11.5px] text-foreground">
               <span className="size-1.5 rounded-full bg-primary" aria-hidden /> {isAdmin ? "Administrador" : "Membro"}
             </span>
             {avatarUrl && !busy && (
-              <button
+              <Button variant="unstyled"
                 type="button"
                 onClick={() => setConfirmRemove(true)}
                 className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11.5px] text-muted-foreground outline-none transition hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <Trash2 className="size-3.5" /> Remover foto
-              </button>
+              </Button>
             )}
           </div>
         </div>

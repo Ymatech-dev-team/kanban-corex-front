@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/toast";
 import { ArrowLeft, ChevronDown, FolderX, ListChecks, ListFilter, Loader2, X } from "lucide-react";
 import { PERMISSIONS, type TaskStatus } from "@sistema-tasks/contracts";
 import { useProject, useProjects } from "@/lib/hooks/use-projects";
@@ -245,18 +245,18 @@ export function ProjectBoard({
   const renderTabs = (containerClass: string) => (
     <div className={containerClass}>
       {VIEWS.map((v) => (
-        <button
+        <Button variant="unstyled"
           key={v.key}
           type="button"
           onClick={() => setView(v.key)}
           aria-pressed={effectiveView === v.key}
           className={cn(
             "shrink-0 rounded-md px-3 py-1 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-            effectiveView === v.key ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground",
+            effectiveView === v.key ? "bg-surface-tertiary text-foreground" : "text-muted-foreground hover:text-foreground",
           )}
         >
           {v.label}
-        </button>
+        </Button>
       ))}
     </div>
   );
@@ -290,15 +290,15 @@ export function ProjectBoard({
       {/* ---------- MOBILE header (< lg): voltar + breadcrumb/sheet + abas roláveis ---------- */}
       <header className="flex flex-col gap-2 border-b border-border px-4 py-2.5 lg:hidden">
         <div className="flex items-center gap-2">
-          <button
+          <Button variant="unstyled"
             type="button"
             aria-label="Voltar para o cliente"
             onClick={() => router.push(`/clientes/${clientId}`)}
             className="flex size-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
           >
             <ArrowLeft className="size-4" />
-          </button>
-          <button
+          </Button>
+          <Button variant="unstyled"
             type="button"
             onClick={() => setSheetOpen(true)}
             className="flex h-10 min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-[12.5px] outline-none transition-colors hover:border-muted-foreground/40 focus-visible:ring-2 focus-visible:ring-ring"
@@ -307,14 +307,14 @@ export function ProjectBoard({
             <span className="shrink-0 text-muted-foreground/60">›</span>
             <span className="truncate text-muted-foreground">{current?.name ?? "Projeto"}</span>
             <ChevronDown className="ml-auto size-3.5 shrink-0 text-muted-foreground" aria-hidden />
-          </button>
-          <button
+          </Button>
+          <Button variant="unstyled"
             type="button"
             aria-label="Filtros do quadro"
             onClick={() => setSheetOpen(true)}
             className={cn(
               "flex h-10 shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-[12.5px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-              activeCount > 0 ? "border-muted-foreground/40 bg-accent text-foreground" : "border-border bg-card text-muted-foreground hover:text-foreground",
+              activeCount > 0 ? "border-muted-foreground/40 bg-surface-tertiary text-foreground" : "border-border bg-card text-muted-foreground hover:text-foreground",
             )}
           >
             <ListFilter className="size-3.5" aria-hidden />
@@ -323,20 +323,20 @@ export function ProjectBoard({
                 {activeCount}
               </span>
             )}
-          </button>
+          </Button>
           {canSelect && (
-            <button
+            <Button variant="unstyled"
               type="button"
               aria-pressed={selectMode}
               aria-label={selectMode ? "Cancelar seleção" : "Selecionar tarefas"}
               onClick={enterOrExit}
               className={cn(
                 "flex size-10 shrink-0 items-center justify-center rounded-lg border outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-                selectMode ? "border-primary bg-accent text-primary" : "border-border bg-card text-muted-foreground hover:text-foreground",
+                selectMode ? "border-primary bg-surface-tertiary text-primary" : "border-border bg-card text-muted-foreground hover:text-foreground",
               )}
             >
               {selectMode ? <X className="size-4" aria-hidden /> : <ListChecks className="size-4" aria-hidden />}
-            </button>
+            </Button>
           )}
         </div>
         {renderTabs("flex gap-0.5 overflow-x-auto rounded-lg border border-border bg-card p-[3px] text-[12.5px]")}
@@ -349,21 +349,21 @@ export function ProjectBoard({
         footer={
           <>
             {canSave && (
-              <button
+              <Button variant="unstyled"
                 type="button"
                 onClick={() => changeFilters(EMPTY_BOARD_FILTERS)}
                 className="text-[12.5px] text-muted-foreground underline decoration-muted-foreground/40 underline-offset-2 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
               >
                 Limpar filtros
-              </button>
+              </Button>
             )}
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={() => setSheetOpen(false)}
               className="ml-auto inline-flex h-9 items-center rounded-lg bg-secondary px-4 text-[13px] font-medium text-secondary-foreground outline-none transition-colors hover:bg-secondary/80 focus-visible:ring-2 focus-visible:ring-ring"
             >
               Ver {visibleTasks.length} {visibleTasks.length === 1 ? "tarefa" : "tarefas"}
-            </button>
+            </Button>
           </>
         }
       >
@@ -409,14 +409,14 @@ export function ProjectBoard({
 
       {/* ---------- DESKTOP header (≥ lg): barra atual ---------- */}
       <header className="hidden flex-wrap items-center gap-3 border-b border-border px-6 py-3.5 lg:flex">
-        <button
+        <Button variant="unstyled"
           type="button"
           aria-label="Voltar para a página do cliente"
           onClick={() => router.push(`/clientes/${clientId}`)}
           className="inline-flex size-6 items-center justify-center rounded text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         >
           <ArrowLeft className="size-4" />
-        </button>
+        </Button>
 
         {/* Seletor de CLIENTE — só os clientes que o usuário acessa; some se houver apenas um. */}
         {(clients.data?.length ?? 0) > 1 ? (
@@ -471,7 +471,7 @@ export function ProjectBoard({
 
         <div className="ml-auto flex items-center gap-2">
           {canSelect && (
-            <button
+            <Button variant="unstyled"
               ref={selectBtnRef}
               type="button"
               aria-pressed={selectMode}
@@ -479,22 +479,22 @@ export function ProjectBoard({
               className={cn(
                 "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[12px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
                 selectMode
-                  ? "border-primary bg-accent text-primary"
+                  ? "border-primary bg-surface-tertiary text-primary"
                   : "border-border bg-card text-muted-foreground hover:text-foreground",
               )}
             >
               {selectMode ? <X className="size-3.5" aria-hidden /> : <ListChecks className="size-3.5" aria-hidden />}
               {selectMode ? "Cancelar" : "Selecionar"}
-            </button>
+            </Button>
           )}
           {canSave && (
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={() => changeFilters(EMPTY_BOARD_FILTERS)}
               className="text-[12px] text-muted-foreground underline decoration-muted-foreground/40 underline-offset-2 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
             >
               Limpar
-            </button>
+            </Button>
           )}
           <PresetsControl
             presets={presets.data ?? []}

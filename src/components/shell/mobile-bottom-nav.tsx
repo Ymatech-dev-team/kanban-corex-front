@@ -32,7 +32,7 @@ export function MobileBottomNav() {
             {/* ponteiro de ativo — barra fina no topo (amarelo só como ponteiro, cor contida) */}
             {on && <span aria-hidden className="absolute inset-x-4 top-0 h-0.5 rounded-full bg-primary" />}
             <Icon className="size-[22px]" strokeWidth={1.8} />
-            <span className="text-[10.5px] leading-none">{n.label}</span>
+            <span className="text-xs leading-none">{n.label}</span>
           </Link>
         );
       })}

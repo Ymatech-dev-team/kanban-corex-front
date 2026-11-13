@@ -1,4 +1,5 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ProjetosSection } from "./projetos-section";
 import { useEngagements } from "@/lib/hooks/use-engagements";
@@ -52,9 +53,9 @@ describe("ProjetosSection", () => {
     mockList.mockReturnValue(state([eng({ id: "gen-p1", name: "Projeto geral", isGeneral: true })]));
     render(<ProjetosSection projectId="p1" />);
     const trigger = screen.getByRole("button", { name: "Ações do projeto Projeto geral" });
-    trigger.focus();
-    fireEvent.keyDown(trigger, { key: "Enter" });
-    const remove = screen.getByRole("menuitem", { name: /Excluir.*não pode ser excluído/i });
+    act(() => trigger.focus());
+    await userEvent.keyboard("{Enter}");
+    const remove = await screen.findByRole("menuitem", { name: /Excluir.*não pode ser excluído/i });
     expect(remove).toHaveAttribute("aria-disabled", "true");
     fireEvent.click(remove);
     expect(screen.queryByRole("dialog", { name: "Excluir projeto" })).not.toBeInTheDocument();
@@ -65,9 +66,9 @@ describe("ProjetosSection", () => {
     mockList.mockReturnValue(state([eng({ id: "e2", name: "Rebranding" })]));
     render(<ProjetosSection projectId="p1" />);
     const trigger = screen.getByRole("button", { name: "Ações do projeto Rebranding" });
-    trigger.focus();
-    fireEvent.keyDown(trigger, { key: "Enter" });
-    const remove = screen.getByRole("menuitem", { name: "Excluir" });
+    act(() => trigger.focus());
+    await userEvent.keyboard("{Enter}");
+    const remove = await screen.findByRole("menuitem", { name: "Excluir" });
     expect(remove).not.toHaveAttribute("aria-disabled", "true");
     fireEvent.click(remove);
     expect(await screen.findByRole("dialog", { name: "Excluir projeto" })).toHaveTextContent("Rebranding");

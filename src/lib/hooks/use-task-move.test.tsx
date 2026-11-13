@@ -6,7 +6,7 @@ import type { Task } from "@/lib/types";
 import { useMoveTask, tasksKey } from "./use-tasks";
 import { api } from "@/lib/api";
 vi.mock("@/lib/api",()=>({api:{patch:vi.fn()}}));
-vi.mock("sonner",()=>({toast:{error:vi.fn()}}));
+vi.mock("@/components/ui/toast",()=>({toast:{error:vi.fn()}}));
 const task={id:"a",status:"TODO",position:1,updatedAt:"2026-11-12T00:00:00Z"} as Task;
 function setup(){const cache=new QueryClient({defaultOptions:{mutations:{retry:false},queries:{retry:false}}});cache.setQueryData(tasksKey("p"),[task,{...task,id:"b",title:"initial"}]);const invalidation=vi.spyOn(cache,"invalidateQueries");const wrapper=({children}:{children:ReactNode})=><QueryClientProvider client={cache}>{children}</QueryClientProvider>;return {...renderHook(()=>useMoveTask("p"),{wrapper}),cache,invalidation};}
 it("sends concurrency/idempotency and reconciles canonical updatedAt plus workflow",async()=>{const fresh={...task,status:"DONE",updatedAt:"2026-11-12T00:01:00Z"};vi.mocked(api.patch).mockResolvedValueOnce({data:fresh});const {result,cache,invalidation}=setup();await act(()=>result.current.mutateAsync({id:"a",status:"DONE",position:2,updatedAt:task.updatedAt,operationId:"operation"}));expect(api.patch).toHaveBeenCalledWith("/tasks/a/move",{status:"DONE",position:2},{headers:{"idempotency-key":"operation","x-expected-updated-at":task.updatedAt}});expect(cache.getQueryData<Task[]>(tasksKey("p"))?.[0].updatedAt).toBe(fresh.updatedAt);expect(invalidation).toHaveBeenCalledWith({queryKey:["workflow","a"]});cache.clear();});

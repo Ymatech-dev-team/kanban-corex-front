@@ -47,7 +47,7 @@ export function RoleCard({
       <div className="flex items-start gap-3">
         {/* Ícone do perfil: menta só no de sistema (marcador privilegiado); personalizado fica neutro. */}
         <span
-          className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-accent"
+          className="flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-surface-tertiary"
           aria-hidden
         >
           {role.isSystem ? (

@@ -1,6 +1,6 @@
+"use client";
+import { Skeleton as HeroSkeleton } from "@heroui/react";
 import { cn } from "@/lib/utils";
-
-/** Placeholder de carregamento (shadcn). Pulso suave sobre o tom neutro. */
-export function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div aria-hidden="true" className={cn("ui-skeleton rounded-md bg-muted", className)} {...props} />;
+export function Skeleton({className, ...props}: React.ComponentProps<"div">) {
+  return <HeroSkeleton aria-hidden="true" className={cn("rounded-md", className)} {...props} />;
 }

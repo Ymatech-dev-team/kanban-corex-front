@@ -9,13 +9,13 @@ describe("Button (design system)", () => {
     expect(screen.getByRole("button", { name: "Salvar" })).toBeInTheDocument();
   });
 
-  it("a variante primária usa o token primary + foreground near-black (invariante do amarelo)", () => {
+  it("a variante primária usa os tokens de contraste da marca", () => {
     const cls = buttonVariants({ variant: "default" });
     expect(cls).toContain("bg-primary");
     expect(cls).toContain("text-primary-foreground");
   });
 
-  it("asChild compõe o elemento filho (Slot)", () => {
+  it("asChild mantém a navegação do Link", () => {
     render(
       <Button asChild>
         <Link href="/x">Ir</Link>

@@ -11,6 +11,7 @@ import { dueState } from "@/lib/due";
 import { nextTasks, PRIORITY_LABEL } from "@/lib/focus";
 import { weekDaysMonday } from "@/lib/week";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 const DAY = 86_400_000;
@@ -149,12 +150,12 @@ export function TaskOverview() {
                         >
                           <div className="mt-auto flex w-full items-end justify-center">
                             <div
-                              className={cn("w-full rounded-t-md", isToday ? "bg-primary" : "bg-muted-foreground/25")}
+                              className={cn("w-full rounded-t-md", isToday ? "bg-primary" : "bg-surface-secondary-foreground/25")}
                               style={{ height: `${Math.max(c > 0 ? 8 : 0, (c / weekMax) * 92)}px` }}
                               aria-hidden
                             />
                           </div>
-                          <span className={cn("text-[10.5px]", isToday ? "text-primary" : "text-muted-foreground")}>
+                          <span className={cn("text-xs", isToday ? "text-primary" : "text-muted-foreground")}>
                             {WEEKDAY[i]}
                           </span>
                         </div>
@@ -189,21 +190,21 @@ export function TaskOverview() {
                       const due = dueState(t.dueDate, t.status, now);
                       return (
                         <li key={t.id}>
-                          <button
+                          <Button variant="unstyled"
                             type="button"
                             onClick={() => openTask(t)}
                             className={cn(
-                              "flex w-full items-center gap-3 rounded-lg border border-border bg-background px-3.5 py-2.5 text-left transition-colors hover:border-muted-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                              "flex w-full items-center gap-3 rounded-md border-b border-border bg-transparent px-3.5 py-2.5 text-left transition-colors hover:border-muted-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
                               due.state === "overdue" && "rounded-l-none border-l-[3px] border-l-amber",
                             )}
                           >
                             <span className="min-w-0 flex-1">
                               <span className="line-clamp-1 text-[13.5px]">{t.title}</span>
-                              <span className="text-[11.5px] text-muted-foreground">{projectsById[t.projectId] ?? "Cliente"}</span>
+                              <span className="text-xs text-muted-foreground">{projectsById[t.projectId] ?? "Cliente"}</span>
                             </span>
-                            <span className="shrink-0 text-[11.5px] text-amber">{due.label}</span>
+                            <span className="shrink-0 text-xs text-amber">{due.label}</span>
                             <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                          </button>
+                          </Button>
                         </li>
                       );
                     })}
@@ -214,22 +215,22 @@ export function TaskOverview() {
                     <ul className="flex flex-col gap-2">
                       {nextUp.map((t) => (
                         <li key={t.id}>
-                          <button
+                          <Button variant="unstyled"
                             type="button"
                             onClick={() => openTask(t)}
-                            className="flex w-full items-center gap-3 rounded-lg border border-border bg-background px-3.5 py-2.5 text-left transition-colors hover:border-muted-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            className="flex w-full items-center gap-3 rounded-md border-b border-border bg-transparent px-3.5 py-2.5 text-left transition-colors hover:border-muted-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           >
                             <span className="min-w-0 flex-1">
                               <span className="line-clamp-1 text-[13.5px]">{t.title}</span>
-                              <span className="text-[11.5px] text-muted-foreground">
+                              <span className="text-xs text-muted-foreground">
                                 {projectsById[t.projectId] ?? "Cliente"} · {PRIORITY_LABEL[t.priority] ?? "—"}
                               </span>
                             </span>
-                            <span className="shrink-0 text-[11.5px] text-muted-foreground">
+                            <span className="shrink-0 text-xs text-muted-foreground">
                               {t.dueDate ? dueState(t.dueDate, t.status, now).label : "sem prazo"}
                             </span>
                             <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                          </button>
+                          </Button>
                         </li>
                       ))}
                     </ul>
@@ -242,16 +243,16 @@ export function TaskOverview() {
                   <ul className="flex flex-col gap-2">
                     {doing.slice(0, 5).map((t) => (
                       <li key={t.id}>
-                        <button
+                        <Button variant="unstyled"
                           type="button"
                           onClick={() => openTask(t)}
-                          className="w-full rounded-lg border border-border bg-background px-3.5 py-2.5 text-left transition-colors hover:border-muted-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          className="flex w-full flex-col items-start rounded-md border-b border-border bg-transparent px-3.5 py-2.5 text-left transition-colors hover:border-muted-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
                           <span className="line-clamp-1 text-[13px]">{t.title}</span>
-                          <span className="mt-1 block text-[11px] text-muted-foreground">
+                          <span className="mt-1 block text-xs text-muted-foreground">
                             {projectsById[t.projectId] ?? "Cliente"} · {PRIORITY_LABEL[t.priority] ?? "—"}
                           </span>
-                        </button>
+                        </Button>
                       </li>
                     ))}
                   </ul>
@@ -266,18 +267,18 @@ export function TaskOverview() {
               <Card title="Seus clientes">
                 <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
                   {perClient.map((c) => (
-                    <button
+                    <Button variant="unstyled"
                       key={c.id}
                       type="button"
                       onClick={() => openClient(c.id)}
-                      className="flex items-center gap-3 rounded-lg border border-border bg-background px-3.5 py-2.5 text-left transition-colors hover:border-muted-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="flex items-center gap-3 rounded-md border-b border-border bg-transparent px-3.5 py-2.5 text-left transition-colors hover:border-muted-foreground/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       <span className="min-w-0 flex-1 truncate text-[13px]">{c.name}</span>
-                      <span className="shrink-0 text-[11.5px] text-muted-foreground">
+                      <span className="shrink-0 text-xs text-muted-foreground">
                         {c.count} {c.count === 1 ? "tarefa" : "tarefas"}
                       </span>
                       <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                    </button>
+                    </Button>
                   ))}
                 </div>
               </Card>
@@ -291,10 +292,10 @@ export function TaskOverview() {
 
 function Card({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl border border-border bg-card p-4">
+    <section className="min-w-0 border-t border-border py-5">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-[13px] font-medium tracking-tight">{title}</h2>
-        {hint && <span className="text-[11px] text-muted-foreground">{hint}</span>}
+        {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
       </div>
       {children}
     </section>
@@ -305,12 +306,12 @@ function Tile({ value, label, amber }: { value: number; label: string; amber?: b
   return (
     <div
       className={cn(
-        "rounded-xl border border-border bg-background px-3 py-2.5",
+        "border-l border-border px-3 py-2.5",
         amber && "rounded-l-none border-l-[2px] border-l-amber",
       )}
     >
-      <div className={cn("text-2xl font-semibold leading-none tracking-tight", amber && "text-amber")}>{value}</div>
-      <div className="mt-1.5 text-[11.5px] text-muted-foreground">{label}</div>
+      <div className={cn("text-3xl font-extrabold leading-none tracking-tight", amber && "text-amber")}>{value}</div>
+      <div className="mt-1.5 text-xs text-muted-foreground">{label}</div>
     </div>
   );
 }
@@ -341,7 +342,7 @@ function Donut({ pct }: { pct: number }) {
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className="text-xl font-semibold tracking-tight">{pct}%</span>
-        <span className="text-[10.5px] text-muted-foreground">concluído</span>
+        <span className="text-xs text-muted-foreground">concluído</span>
       </div>
     </div>
   );
@@ -363,12 +364,12 @@ function DashboardSkeleton() {
     <div className="flex flex-col gap-4">
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {[0, 1, 2].map((i) => (
-          <div key={i} className="h-[168px] animate-pulse rounded-2xl border border-border bg-card" />
+          <Skeleton key={i} className="h-[168px] rounded-lg" />
         ))}
       </div>
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.9fr_1fr]">
-        <div className="h-[240px] animate-pulse rounded-2xl border border-border bg-card" />
-        <div className="h-[240px] animate-pulse rounded-2xl border border-border bg-card" />
+        <Skeleton className="h-[240px] rounded-lg" />
+        <Skeleton className="h-[240px] rounded-lg" />
       </div>
     </div>
   );

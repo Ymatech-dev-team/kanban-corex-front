@@ -1,3 +1,4 @@
+import userEvent from "@testing-library/user-event";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createRef } from "react";
@@ -165,11 +166,11 @@ it("uses managed Resumo/Revisão/Histórico navigation and retains the dirty clo
   const summary = await screen.findByRole("tab", { name: "Resumo" });
   expect(summary).toHaveAttribute("aria-selected", "true");
   expect(screen.queryByRole("button", { name: "Detalhes" })).not.toBeInTheDocument();
-  expect(screen.getByText("Dados da tarefa").closest("details")).not.toHaveAttribute("open");
+  expect(screen.getByRole("button", { name: "Dados da tarefa" })).toHaveAttribute("aria-expanded", "false");
   fireEvent.click(screen.getByRole("button", { name: "Workflow operável" }));
-  fireEvent.click(screen.getByRole("tab", { name: "Revisão" }));
+  await userEvent.click(screen.getByRole("tab", { name: "Revisão" }));
   expect(screen.getByRole("tabpanel", { name: "Revisão" })).toBeInTheDocument();
-  fireEvent.keyDown(screen.getByRole("tab", { name: "Revisão" }), { key: "ArrowRight" });
+  await userEvent.keyboard("{ArrowRight}");
   expect(screen.getByRole("tab", { name: "Histórico" })).toHaveFocus();
   act(() => closeRef.current?.requestClose());
   expect(screen.getByRole("dialog")).toBeInTheDocument();

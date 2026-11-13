@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Lock, KeyRound, Trash2, Check } from "lucide-react";
 import type { AxiosError } from "axios";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/toast";
 import { META_PERMISSIONS, type CompensationType } from "@sistema-tasks/contracts";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -330,8 +330,8 @@ export function EditMemberDialog({
                   />
 
                   {addsMeta && (
-                    <div className="flex items-start gap-2.5 rounded-r-md border-l-2 border-primary bg-accent/40 px-3 py-2.5">
-                      <button
+                    <div className="flex items-start gap-2.5 rounded-r-md border-l-2 border-primary bg-surface-tertiary/40 px-3 py-2.5">
+                      <Button variant="unstyled"
                         type="button"
                         role="checkbox"
                         aria-checked={confirmMeta}
@@ -346,7 +346,7 @@ export function EditMemberDialog({
                         )}
                       >
                         <Check className="size-3" strokeWidth={3} aria-hidden="true" />
-                      </button>
+                      </Button>
                       <span id="em-meta-desc" className="text-[12.5px] text-muted-foreground">
                         Este perfil concede <span className="text-foreground">permissões de administração</span>.
                         Confirmo que quero dar esse nível de acesso a {member.name}.
@@ -373,18 +373,18 @@ export function EditMemberDialog({
                   <Label>Tipo</Label>
                   <div role="group" aria-label="Tipo de remuneração" className="flex gap-0.5 rounded-lg border border-border bg-card p-[3px]">
                     {COMP_TYPES.map((t) => (
-                      <button
+                      <Button variant="unstyled"
                         key={t.value}
                         type="button"
                         aria-pressed={compType === t.value}
                         onClick={() => setCompType(t.value)}
                         className={cn(
                           "flex-1 rounded-md px-3 py-1.5 text-[13px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-                          compType === t.value ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground",
+                          compType === t.value ? "bg-surface-tertiary text-foreground" : "text-muted-foreground hover:text-foreground",
                         )}
                       >
                         {t.label}
-                      </button>
+                      </Button>
                     ))}
                   </div>
                 </div>
@@ -417,13 +417,13 @@ export function EditMemberDialog({
                   )}
                 </div>
                 {hasComp && (
-                  <button
+                  <Button variant="unstyled"
                     type="button"
                     onClick={() => setAmount("")}
                     className="self-start rounded text-[12.5px] text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     Limpar valor
-                  </button>
+                  </Button>
                 )}
               </TabsContent>
             )}

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 // toast estável entre re-imports (resetModules recria o módulo, não o spy). [fix jornada-token]
 const { toastError } = vi.hoisted(() => ({ toastError: vi.fn() }));
-vi.mock("sonner", () => ({ toast: { error: toastError } }));
+vi.mock("@/components/ui/toast", () => ({ toast: { error: toastError } }));
 
 type ErrLike = {
   response?: { status?: number; data?: { error?: { code?: string } } };

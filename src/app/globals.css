@@ -1,140 +1,95 @@
 @import "tailwindcss";
+@import "@heroui/styles";
+@custom-variant dark (&:where(.dark, .dark *));
 
-/*
-  Design System — dark-first, identidade COREX. [reskin 2026-09-15]
-  3 camadas: primitivo → semântico (o que shadcn/Tailwind consomem) → componente.
-  Marca = verde-menta (acento, ≤10% da tela); texto SOBRE o verde = verde-escuro (nunca branco).
-  Os nomes --yma-* são históricos; os VALORES são Corex (troca de valor propaga o app inteiro).
-*/
-:root {
-  /* camada 1 — primitivos (único lugar com hex) — paleta Corex */
-  --yma-yellow-500: #34f5c5; /* verde-menta — cor de marca (acento) */
-  --primary-ink: #04231c; /* verde-escuro — texto/ícone SOBRE o verde */
-  --yma-neutral-950: #0a0d12; /* grafite — fundo */
-  --yma-neutral-900: #12161e; /* card / popover */
-  --yma-neutral-800: #161c25; /* superfície elevada / hover / accent */
-  --yma-neutral-700: #232a33; /* borda / input */
-  --yma-neutral-400: #9aa3ad; /* texto secundário */
-  --yma-neutral-50: #ffffff; /* texto principal (ink) */
-  --yma-red-500: #e3855a; /* danger / terracota (erro de form) */
-  /* nota: --color-amber (bg-amber/text-amber) aponta pro --primary (menta) — decisão do JP: "tudo menta".
-     Atraso/senha/botões destrutivos usam a cor de marca. Ver @theme inline abaixo. */
-
-  /* camada 2 — semânticos (dark-first) */
-  --background: var(--yma-neutral-950);
-  --foreground: var(--yma-neutral-50);
-  --card: var(--yma-neutral-900);
-  --card-foreground: var(--yma-neutral-50);
-  --popover: var(--yma-neutral-800);
-  --popover-foreground: var(--yma-neutral-50);
-  --primary: var(--yma-yellow-500);
-  --primary-foreground: var(--primary-ink); /* verde-escuro — nunca branco sobre a menta */
-  --secondary: var(--yma-neutral-800);
-  --secondary-foreground: var(--yma-neutral-50);
-  --muted: var(--yma-neutral-800);
-  --muted-foreground: var(--yma-neutral-400);
-  --accent: var(--yma-neutral-800);
-  --accent-foreground: var(--yma-neutral-50);
-  --destructive: var(--yma-red-500);
-  --destructive-foreground: var(--yma-neutral-50);
-  --border: var(--yma-neutral-700);
-  --input: var(--yma-neutral-700);
-  --ring: var(--yma-yellow-500);
-  --radius: 0.5rem;
-
-  color-scheme: dark;
-}
-
-/*
-  Modo claro — ativado por `.light` no <html>. A menta pura reprova contraste no branco, então a marca
-  vira teal escuro (ver abaixo). Como --color-amber segue o --primary, a "cor de atenção" também vira
-  o teal no claro automaticamente. [review UX / reskin Corex]
-*/
-:root.light {
-  /* primitivos claros */
-  --yma-l-bg: #f6f6f7;
-  --yma-l-surface: #ffffff;
-  --yma-l-100: #efeff1;
-  --yma-l-200: #e6e6e9;
-  --yma-l-text: #18181b;
-  --yma-l-muted: #6b6b74;
-
-  /* Marca no claro: a menta pura reprova contraste sobre branco (botão some, texto ilegível). Vira um
-     teal-Corex escuro que passa AA — botão sólido com TEXTO BRANCO. A Corex é dark-only, isto é só
-     pra não quebrar o toggle de tema do app. [painel a11y] */
-  --primary: #0a7d63;
-  --primary-foreground: #ffffff;
-  --ring: #0a7d63;
-
-  /* semânticos (só o que muda; destructive herda; amber escurece acima) */
-  --background: var(--yma-l-bg);
-  --foreground: var(--yma-l-text);
-  --card: var(--yma-l-surface);
-  --card-foreground: var(--yma-l-text);
-  --popover: var(--yma-l-surface);
-  --popover-foreground: var(--yma-l-text);
-  --secondary: var(--yma-l-100);
-  --secondary-foreground: var(--yma-l-text);
-  --muted: var(--yma-l-100);
-  --muted-foreground: var(--yma-l-muted);
-  --accent: var(--yma-l-200);
-  --accent-foreground: var(--yma-l-text);
-  --destructive-foreground: #ffffff;
-  --border: var(--yma-l-200);
-  --input: var(--yma-l-200);
-  /* pontinhos escuros e discretos no claro */
-  --dot-color: rgba(24, 24, 27, 0.11);
-
+/* Corex Opção 2 / Refinamento 02: primitives → HeroUI → domain aliases. */
+:root, :root.light {
+  --corex-blue: #091e2b;
+  --corex-oil: #087f75;
+  --corex-turquoise: #15bfa5;
+  --corex-graphite: #344449;
+  --corex-paper: #f5f5f0;
+  --background: var(--corex-paper);
+  --foreground: var(--corex-blue);
+  --surface: #fff;
+  --surface-foreground: var(--foreground);
+  --surface-secondary: #edf1ec;
+  --surface-secondary-foreground: var(--foreground);
+  --surface-tertiary: #e4ebe5;
+  --surface-tertiary-foreground: var(--foreground);
+  --overlay: var(--surface);
+  --overlay-foreground: var(--foreground);
+  --default: var(--surface-secondary);
+  --default-foreground: var(--foreground);
+  --accent: var(--corex-oil);
+  --accent-foreground: #fff;
+  --muted: #526365;
+  --border: #d5dfd8;
+  --separator: var(--border);
+  --focus: var(--corex-oil);
+  --field-background: var(--surface);
+  --field-foreground: var(--foreground);
+  --field-placeholder: var(--muted);
+  --field-border: var(--border);
+  --field-border-width: 1px;
+  --field-shadow: none;
+  --success: #087367;
+  --success-foreground: #fff;
+  --warning: #90611c;
+  --warning-foreground: #fff;
+  --danger: #b33f3b;
+  --danger-foreground: #fff;
+  --segment: var(--surface);
+  --segment-foreground: var(--foreground);
+  --radius: .5rem;
+  --field-radius: .5rem;
+  --surface-shadow: none;
+  --overlay-shadow: 0 12px 36px #091e2b20;
+  --scrollbar-thumb: color-mix(in srgb, var(--foreground) 25%, transparent);
+  --font-sans: var(--font-manrope), sans-serif;
+  --font-display: var(--font-manrope), sans-serif;
+  --motion-fast: 140ms;
+  --motion-panel: 200ms;
+  --motion-ease: cubic-bezier(.2,.8,.2,1);
   color-scheme: light;
 }
-
-/* No claro, a menta pura some como ícone/texto pequeno → teal-Corex escuro legível (≥5:1 no branco). */
-:root.light .text-primary {
-  color: #0a7d63;
-}
-:root.light .\[\&_svg\]\:text-primary svg {
-  color: #0a7d63;
-}
-
-/*
-  Plaque escuro atrás da logo da sidebar. A logo é dark-first (branco+amarelo); a placa escura
-  garante a leitura da marca nos dois temas (no claro, sem ela o branco sumiria). [review sidebar 2026-09-11]
-*/
-.brand-plaque {
-  background: var(--yma-neutral-900);
-}
-/*
-  Login SEMPRE escuro (momento de marca; a logo e o hero são dark-first). Redeclara os tokens dark
-  independentemente do tema escolhido, então logo/contraste/foco funcionam mesmo se o usuário usa o app no claro.
-  [login-redesign / review UX]
-*/
-.login-dark {
+:root.dark {
+  --background: var(--corex-blue);
+  --foreground: var(--corex-paper);
+  --surface: #102c37;
+  --surface-secondary: #183944;
+  --surface-tertiary: #20434d;
+  --accent: var(--corex-turquoise);
+  --accent-foreground: var(--corex-blue);
+  --muted: #b7c9cb;
+  --border: #2d4a52;
+  --focus: var(--corex-turquoise);
+  --success: #57dbc2;
+  --success-foreground: var(--corex-blue);
+  --warning: #efc477;
+  --warning-foreground: var(--corex-blue);
+  --danger: #f39b94;
+  --danger-foreground: var(--corex-blue);
+  --overlay-shadow: 0 12px 36px #0005;
   color-scheme: dark;
-  --primary: var(--yma-yellow-500); /* menta — o login é sempre escuro, mesmo no tema claro */
-  --primary-foreground: var(--primary-ink);
-  --ring: var(--yma-yellow-500);
-  --background: var(--yma-neutral-950);
-  --foreground: var(--yma-neutral-50);
-  --card: var(--yma-neutral-900);
-  --card-foreground: var(--yma-neutral-50);
-  --popover: var(--yma-neutral-800);
-  --popover-foreground: var(--yma-neutral-50);
-  --secondary: var(--yma-neutral-800);
-  --secondary-foreground: var(--yma-neutral-50);
-  --muted: var(--yma-neutral-800);
-  --muted-foreground: var(--yma-neutral-400);
-  --accent: var(--yma-neutral-800);
-  --accent-foreground: var(--yma-neutral-50);
-  --border: var(--yma-neutral-700);
-  --input: var(--yma-neutral-700);
 }
-/* neutraliza o override dourado-do-claro dentro do login forçado-escuro (dot/ícone voltam ao amarelo) */
-:root .login-dark .text-primary {
-  color: var(--primary);
+:root {
+  --card: var(--surface);
+  --card-foreground: var(--foreground);
+  --popover: var(--overlay);
+  --popover-foreground: var(--foreground);
+  --primary: var(--accent);
+  --primary-foreground: var(--accent-foreground);
+  --secondary: var(--surface-secondary);
+  --secondary-foreground: var(--foreground);
+  --muted-foreground: var(--muted);
+  --destructive: var(--danger);
+  --destructive-foreground: var(--danger-foreground);
+  --input: var(--border);
+  --ring: var(--focus);
 }
-
-/* Tailwind v4: mapeia os tokens semânticos para utilitários (bg-primary, text-muted-foreground…) */
 @theme inline {
+  --font-sans: var(--font-manrope), sans-serif;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -151,86 +106,64 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
-  --color-amber: var(--primary); /* "cor de atenção" segue a menta da marca [JP: tudo menta] */
+  --color-amber: var(--warning);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --radius-lg: var(--radius);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-sm: calc(var(--radius) - 4px);
+  --radius-lg: .75rem;
+  --radius-md: .5rem;
+  --radius-sm: .375rem;
 }
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-inter), Inter, system-ui, -apple-system, sans-serif;
-}
-
-/* Fundo da área do app. Corex é grafite LISO (glow/gradiente decorativo é proibido na régua da marca,
-   então a antiga aurora âmbar foi removida). No CLARO mantém um dot-grid sutil. [reskin Corex] */
-:root.light .app-dots {
-  background-image: radial-gradient(var(--dot-color) 1.4px, transparent 1.4px);
-  background-size: 20px 20px;
-  background-position: -1px -1px;
-}
-
-/* iOS dá auto-zoom ao focar um campo com fonte < 16px. Em telas de TOQUE, força 16px nos campos
-   (recomendação do próprio iOS) sem tocar na densidade do desktop. `!important` vence as utilitárias
-   text-[13/14px]/text-sm espalhadas pelos componentes. [fix zoom-login] */
-@media (pointer: coarse) {
-  input:not([type="checkbox"]):not([type="radio"]),
-  textarea,
-  select {
-    font-size: 16px !important;
-  }
-}
-
-/* Interaction tokens shared by the existing interface. Motion communicates state. */
-:root {
-  --motion-fast: 140ms;
-  --motion-panel: 200ms;
-  --motion-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.ui-button {
-  transition-property: color, background-color, border-color, opacity, translate;
-  transition-duration: var(--motion-fast);
-  transition-timing-function: var(--motion-ease);
-}
-.ui-button:enabled:active { translate: 0 1px; }
+body { background: var(--background); color: var(--foreground); font-family: var(--font-manrope), sans-serif; }
+::selection { background: var(--corex-turquoise); color: var(--corex-blue); }
+/* Institutional chrome stays blue; portalled overlays retain page-theme tokens. */
+.corex-sidebar { background: var(--corex-blue); color: var(--corex-paper); }
+.corex-sidebar nav a, .corex-sidebar button { color: #bfd0d2; }
+.corex-sidebar nav a:hover, .corex-sidebar button:hover { background: #173640; color: var(--corex-paper); }
+.corex-sidebar nav a[aria-current="page"] { background: #17463f; color: var(--corex-paper); }
+.corex-sidebar .text-muted-foreground { color: #bfd0d2; }
+.corex-sidebar .border-border { border-color: #29454d; }
+.corex-sidebar .bg-card, .corex-sidebar .bg-accent { background: #173640; }
+.brand-plaque { background: var(--corex-blue); }
+.corex-home { padding: 2rem; }
+.corex-heading { font-size: clamp(1.75rem, 3vw, 2.25rem); line-height: 1.16; font-weight: 800; letter-spacing: -.035em; text-wrap: balance; }
+.corex-section { border-top: 1px solid var(--border); padding-top: 1.25rem; }
+.corex-editorial-list { border-top: 2px solid var(--foreground); }
+.corex-editorial-list > * { border-bottom: 1px solid var(--border); }
+.corex-logo-light { display: block; }
+.corex-logo-dark { display: none; }
+:root.dark .corex-logo-light { display: none; }
+:root.dark .corex-logo-dark { display: block; }
+.ui-button { transition: background-color var(--motion-fast), color var(--motion-fast), border-color var(--motion-fast); }
 .ui-button[aria-busy="true"] { cursor: progress; }
+.corex-toast-region { bottom: max(1rem, env(safe-area-inset-bottom)); }
+@media(max-width:1023px) { .corex-home { padding: 1.5rem 1rem; } .corex-toast-region { bottom: calc(76px + env(safe-area-inset-bottom)); } }
+@media(pointer:coarse) { input:not([type="checkbox"]):not([type="radio"]), textarea, select { font-size: 16px!important; } }
+@media(prefers-reduced-motion:reduce) { *, *::before, *::after { scroll-behavior: auto!important; animation-duration: .01ms!important; transition-duration: .01ms!important; } }
 
-.ui-skeleton { animation: skeleton-breathe 1.8s ease-in-out infinite; }
-@keyframes skeleton-breathe { 50% { opacity: 0.45; } }
-
-.ui-dialog-overlay[data-state="open"] { animation: dialog-fade-in var(--motion-fast) ease-out; }
-.ui-dialog-overlay[data-state="closed"] { animation: dialog-fade-out var(--motion-fast) ease-in; }
-.ui-dialog-content[data-state="open"] { animation: dialog-enter var(--motion-panel) var(--motion-ease); }
-.ui-dialog-content[data-state="closed"] { animation: dialog-fade-out var(--motion-fast) ease-in; }
-@keyframes dialog-fade-in { from { opacity: 0; } to { opacity: 1; } }
-@keyframes dialog-fade-out { from { opacity: 1; } to { opacity: 0; } }
-@keyframes dialog-enter {
-  from { opacity: 0; scale: 0.98; }
-  to { opacity: 1; scale: 1; }
+/* Layout-only buttons retain HeroUI interaction and accessibility. */
+@layer components {
+.ui-button-reset {
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  white-space: normal;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .ui-button { transition: none; }
-  .ui-button:enabled:active { translate: none; }
-  .ui-skeleton,
-  .ui-dialog-overlay,
-  .ui-dialog-content,
-  .animate-pulse,
-  .animate-spin { animation: none !important; }
 }
 
-/* Contextual task drawer: desktop side panel, full viewport on mobile. */
-.ui-task-panel[data-state="open"] { animation: task-panel-enter var(--motion-panel) var(--motion-ease); }
-.ui-task-panel[data-state="closed"] { animation: dialog-fade-out var(--motion-fast) ease-in; }
-@keyframes task-panel-enter {
-  from { opacity: 0.6; translate: 24px 0; }
-  to { opacity: 1; translate: 0 0; }
+.corex-modal-container-right,
+.corex-modal-container-left {
+  padding: 0;
+  justify-content: flex-start;
+  width: 100%;
+  max-width: none;
 }
-@media (prefers-reduced-motion: reduce) {
-  .ui-task-panel { animation: none !important; }
-}
+.corex-modal-container-right { align-items: flex-end; }
+.corex-modal-container-left { align-items: flex-start; }
+.corex-modal-container-bottom { padding: 0; align-items: stretch; justify-content: flex-end; }
+
+.corex-sidebar nav a[aria-current="page"] svg { color: var(--corex-turquoise); }
+.ui-task-panel:not(.corex-sidebar) { max-width: none; }

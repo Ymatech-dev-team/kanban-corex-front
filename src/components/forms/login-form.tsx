@@ -1,5 +1,8 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -12,10 +15,6 @@ interface Props {
   error?: string | null;
 }
 
-/**
- * Form do login no visual do handoff Corex (label acima, input 48px, olho na senha, botão menta).
- * Cores login-scoped (hex do PROMPT.md). Valida no submit e revalida no blur. [login-redesign]
- */
 export function LoginForm({ onSubmit, pending, error }: Props) {
   const [show, setShow] = useState(false);
   const {
@@ -29,17 +28,16 @@ export function LoginForm({ onSubmit, pending, error }: Props) {
     defaultValues: { email: "", password: "" },
   });
 
-  const inputCls =
-    "h-12 w-full rounded-lg border border-[#1C232D] bg-[#0F141B] px-4 text-[15px] text-[#E8ECEF] outline-none transition placeholder:text-[#737D8C] read-only:opacity-70 focus:border-[#34F5C5] focus:shadow-[0_0_0_3px_rgba(52,245,197,0.18)] aria-[invalid=true]:border-[#F87171] aria-[invalid=true]:focus:border-[#F87171]";
+  const inputCls = "h-12 w-full text-base read-only:opacity-70";
 
   return (
     <form onSubmit={handleSubmit((v) => onSubmit(v))} method="post" noValidate className="flex w-full flex-col">
       <div className="flex flex-col gap-5">
         <div className="flex flex-col gap-2">
-          <label htmlFor="email" className="text-[13px] font-medium text-[#8A94A3]">
+          <Label htmlFor="email" className="text-[13px] font-medium text-muted-foreground">
             E-mail
-          </label>
-          <input
+          </Label>
+          <Input
             id="email"
             type="email"
             autoComplete="email"
@@ -51,18 +49,18 @@ export function LoginForm({ onSubmit, pending, error }: Props) {
             {...register("email")}
           />
           {errors.email && (
-            <p id="email-error" className="text-[13px] text-[#F87171]">
+            <p id="email-error" className="text-[13px] text-destructive">
               Informe um e-mail válido.
             </p>
           )}
         </div>
 
         <div className="flex flex-col gap-2">
-          <label htmlFor="password" className="text-[13px] font-medium text-[#8A94A3]">
+          <Label htmlFor="password" className="text-[13px] font-medium text-muted-foreground">
             Senha
-          </label>
+          </Label>
           <div className="relative">
-            <input
+            <Input
               id="password"
               type={show ? "text" : "password"}
               autoComplete="current-password"
@@ -73,25 +71,26 @@ export function LoginForm({ onSubmit, pending, error }: Props) {
               className={`${inputCls} pr-12`}
               {...register("password")}
             />
-            <button
+            <Button
+              variant="ghost"
               type="button"
               onClick={() => setShow((s) => !s)}
               aria-label={show ? "Ocultar senha" : "Mostrar senha"}
-              className="absolute right-1.5 top-1.5 flex size-9 items-center justify-center rounded-md text-[#8A94A3] outline-none transition hover:text-[#E8ECEF] focus-visible:ring-2 focus-visible:ring-[#34F5C5]"
+              className="absolute right-1.5 top-1.5 flex size-9 items-center justify-center rounded-md text-muted-foreground outline-none transition hover:text-foreground focus-visible:ring-2 focus-visible:ring-primary"
             >
               {show ? <EyeOff className="size-[18px]" /> : <Eye className="size-[18px]" />}
-            </button>
+            </Button>
           </div>
           {/* placeholder: ainda não há rota de reset — evita rolar pro topo / sujar a URL [login-redesign] */}
           <a
             href="#"
             onClick={(e) => e.preventDefault()}
-            className="self-end text-[14px] text-[#8A94A3] outline-none transition hover:text-[#E8ECEF] hover:underline focus-visible:ring-2 focus-visible:ring-[#34F5C5]"
+            className="self-end text-[14px] text-muted-foreground outline-none transition hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-primary"
           >
             Esqueci a senha
           </a>
           {errors.password && (
-            <p id="password-error" className="text-[13px] text-[#F87171]">
+            <p id="password-error" className="text-[13px] text-destructive">
               Informe sua senha.
             </p>
           )}
@@ -99,19 +98,19 @@ export function LoginForm({ onSubmit, pending, error }: Props) {
       </div>
 
       {error && (
-        <p role="alert" className="mt-5 text-[13px] text-[#F87171]">
+        <p role="alert" className="mt-5 text-[13px] text-destructive">
           {error}
         </p>
       )}
 
-      <button
+      <Button
         type="submit"
         disabled={pending}
-        className="mt-7 flex h-12 w-full items-center justify-center gap-2.5 rounded-lg bg-[#34F5C5] text-[15px] font-semibold text-[#0A0D12] outline-none transition hover:bg-[#5CF7D3] focus-visible:ring-2 focus-visible:ring-[#34F5C5] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0A0D12] disabled:opacity-70"
+        className="mt-7 h-12 w-full text-base"
       >
         {pending && <Loader2 className="size-4 animate-spin" aria-hidden />}
         {pending ? "Entrando…" : "Entrar"}
-      </button>
+      </Button>
     </form>
   );
 }

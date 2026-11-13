@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Bookmark, ListFilter, Loader2, Pencil, Plus, Trash2 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "@/components/ui/toast";
 import {
   type BoardFilters,
   type BoardStatus,
@@ -48,7 +48,7 @@ export function facetCount(f: BoardFilters): number {
 const trigBase =
   "flex h-9 items-center gap-1.5 rounded-lg border px-2.5 text-[12.5px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring";
 const trigIdle = "border-border bg-card text-muted-foreground hover:text-foreground";
-const trigActive = "border-muted-foreground/40 bg-accent text-foreground";
+const trigActive = "border-muted-foreground/40 bg-surface-tertiary text-foreground";
 
 /** Desktop: um dropdown "Filtros" com Status (fora do Kanban) + Prioridade + Prazo. */
 export function FacetsDropdown({
@@ -173,7 +173,7 @@ function PillGroup<T extends string>({
         {options.map((o) => {
           const active = o.value === selected;
           return (
-            <button
+            <Button variant="unstyled"
               key={o.value ?? "_any"}
               type="button"
               role="radio"
@@ -181,11 +181,11 @@ function PillGroup<T extends string>({
               onClick={() => onSelect(o.value)}
               className={cn(
                 "flex h-10 items-center rounded-lg border px-3.5 text-[12.5px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring",
-                active ? "border-muted-foreground/40 bg-accent text-foreground" : "border-border bg-card text-muted-foreground",
+                active ? "border-muted-foreground/40 bg-surface-tertiary text-foreground" : "border-border bg-card text-muted-foreground",
               )}
             >
               {o.label}
-            </button>
+            </Button>
           );
         })}
       </div>
@@ -236,13 +236,13 @@ export function PresetsControl({
         ) : isError ? (
           <div className="flex items-center justify-between gap-2 px-2.5 py-2 text-[12.5px] text-muted-foreground">
             Não foi possível carregar.
-            <button
+            <Button variant="unstyled"
               type="button"
               onClick={(e) => { e.preventDefault(); onRetry(); }}
               className="text-foreground underline decoration-muted-foreground/40 underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               Tentar de novo
-            </button>
+            </Button>
           </div>
         ) : presets.length === 0 ? (
           <div className="px-2.5 py-2 text-[12.5px] text-muted-foreground">
@@ -254,35 +254,35 @@ export function PresetsControl({
               <div
                 key={p.id}
                 className={cn(
-                  "group flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-accent",
-                  activeId === p.id && "bg-accent",
+                  "group flex items-center gap-2 rounded-md px-2 py-1.5 transition-colors hover:bg-surface-tertiary",
+                  activeId === p.id && "bg-surface-tertiary",
                 )}
               >
-                <button
+                <Button variant="unstyled"
                   type="button"
                   onClick={() => { onApply(p); setOpen(false); }}
                   className="flex min-w-0 flex-1 items-center gap-2 text-left outline-none"
                 >
-                  <span className={cn("size-[6px] shrink-0 rounded-full", activeId === p.id ? "bg-primary" : "bg-muted-foreground/40")} />
+                  <span className={cn("size-[6px] shrink-0 rounded-full", activeId === p.id ? "bg-primary" : "bg-surface-secondary-foreground/40")} />
                   <span className="truncate text-[13px] text-foreground" title={p.name}>{p.name}</span>
                   {activeId === p.id && <span className="shrink-0 text-[10.5px] text-primary">aplicado</span>}
-                </button>
-                <button
+                </Button>
+                <Button variant="unstyled"
                   type="button"
                   aria-label={`Renomear ${p.name}`}
                   onClick={() => { onRename(p); setOpen(false); }}
                   className="shrink-0 text-muted-foreground opacity-0 outline-none transition hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
                 >
                   <Pencil className="size-3.5" />
-                </button>
-                <button
+                </Button>
+                <Button variant="unstyled"
                   type="button"
                   aria-label={`Excluir ${p.name}`}
                   onClick={() => { onDelete(p); setOpen(false); }}
                   className="shrink-0 text-muted-foreground opacity-0 outline-none transition hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
                 >
                   <Trash2 className="size-3.5" />
-                </button>
+                </Button>
               </div>
             ))}
           </div>
@@ -327,14 +327,14 @@ export function PresetsSheet({
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between">
         <span className="text-[11px] text-muted-foreground">Presets</span>
-        <button
+        <Button variant="unstyled"
           type="button"
           disabled={!canSave}
           onClick={onSave}
           className="inline-flex items-center gap-1 text-[12px] text-muted-foreground outline-none transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:text-muted-foreground/50 focus-visible:ring-2 focus-visible:ring-ring"
         >
           <Plus className="size-3.5" /> Salvar filtro atual
-        </button>
+        </Button>
       </div>
       {isLoading ? (
         <div className="flex items-center gap-2 py-1 text-[12.5px] text-muted-foreground">
@@ -343,13 +343,13 @@ export function PresetsSheet({
       ) : isError ? (
         <div className="flex items-center gap-2 py-1 text-[12.5px] text-muted-foreground">
           Não foi possível carregar.
-          <button
+          <Button variant="unstyled"
             type="button"
             onClick={onRetry}
             className="text-foreground underline decoration-muted-foreground/40 underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             Tentar de novo
-          </button>
+          </Button>
         </div>
       ) : presets.length === 0 ? (
         <p className="text-[12.5px] text-muted-foreground">Nenhum preset ainda. Monte um filtro e salve para reusar.</p>
@@ -358,21 +358,21 @@ export function PresetsSheet({
           {presets.map((p) => (
             <div
               key={p.id}
-              className={cn("flex items-center gap-2 rounded-lg border px-3 py-2.5", activeId === p.id ? "border-muted-foreground/40 bg-accent" : "border-border bg-card")}
+              className={cn("flex items-center gap-2 rounded-lg border px-3 py-2.5", activeId === p.id ? "border-muted-foreground/40 bg-surface-tertiary" : "border-border bg-card")}
             >
-              <button type="button" onClick={() => onApply(p)} className="flex min-w-0 flex-1 items-center gap-2 text-left outline-none">
-                <span className={cn("size-[6px] shrink-0 rounded-full", activeId === p.id ? "bg-primary" : "bg-muted-foreground/40")} />
+              <Button variant="unstyled" type="button" onClick={() => onApply(p)} className="flex min-w-0 flex-1 items-center gap-2 text-left outline-none">
+                <span className={cn("size-[6px] shrink-0 rounded-full", activeId === p.id ? "bg-primary" : "bg-surface-secondary-foreground/40")} />
                 <span className="truncate text-[13px] text-foreground">{p.name}</span>
                 {activeId === p.id && <span className="shrink-0 text-[10.5px] text-primary">aplicado</span>}
-              </button>
-              <button
+              </Button>
+              <Button variant="unstyled"
                 type="button"
                 aria-label={`Excluir ${p.name}`}
                 onClick={() => onDelete(p)}
                 className="shrink-0 text-muted-foreground outline-none transition hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <Trash2 className="size-4" />
-              </button>
+              </Button>
             </div>
           ))}
         </div>

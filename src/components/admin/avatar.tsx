@@ -1,3 +1,4 @@
+import { Avatar as HeroAvatar } from "@heroui/react";
 import { initials } from "@/lib/initials";
 import { cn } from "@/lib/utils";
 
@@ -18,15 +19,15 @@ export function Avatar({
   className?: string;
 }) {
   return (
-    <span
+    <HeroAvatar
       aria-hidden
       className={cn(
-        "flex shrink-0 items-center justify-center rounded-full bg-accent font-medium text-foreground",
+        "flex shrink-0 items-center justify-center rounded-full bg-surface-tertiary font-medium text-foreground",
         SIZES[size],
         className,
       )}
     >
-      {initials(name)}
-    </span>
+      <HeroAvatar.Fallback>{initials(name)}</HeroAvatar.Fallback>
+    </HeroAvatar>
   );
 }

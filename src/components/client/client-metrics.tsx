@@ -1,5 +1,6 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { useTasks } from "@/lib/hooks/use-tasks";
 import { formatMinutesAsHours } from "@/lib/duration";
 
@@ -32,13 +33,13 @@ export function ClientMetrics({ projectId, canSeeCost = false }: { projectId: st
     return (
       <div className="rounded-xl border border-border bg-card p-4 text-[13px] text-muted-foreground">
         Não foi possível carregar as métricas.{" "}
-        <button
+        <Button variant="unstyled"
           type="button"
           onClick={() => tasks.refetch()}
           className="rounded-sm text-foreground underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           Tentar de novo
-        </button>
+        </Button>
       </div>
     );
   }

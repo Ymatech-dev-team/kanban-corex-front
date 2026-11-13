@@ -87,17 +87,17 @@ export function CreateTaskDialog({ projectId, engagementId, status, initialTitle
             <Label>Prioridade</Label>
             <div className="flex gap-0.5 rounded-lg border border-border bg-card p-[3px]">
               {PRIOS.map((p) => (
-                <button
+                <Button variant="unstyled"
                   key={p.value}
                   type="button"
                   onClick={() => setPriority(p.value)}
                   className={cn(
                     "flex-1 rounded-md px-3 py-1.5 text-[13px] transition-colors",
-                    priority === p.value ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground",
+                    priority === p.value ? "bg-surface-tertiary text-foreground" : "text-muted-foreground hover:text-foreground",
                   )}
                 >
                   {p.label}
-                </button>
+                </Button>
               ))}
             </div>
           </div>

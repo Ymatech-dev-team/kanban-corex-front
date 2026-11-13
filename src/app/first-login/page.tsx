@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+import { ThemeToggle } from "@/components/shell/theme-toggle";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AxiosError } from "axios";
@@ -31,9 +33,12 @@ export default function FirstLoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-8 px-6">
+    <main className="flex min-h-svh flex-col items-center justify-center gap-8 bg-background px-6 py-12">
+      <div className="absolute right-6 top-6"><ThemeToggle /></div>
+      <Image src="/brand/logo-light.svg" alt="Corex" width={150} height={45} className="h-10 w-auto dark:hidden" priority />
+      <Image src="/brand/logo-dark.svg" alt="Corex" width={150} height={45} className="hidden h-10 w-auto dark:block" priority />
       <div className="text-center">
-        <h1 className="text-2xl font-medium tracking-tight">Troque sua senha</h1>
+        <h1 className="text-3xl font-semibold tracking-tight">Troque sua senha</h1>
         <p className="mt-1 max-w-sm text-sm text-muted-foreground">
           Este é seu primeiro acesso. Defina uma senha nova para continuar.
         </p>

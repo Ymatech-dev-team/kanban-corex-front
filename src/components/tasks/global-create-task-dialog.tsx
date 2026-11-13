@@ -1,4 +1,5 @@
 "use client";
+import { SimpleSelect } from "@/components/ui/select";
 
 import { useEffect, useState } from "react";
 import type { CreateTaskInput, TaskPriority, TaskStatus } from "@sistema-tasks/contracts";
@@ -35,25 +36,7 @@ function SelectRow({
   placeholder: string;
   options: { id: string; name: string }[];
 }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <Label>{label}</Label>
-      <select
-        value={value}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.value)}
-        style={{ colorScheme: "inherit" }} // popup nativo de <option> segue o tema (claro/escuro) [review UX M3]
-        className="h-9 rounded-lg border border-border bg-card px-2.5 text-[13px] text-foreground outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-      >
-        <option value="">{placeholder}</option>
-        {options.map((o) => (
-          <option key={o.id} value={o.id}>
-            {o.name}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
+  return <SimpleSelect label={label} value={value} onValueChange={onChange} disabled={disabled} placeholder={placeholder} options={options.map(({ id, name }) => ({ value: id, label: name }))} />;
 }
 
 /**
@@ -154,17 +137,17 @@ export function GlobalCreateTaskDialog({
             <Label>Prioridade</Label>
             <div className="flex gap-0.5 rounded-lg border border-border bg-card p-[3px]">
               {PRIOS.map((p) => (
-                <button
+                <Button variant="unstyled"
                   key={p.value}
                   type="button"
                   onClick={() => setPriority(p.value)}
                   className={cn(
                     "flex-1 rounded-md px-3 py-1.5 text-[13px] transition-colors",
-                    priority === p.value ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground",
+                    priority === p.value ? "bg-surface-tertiary text-foreground" : "text-muted-foreground hover:text-foreground",
                   )}
                 >
                   {p.label}
-                </button>
+                </Button>
               ))}
             </div>
           </div>

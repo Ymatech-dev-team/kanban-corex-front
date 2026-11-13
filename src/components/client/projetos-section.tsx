@@ -65,20 +65,20 @@ export function ProjetosSection({ projectId }: { projectId: string }) {
       ) : list.isError ? (
         <div className="rounded-xl border border-border bg-card p-4 text-[13px] text-muted-foreground">
           Não foi possível carregar os projetos.{" "}
-          <button
+          <Button variant="unstyled"
             type="button"
             onClick={() => list.refetch()}
             className="rounded-sm text-foreground underline underline-offset-2 outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             Tentar de novo
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {(list.data ?? []).map((e) => (
             <article key={e.id} className="flex flex-col gap-2 rounded-xl border border-border bg-card p-4">
               <div className="flex items-start justify-between gap-2">
-                <button
+                <Button variant="unstyled"
                   type="button"
                   aria-label={`Abrir projeto ${e.name}`}
                   onClick={() => router.push(`/clientes/${projectId}/projetos/${e.id}`)}
@@ -86,7 +86,7 @@ export function ProjetosSection({ projectId }: { projectId: string }) {
                 >
                   <span className="truncate font-medium tracking-tight">{e.name}</span>
                   <ChevronRight className="size-4 shrink-0 text-muted-foreground/50 transition-colors group-hover/name:text-foreground" />
-                </button>
+                </Button>
                 <ActionsMenu
                   label={`Ações do projeto ${e.name}`}
                   className="shrink-0"
@@ -125,13 +125,13 @@ export function ProjetosSection({ projectId }: { projectId: string }) {
                 <span>{e.taskCount} {e.taskCount === 1 ? "tarefa" : "tarefas"}</span>
                 <span>{e.consultorCount} {e.consultorCount === 1 ? "consultor" : "consultores"}</span>
                 {canConsult && (
-                  <button
+                  <Button variant="unstyled"
                     type="button"
                     onClick={() => setConsultoresOf(e)}
                     className="ml-auto inline-flex items-center gap-1.5 rounded-sm text-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <Users className="size-3.5" /> Consultores
-                  </button>
+                  </Button>
                 )}
               </div>
             </article>
@@ -296,18 +296,18 @@ function ConsultoresDialog({
           <ul className="flex flex-col gap-1">
             {current.map((c) => (
               <li key={c.id} className="flex items-center gap-2.5 rounded-lg px-1 py-1">
-                <span className="flex size-6 items-center justify-center rounded-full border border-muted-foreground/40 bg-accent text-[10px] font-medium text-foreground">
+                <span className="flex size-6 items-center justify-center rounded-full border border-muted-foreground/40 bg-surface-tertiary text-[10px] font-medium text-foreground">
                   {initials(c.name)}
                 </span>
                 <span className="flex-1 text-[13.5px]">{c.name}</span>
-                <button
+                <Button variant="unstyled"
                   type="button"
                   aria-label={`Remover ${c.name}`}
                   onClick={() => remove.mutate(c.id)}
                   className="flex size-7 items-center justify-center rounded-md text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <X className="size-4" />
-                </button>
+                </Button>
               </li>
             ))}
           </ul>
@@ -328,7 +328,7 @@ function ConsultoresDialog({
           ) : (
             <div className="flex flex-wrap gap-2">
               {candidates.map((m) => (
-                <button
+                <Button variant="unstyled"
                   key={m.id}
                   type="button"
                   onClick={() => add.mutate(m.id)}
@@ -336,7 +336,7 @@ function ConsultoresDialog({
                   className="inline-flex items-center gap-1.5 rounded-full border border-border px-3 py-1 text-[12.5px] outline-none transition-colors hover:border-muted-foreground/40 focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
                 >
                   <Plus className="size-3.5" /> {m.name}
-                </button>
+                </Button>
               ))}
             </div>
           )}

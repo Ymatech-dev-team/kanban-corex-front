@@ -34,4 +34,26 @@ describe("LoginForm", () => {
     render(<LoginForm onSubmit={() => {}} error="Muitas tentativas. Aguarde e tente de novo." />);
     expect(screen.getByRole("alert")).toHaveTextContent("Muitas tentativas");
   });
+  it("alterna a visibilidade sem submeter o formulário", async () => {
+    const onSubmit = vi.fn();
+    render(<LoginForm onSubmit={onSubmit} />);
+    const password = screen.getByLabelText("Senha");
+    expect(password).toHaveAttribute("type", "password");
+    await userEvent.click(screen.getByRole("button", { name: "Mostrar senha" }));
+    expect(password).toHaveAttribute("type", "text");
+    await userEvent.click(screen.getByRole("button", { name: "Ocultar senha" }));
+    expect(password).toHaveAttribute("type", "password");
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("bloqueia edição e novo envio enquanto autentica", async () => {
+    const onSubmit = vi.fn();
+    render(<LoginForm onSubmit={onSubmit} pending />);
+    expect(screen.getByLabelText("E-mail")).toHaveAttribute("readonly");
+    expect(screen.getByLabelText("Senha")).toHaveAttribute("readonly");
+    expect(screen.getByRole("button", { name: "Entrando…" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "Entrando…" }));
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
 });

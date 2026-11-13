@@ -1,5 +1,6 @@
 "use client";
 
+import { ThemeToggle } from "@/components/shell/theme-toggle";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -43,68 +44,25 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="relative flex min-h-svh flex-col overflow-hidden bg-[#0A0D12] text-[#E8ECEF] md:block">
-      {/* Foto de fundo (decorativa). Desktop: cobre tudo, âncora 80%. Mobile: faixa no topo. */}
-      <div className="relative h-[40svh] min-h-[260px] w-full shrink-0 md:absolute md:inset-0 md:h-auto">
-        <Image
-          src="/login-bg.webp"
-          alt=""
-          aria-hidden
-          fill
-          priority
-          sizes="100vw"
-          className="object-cover [object-position:8%_center] md:[object-position:right_center] lg:[object-position:80%_center]"
-        />
-        {/* scrim mobile: topo forte (logo não briga com o giz) + funde a base no fundo */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 md:hidden"
-          style={{
-            background:
-              "linear-gradient(to bottom, rgba(10,13,18,.88) 0%, rgba(10,13,18,0) 34%, rgba(10,13,18,0) 52%, #0A0D12 100%)",
-          }}
-        />
-        {/* scrim desktop: leve no topo + vinheta na base */}
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 hidden md:block"
-          style={{
-            background:
-              "linear-gradient(to bottom, rgba(10,13,18,.55) 0%, rgba(10,13,18,0) 22%), linear-gradient(to top, rgba(10,13,18,.92) 0%, rgba(10,13,18,0) 40%)",
-          }}
-        />
-      </div>
-
-      {/* Logo — único elemento sobre a foto */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src="/corex-logo-wordmark.png"
-        alt="Corex"
-        className="absolute left-5 top-5 z-20 h-[30px] w-auto md:left-10 md:top-12 md:h-9 lg:left-16"
-      />
-
-      {/* Painel do formulário */}
-      <section
-        aria-labelledby="login-title"
-        className="relative z-10 w-full bg-[#0A0D12] px-5 pb-[88px] pt-8 md:absolute md:inset-y-0 md:right-0 md:flex md:w-[440px] md:flex-col md:justify-center md:border-l md:border-[#141A22] md:px-10 md:py-12 lg:w-[clamp(420px,36vw,600px)] lg:px-16"
-      >
-        <div className="mx-auto w-full max-w-[400px]">
-          <h1
-            id="login-title"
-            className="text-[32px] font-medium leading-[1.1] tracking-[-0.025em] [font-family:var(--font-display)] md:text-[40px]"
-          >
-            Entrar
-          </h1>
-          <p className="mt-2.5 text-[16px] text-[#8A94A3]">Acesse o quadro da sua equipe.</p>
-
-          <div className="mt-7 md:mt-10">
-            <LoginForm onSubmit={onSubmit} pending={pending} error={error} />
-          </div>
+    <main className="grid min-h-svh bg-background text-foreground lg:grid-cols-[1.1fr_1fr]">
+      <section className="relative flex flex-col justify-between overflow-hidden bg-[#091E2B] px-7 py-8 text-[#F5F5F0] sm:px-12 lg:min-h-svh lg:px-16 lg:py-12">
+        <Image src="/brand/logo-dark.svg" alt="Corex" width={160} height={48} priority className="h-10 w-auto self-start" />
+        <div className="relative z-10 max-w-xl py-12 lg:py-20">
+          <p className="mb-6 text-xs font-semibold uppercase tracking-[0.18em] text-[#15BFA5]">Corex Tasks</p>
+          <h2 className="max-w-lg text-4xl font-semibold leading-[1.1] tracking-tight sm:text-5xl lg:text-6xl">Clareza para pensar.<br />Espaço para construir.</h2>
+          <p className="mt-7 max-w-md text-base leading-relaxed text-white/65">Planos, tarefas e entregas em um só lugar. Acompanhe o trabalho da sua equipe e dos seus agentes.</p>
         </div>
-
-        <p className="mt-8 text-[12px] tracking-[0.02em] text-[#737D8C] md:absolute md:bottom-10 md:left-1/2 md:mt-0 md:w-[min(400px,calc(100%-5rem))] md:-translate-x-1/2 lg:w-[min(400px,calc(100%-8rem))]">
-          pensar. construir. resolver.
-        </p>
+        <p className="text-xs tracking-wide text-white/50">pensar. construir. resolver.</p>
+        <div aria-hidden className="pointer-events-none absolute -bottom-28 -right-28 size-80 rounded-full border border-white/10" />
+      </section>
+      <section aria-labelledby="login-title" className="flex items-center justify-center px-7 py-14 sm:px-12 lg:py-20">
+        <div className="w-full max-w-sm">
+          <div className="mb-8 flex justify-end"><ThemeToggle /></div>
+          <p className="mb-4 text-xs font-semibold uppercase tracking-[0.15em] text-primary">Seu espaço de trabalho</p>
+          <h1 id="login-title" className="text-3xl font-semibold tracking-tight sm:text-4xl">Bom ter você aqui.</h1>
+          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">Entre para acompanhar o que está acontecendo.</p>
+          <div className="mt-9"><LoginForm onSubmit={onSubmit} pending={pending} error={error} /></div>
+        </div>
       </section>
     </main>
   );
