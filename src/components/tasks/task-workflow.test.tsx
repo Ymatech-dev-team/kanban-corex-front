@@ -19,7 +19,7 @@ describe("workflow visible authorization and recovery", () => {
   it("keeps approval disabled when mandatory checks are missing", () => {
     view();
     expect(screen.getByRole("button", { name: "Aprovar entrega" })).toBeDisabled();
-    expect(screen.getByText(/A aprovação exige/)).toBeInTheDocument();
+    expect(screen.getByText(/Aprovar mesmo assim conclui/)).toBeInTheDocument();
   });
   it("preserves finding contents and identity after failed save", async () => {
     mock.write.mockRejectedValueOnce(new Error("network")).mockResolvedValue({}); view();
@@ -93,7 +93,7 @@ it("separates summary from review while retaining the review draft across views"
 it("marks only unresolved blocking findings and hides new action on completed task", () => {
   const findings = ["open", "fix_reported", "validated", "waived"].map((status) => ({ id: status, description: status, criterion: "Critério", responsibleId: "executor", blocking: true, state: status, fixEvidence: [] }));
   view(query({ data: { ...query().data, state: { ...state, stage: "DONE", findings }, actions: [{ id: "review", question: "Revisar entrega", kind: "REVIEW", recipientId: "reviewer" }] } }));
-  expect(screen.getAllByText(/bloqueia aprovação/)).toHaveLength(2);
+  expect(screen.getAllByText(/bloqueante preservado/)).toHaveLength(2);
   expect(screen.getByText("Validado")).toBeInTheDocument();
   expect(screen.getByText("Dispensado com justificativa")).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Solicitar ação" })).not.toBeInTheDocument();
@@ -122,7 +122,7 @@ it("keeps autonomous review with the agent without a final acceptance button", (
   view(query({ data: { ...query().data, state: { ...state, reviews: [{ ...state.reviews[0], reviewMode: "AGENT" }] } } }));
   expect(screen.getByText(/Nenhum aceite final seu é necessário/)).toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Aprovar entrega" })).not.toBeInTheDocument();
-  expect(screen.getByText(/A aprovação exige/)).toBeInTheDocument();
+  expect(screen.getByText(/Aprovar mesmo assim conclui/)).toBeInTheDocument();
 });
 it("keeps the full technical report behind a disclosure", () => {
   view(query({ data: { ...query().data, state: { ...state, reviews: [{ ...state.reviews[0], summary: "Relatório técnico extenso" }] } } }));
@@ -140,56 +140,47 @@ it("renders compact question with task identity and preserves full text", () => 
 
 it("keeps short human questions fully readable in task detail", () => { const question = "Confirmar a regra de arredondamento e as unidades afetadas antes de continuar com a mudança aprovada no plano."; view(query({ data: { ...query().data, actions: [{ id: "a", taskId: "t1", question, kind: "DECIDE", recipientId: "reviewer" }] } })); expect(screen.getByText(question)).not.toHaveClass("line-clamp-2"); });
 
-describe("human approval with reservations", () => {
-  const failedReview = { ...state.reviews[0], reviewMode: "HUMAN", checks: ["typecheck", "lint", "test", "build"].map(name => ({ name, required: true, status: ["lint", "test"].includes(name) ? "failed" : "passed" })) };
-  function failedView(patch = {}) { return view(query({ data: { ...query().data, state: { ...state, reviews: [failedReview], ...patch } } })); }
-  it("requires explicit failed check selection and reason, preserving failed results", async () => {
-    mock.write.mockResolvedValue({}); failedView();
-    fireEvent.click(screen.getByRole("button", { name: "Aprovar com ressalva" }));
-    const confirm = screen.getByRole("button", { name: "Confirmar aprovação com ressalva" });
-    expect(confirm).toBeDisabled();
-    fireEvent.click(screen.getByRole("checkbox", { name: /lint/ }));
-    fireEvent.change(screen.getByLabelText("Justificativa"), { target: { value: "Falhas preexistentes fora do escopo desta entrega" } });
-    expect(confirm).toBeDisabled();
-    fireEvent.click(screen.getByRole("checkbox", { name: /test/ }));
-    fireEvent.click(confirm);
-    await waitFor(() => expect(mock.write).toHaveBeenCalledWith(expect.objectContaining({ expectedVersion: 3, command: { type: "approve_with_reservations", cycle: 1, checkNames: ["lint", "test"], reason: "Falhas preexistentes fora do escopo desta entrega" } })));
+describe("approve anyway", () => {
+  const failedReview = { ...state.reviews[0], reviewMode: "HUMAN", checks: ["typecheck", "lint", "test", "build"].map(name => ({ name, required: true, status: ["lint", "test"].includes(name) ? "failed" : "pending" })) };
+  const finding = { id: "f1", description: "Falha bloqueante original", criterion: "C", responsibleId: "executor", blocking: true, state: "open", fixEvidence: [] };
+  function failedView(patch = {}) { return view(query({ data: { ...query().data, state: { ...state, reviews: [failedReview], findings: [finding], ...patch } } })); }
+  it.each(["HUMAN", "AGENT", undefined])("completes in one click without input despite failed and pending checks and blockers (%s)", async reviewMode => {
+    mock.user = "executor"; mock.write.mockResolvedValue({});
+    failedView({ reviews: [{ ...failedReview, reviewMode }] });
+    fireEvent.click(screen.getByRole("button", { name: "Aprovar mesmo assim" }));
+    await waitFor(() => expect(mock.write).toHaveBeenCalledWith({ kind: "commands", expectedVersion: 3, command: { type: "approve_anyway", cycle: 1 } }));
+    expect(screen.queryByLabelText("Justificativa")).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
     expect(screen.getAllByText("Falhou")).toHaveLength(2);
+    expect(screen.getByText("Falha bloqueante original")).toBeInTheDocument();
   });
-  it("never offers an exception for pending or missing mandatory checks", () => {
-    failedView({ reviews: [{ ...failedReview, checks: failedReview.checks.map(c => c.name === "build" ? { ...c, status: "pending" } : c) }] });
-    expect(screen.queryByRole("button", { name: "Aprovar com ressalva" })).not.toBeInTheDocument();
+  it("allows missing mandatory checks but never without approval permission", () => {
+    const { unmount } = failedView({ reviews: [{ ...failedReview, checks: [] }] });
+    expect(screen.getByRole("button", { name: "Aprovar mesmo assim" })).toBeEnabled();
+    unmount(); view(query({ data: { ...query().data, capabilities: { canWrite: true, canReview: true, canApprove: false } } }));
+    expect(screen.queryByRole("button", { name: "Aprovar mesmo assim" })).not.toBeInTheDocument();
   });
-  it("blocks reservations while an unresolved finding blocks the delivery", () => {
-    failedView({ findings: [{ id: "f1", description: "Falha", criterion: "C", responsibleId: "executor", blocking: true, state: "open", fixEvidence: [] }] });
-    expect(screen.getByRole("button", { name: "Aprovar com ressalva" })).toBeDisabled();
-  });
-  it("does not offer an exception to the executor or without approval permission", () => {
-    mock.user = "executor";
-    const { unmount } = failedView();
-    expect(screen.queryByRole("button", { name: "Aprovar com ressalva" })).not.toBeInTheDocument();
-    unmount(); mock.user = "reviewer";
-    view(query({ data: { ...query().data, capabilities: { canWrite: true, canReview: true, canApprove: false }, state: { ...state, reviews: [failedReview] } } }));
-    expect(screen.queryByRole("button", { name: "Aprovar com ressalva" })).not.toBeInTheDocument();
-  });
-  it("preserves the reservation draft and original version when polling changes the cycle", async () => {
-    mock.write.mockRejectedValue({ response: { status: 409 } });
-    const { rerender } = failedView();
-    fireEvent.click(screen.getByRole("button", { name: "Aprovar com ressalva" }));
-    fireEvent.click(screen.getByRole("checkbox", { name: /lint/ }));
-    fireEvent.click(screen.getByRole("checkbox", { name: /test/ }));
-    fireEvent.change(screen.getByLabelText("Justificativa"), { target: { value: "Falhas anteriores já documentadas" } });
-    rerender(<TaskWorkflow taskId="t1" query={query({ data: { ...query().data, state: { ...state, version: 8, reviews: [{ ...failedReview, cycle: 2 }] } } })} members={{ executor: "Executor", reviewer: "Revisor" }} onDirtyChange={dirty} />);
-    fireEvent.click(screen.getByRole("button", { name: "Confirmar aprovação com ressalva" }));
+  it("prevents duplicate submission while a request is unresolved and shows failure", async () => {
+    let reject!: (cause: unknown) => void;
+    mock.write.mockReturnValue(new Promise((_, fail) => { reject = fail; })); failedView();
+    const button = screen.getByRole("button", { name: "Aprovar mesmo assim" });
+    fireEvent.click(button); fireEvent.click(button);
+    expect(mock.write).toHaveBeenCalledTimes(1);
+    reject({ response: { status: 409 } });
     await screen.findByRole("alert");
-    expect(mock.write.mock.calls[0][0]).toMatchObject({ expectedVersion: 3, command: { cycle: 1 } });
-    expect(screen.getByLabelText("Justificativa")).toHaveValue("Falhas anteriores já documentadas");
-    expect(screen.getByRole("checkbox", { name: /lint/ })).toBeChecked();
+    expect(screen.queryByText("Alteração registrada nesta tarefa.")).not.toBeInTheDocument();
   });
-  it("shows persisted exception without rewriting failed check outcomes", () => {
-    failedView({ stage: "DONE", reviews: [{ ...failedReview, decision: "approved", reservation: { checkNames: ["lint", "test"], reason: "Problemas anteriores documentados", approvedBy: "reviewer", approvedAt: "2026-11-12T12:00:00Z", cycle: 1, deliveryRevision: 1 } }] });
+  it("shows original failures and blockers alongside explicit completion audit", () => {
+    failedView({ stage: "DONE", reviews: [{ ...failedReview, decision: "approved", approvalOverride: { approvedBy: "reviewer", approvedAt: "2026-11-12T12:00:00Z", cycle: 1, deliveryRevision: 1, channel: "MCP" } }] });
+    expect(screen.getByText("Concluída com exceção")).toBeInTheDocument();
+    expect(screen.getByText("Aprovada mesmo assim")).toBeInTheDocument();
+    expect(screen.getAllByText("Falhou")).toHaveLength(2);
+    expect(screen.getByText(/bloqueante preservado/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Aprovar mesmo assim" })).not.toBeInTheDocument();
+  });
+  it("still renders old reservation audit", () => {
+    failedView({ stage: "DONE", reviews: [{ ...failedReview, decision: "approved", reservation: { checkNames: ["lint"], reason: "Problemas anteriores documentados", approvedBy: "reviewer", approvedAt: "2026-11-12T12:00:00Z", cycle: 1, deliveryRevision: 1 } }] });
     expect(screen.getByText("Concluída com ressalvas")).toBeInTheDocument();
     expect(screen.getByText("Problemas anteriores documentados")).toBeInTheDocument();
-    expect(screen.getAllByText("Falhou")).toHaveLength(2);
   });
 });
