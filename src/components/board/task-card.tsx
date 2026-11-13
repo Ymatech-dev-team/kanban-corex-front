@@ -58,12 +58,14 @@ export function TaskCard({
   clientName,
   projectName,
   asButton,
+  dragHandleSpace = false,
 }: {
   task: Task;
   onOpen?: () => void;
   membersById: Record<string, string>;
   clientName?: string; // "kicker" de cliente no topo — só na visão global que cruza clientes [tarefas-visao-global]
   projectName?: string; // segundo segmento do kicker (cliente · projeto) — usado na Lista mobile [shell-mobile]
+  dragHandleSpace?: boolean;
   asButton?: boolean; // torna o card acionável por teclado (Enter/Espaço) + foco visível [shell-mobile a11y]
 }) {
   const done = task.status === "DONE";
@@ -98,11 +100,11 @@ export function TaskCard({
       )}
     >
       {kicker && (
-        <div className="mb-1 truncate text-[11px] text-muted-foreground" title={kicker}>
+        <div className={cn("mb-1 truncate text-[11px] text-muted-foreground", dragHandleSpace && "pr-8")} title={kicker}>
           {kicker}
         </div>
       )}
-      <div className={cn("mb-2.5 text-[13.5px] leading-snug", done && "text-muted-foreground line-through")}>
+      <div className={cn("mb-2.5 text-[13.5px] leading-snug", dragHandleSpace && "pr-8", done && "text-muted-foreground line-through")}>
         {task.title}
       </div>
       <div className="flex items-center justify-between gap-2.5">

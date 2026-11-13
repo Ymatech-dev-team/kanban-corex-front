@@ -49,10 +49,12 @@ export function useCreateTask(projectId: string) {
   });
 }
 
-interface MoveVars {
+export interface MoveVars {
   id: string;
   status: TaskStatus;
   position: number;
+  updatedAt?: string;
+  operationId?: string;
 }
 
 /**
@@ -64,18 +66,22 @@ export function useMoveTask(projectId: string, engagementId?: string) {
   // Chave da lista que o board REALMENTE renderiza: por projeto (engagement) ou por cliente. [review B2]
   const key = engagementId ? engTasksKey(engagementId) : tasksKey(projectId);
   return useMutation({
-    mutationFn: async ({ id, status, position }: MoveVars) =>
-      (await api.patch<Task>(`/tasks/${id}/move`, { status, position })).data,
+    mutationFn: async ({ id, status, position, updatedAt, operationId }: MoveVars) =>
+      (await api.patch<Task>(`/tasks/${id}/move`, { status, position }, { headers: { "idempotency-key": operationId ?? idemKey(), ...(updatedAt ? { "x-expected-updated-at": updatedAt } : {}) } })).data,
     onMutate: async ({ id, status, position }) => {
       await qc.cancelQueries({ queryKey: key });
       const previous = qc.getQueryData<Task[]>(key);
       qc.setQueryData<Task[]>(key, (old) =>
         (old ?? []).map((t) => (t.id === id ? { ...t, status, position } : t)),
       );
-      return { previous };
+      return { previous: previous?.find(task => task.id === id) };
     },
-    onError: (err, _vars, ctx) => {
-      if (ctx?.previous) qc.setQueryData(key, ctx.previous);
+    onSuccess: (data, vars) => {
+      qc.setQueryData<Task[]>(key, old => old?.map(task => task.id === vars.id ? data : task));
+      qc.setQueryData(taskKey(vars.id), data);
+    },
+    onError: (err, vars, ctx) => {
+      if (ctx?.previous) qc.setQueryData<Task[]>(key, old => old?.map(task => task.id === vars.id ? ctx.previous! : task));
       const code = errorCode(err);
       if (code === "TAREFA_REMOVIDA") {
         toast.error("Essa tarefa foi removida");
@@ -86,11 +92,17 @@ export function useMoveTask(projectId: string, engagementId?: string) {
         qc.invalidateQueries({ queryKey: ["me"] });
       } else if (code === "SEM_PERMISSAO") {
         toast.error("Você não tem permissão para mover tarefas");
+      } else if (code === "CONFLITO") {
+        toast.error("A tarefa mudou durante o movimento. O quadro será atualizado.");
       } else {
         toast.error("Não foi possível mover a tarefa");
       }
     },
     onSettled: (data, _e, vars) => {
+      qc.invalidateQueries({ queryKey: ["workflow", vars.id] });
+      qc.invalidateQueries({ queryKey: ["workflow-actions"] });
+      qc.invalidateQueries({ queryKey: ["workflow-monitoring"] });
+      qc.invalidateQueries({ queryKey: taskKey(vars.id) });
       qc.invalidateQueries({ queryKey: key }); // lista renderizada
       qc.invalidateQueries({ queryKey: ["tasks", "all"] }); // visão global [tarefas-visao-global RF-E5]
       if (engagementId) qc.invalidateQueries({ queryKey: tasksKey(projectId) }); // roll-up/metrics do cliente
@@ -196,6 +208,9 @@ function invalidateTaskLists(qc: ReturnType<typeof useQueryClient>, projectId: s
 /** Listas + painéis por-tarefa abertos em cache (detalhe/timeline/custo) — pro lote, que muda status/existência. */
 function invalidateBoard(qc: ReturnType<typeof useQueryClient>, projectId: string, engagementId?: string) {
   invalidateTaskLists(qc, projectId, engagementId);
+  qc.invalidateQueries({ queryKey: ["workflow"] });
+  qc.invalidateQueries({ queryKey: ["workflow-actions"] });
+  qc.invalidateQueries({ queryKey: ["workflow-monitoring"] });
   qc.invalidateQueries({ queryKey: ["task"] });
   qc.invalidateQueries({ queryKey: ["activity"] });
   qc.invalidateQueries({ queryKey: ["task-cost"] });
@@ -236,7 +251,7 @@ export function useBulkMove(projectId: string, engagementId?: string) {
   return useMutation({
     mutationFn: async ({ moves }: { moves: MoveVars[] }): Promise<BulkMoveResult> => {
       const results = await Promise.allSettled(
-        moves.map((m) => api.patch(`/tasks/${m.id}/move`, { status: m.status, position: m.position })),
+        moves.map((m) => api.patch(`/tasks/${m.id}/move`, { status: m.status, position: m.position }, { headers: { "idempotency-key": m.operationId ?? idemKey(), ...(m.updatedAt ? { "x-expected-updated-at": m.updatedAt } : {}) } })),
       );
       const failedIds = moves.filter((_, i) => results[i].status === "rejected").map((m) => m.id);
       const anyAccessLost = results.some(

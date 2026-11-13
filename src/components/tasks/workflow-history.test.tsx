@@ -60,3 +60,5 @@ it("shows the human exception reason and accepted failed checks in the audit his
   expect(screen.getByText("Check aceito com falha: lint")).toBeInTheDocument();
   expect(screen.getByText("Check aceito com falha: test")).toBeInTheDocument();
 });
+
+it("renders board movement without pretending a check passed",()=>{fixture.type="board_move";fixture.channel="WEB";fixture.payload={from:"DOING",to:"DONE",position:2};render(<WorkflowHistory taskId="t" members={{u:"João"}} expanded/>);expect(screen.getByText("Tarefa movida no quadro")).toBeInTheDocument();expect(screen.getByText("Movimento: Fazendo → Feito")).toBeInTheDocument();});

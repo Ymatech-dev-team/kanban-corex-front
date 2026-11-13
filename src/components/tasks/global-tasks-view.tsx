@@ -188,7 +188,7 @@ export function GlobalTasksView() {
         tasks={tasks}
         projectId=""
         membersById={membersById}
-        onMove={move.mutate}
+        onMove={move.mutateAsync}
         clientNameById={clientsById}
         showClient={showClient}
         onOpenTask={openTask}

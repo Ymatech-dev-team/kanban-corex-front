@@ -184,3 +184,16 @@ describe("approve anyway", () => {
     expect(screen.getByText("Problemas anteriores documentados")).toBeInTheDocument();
   });
 });
+
+it("hands agent execution back to autonomous review without selecting a human reviewer",async()=>{
+  mock.write.mockResolvedValue({});
+  view(query({data:{...query().data,state:{...state,stage:"DOING",execution:{channel:"MCP",agent:"Claude",status:"FINISHED"}}}}));
+  fireEvent.click(screen.getByRole("button",{name:"Enviar para revisão"}));
+  expect(screen.queryByLabelText("Revisor responsável")).not.toBeInTheDocument();
+  fireEvent.change(screen.getByLabelText("Resumo do que foi entregue"),{target:{value:"Implementado e testado"}});
+  fireEvent.change(screen.getByLabelText(/Evidências/),{target:{value:"teste.log"}});
+  fireEvent.click(screen.getByRole("button",{name:/^Registrar$/}));
+  await waitFor(()=>expect(mock.write).toHaveBeenCalled());
+  const command=mock.write.mock.calls[0][0].command;
+  expect(command.reviewMode).toBe("AGENT"); expect(command).not.toHaveProperty("reviewerId");
+});

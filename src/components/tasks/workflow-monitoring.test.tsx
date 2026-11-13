@@ -3,7 +3,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { WorkflowMonitoring } from "./workflow-monitoring";
 const mock = vi.hoisted(() => ({ query: {} as Record<string, unknown> }));
 vi.mock("@/lib/hooks/use-workflow", () => ({ useWorkflowMonitoring: () => mock.query }));
-const state = { taskId: "task-one", stage: "IN_REVIEW", deliveryRevision: 2, reviews: [{ reviewMode: "AGENT", checks: ["typecheck", "lint", "test", "build"].map(name => ({ name, required: true, status: name === "lint" ? "failed" : "passed" })) }], findings: [], execution: { channel: "MCP", agent: "Claude", status: "FINISHED" } };
+const state = { taskId: "task-one", stage: "IN_REVIEW", deliveryRevision: 2, reviews: [{ deliveryRevision: 2, reviewMode: "AGENT", checks: ["typecheck", "lint", "test", "build"].map(name => ({ name, required: true, status: name === "lint" ? "failed" : "passed" })) }], findings: [], execution: { channel: "MCP", agent: "Claude", status: "FINISHED" } };
 beforeEach(() => { mock.query = { data: { pages: [{ items: [{ taskId: "task-one", title: "Preço por unidade", clientName: "Cliente", projectName: "Catálogo", updatedAt: "2026-11-12T12:00:00Z", state }] }] } }; });
 it("shows real failure and next action without asking for human approval", () => {
   render(<WorkflowMonitoring />);

@@ -1,26 +1,31 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   DndContext,
   DragOverlay,
   MouseSensor,
   TouchSensor,
+  KeyboardSensor,
+  pointerWithin,
+  type DragOverEvent,
   useSensor,
   useSensors,
   closestCorners,
   type DragStartEvent,
   type DragEndEvent,
 } from "@dnd-kit/core";
-import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { SortableContext, useSortable, verticalListSortingStrategy, sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { Check, Plus } from "lucide-react";
+import { Check, GripVertical, Plus } from "lucide-react";
 import type { Task } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import type { TaskStatus } from "@sistema-tasks/contracts";
 import { useMoveTask } from "@/lib/hooks/use-tasks";
-import { positionForIndex } from "@/lib/position";
+import { boardDrop } from "@/lib/board-drop";
+import type { MoveVars } from "@/lib/hooks/use-tasks";
 import { QuickAddInput } from "@/components/ui/quick-add-input";
 import { TaskCard } from "./task-card";
 
@@ -61,7 +66,7 @@ function SortableCard({
   selected?: boolean;
   onToggleSelect?: (id: string) => void;
 }) {
-  const { listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+  const { attributes, listeners, setActivatorNodeRef, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
     disabled: dragDisabled || selectMode, // no modo seleção o arrasto fica desligado [acoes-em-massa RF-1]
   });
@@ -70,7 +75,7 @@ function SortableCard({
   // menta no canto e realce menta na selecionada (distinto da barra-left âmbar de prazo). [RF-2/7]
   if (selectMode) {
     return (
-      <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} className="scroll-my-2">
+      <div ref={setNodeRef} style={{ transform: CSS.Translate.toString(transform), transition }} className="scroll-my-2">
         <div
           role="checkbox"
           tabIndex={0}
@@ -102,27 +107,15 @@ function SortableCard({
       </div>
     );
   }
-  // No touch: segurar (delay do TouchSensor) levanta o card; swipe/scroll passa reto. touch-action
-  // fica em "manipulation" (NUNCA "none", que mataria o scroll da coluna); select-none/touch-callout
-  // evitam seleção de texto e menu de contexto no long-press. [painel]
-  //
-  // A11y: o wrapper NÃO recebe `attributes` (role=button/tabIndex do sortable) — quem é focável é o
-  // próprio TaskCard (`asButton`), pra Enter/Espaço ABRIR a tarefa (o arrasto ficou só mouse/touch;
-  // teclado não reordena, mas o status/coluna é editável na tela de detalhe). Sem KeyboardSensor, o
-  // Enter no card não borbulha pra reiniciar drag. [painel a11y]
   return (
-    <div
-      ref={setNodeRef}
-      style={{
-        transform: CSS.Transform.toString(transform),
-        transition,
-        touchAction: "manipulation",
-        WebkitTouchCallout: "none",
-      }}
-      className={`scroll-my-2 select-none${isDragging ? " opacity-40" : ""}`}
-      {...(dragDisabled ? {} : listeners)}
-    >
-      <TaskCard task={task} onOpen={onOpen} membersById={membersById} clientName={clientName} asButton />
+    <div ref={setNodeRef} style={{ transform: CSS.Translate.toString(transform), transition }}
+      className={cn("group relative scroll-my-2 select-none", isDragging && "opacity-20")}>
+      <TaskCard task={task} onOpen={onOpen} membersById={membersById} clientName={clientName} asButton dragHandleSpace />
+      {<button disabled={dragDisabled} ref={setActivatorNodeRef} type="button" {...attributes} {...listeners}
+        aria-label={`Mover tarefa: ${task.title}`} onClick={event => event.stopPropagation()}
+        className="absolute right-2 top-2 flex size-8 touch-none items-center justify-center rounded-md bg-card text-muted-foreground shadow-sm outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing cursor-grab disabled:cursor-default disabled:opacity-40">
+        <GripVertical className="size-4" aria-hidden="true" />
+      </button>}
     </div>
   );
 }
@@ -139,7 +132,7 @@ interface Props {
   // quick-add inline na coluna (só no board por-cliente, engagement conhecido). Ausente = "+" abre o modal.
   onQuickAdd?: (status: TaskStatus, title: string) => Promise<void>;
   // Visão GLOBAL: move próprio (otimista na lista agregada) + kicker de cliente no card. [tarefas-visao-global]
-  onMove?: (vars: { id: string; status: TaskStatus; position: number }) => void;
+  onMove?: (vars: MoveVars) => Promise<unknown>;
   clientNameById?: Record<string, string>;
   showClient?: boolean;
   // Seleção múltipla (ações em massa). Props ausentes = board normal, sem seleção. [acoes-em-massa]
@@ -168,8 +161,13 @@ export function KanbanBoard({
   onToggleColumn,
 }: Props) {
   const move = useMoveTask(projectId, engagementId);
-  const applyMove = onMove ?? move.mutate; // global injeta o próprio move; board usa o por-projeto
+  const applyMove = onMove ?? move.mutateAsync; // global injeta o próprio move; board usa o por-projeto
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [dragWidth, setDragWidth] = useState<number>();
+  const [drop, setDrop] = useState<ReturnType<typeof boardDrop>>(null);
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
+  const sourceRef = useRef<Task | null>(null);
   // Guarda contra "clique fantasma" pós-toque: depois de um drag o click sintético pode chamar
   // onOpen sem querer. Marcamos durante o drag e liberamos no tick seguinte. [painel]
   const draggedRef = useRef(false);
@@ -178,7 +176,8 @@ export function KanbanBoard({
   // rápido rola a coluna (passa da tolerância antes do delay) e toque simples abre. [painel / shell-mobile]
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
   function openGuarded(id: string) {
@@ -198,6 +197,9 @@ export function KanbanBoard({
   const activeTask = activeId ? tasks.find((t) => t.id === activeId) ?? null : null;
 
   function handleDragStart(e: DragStartEvent) {
+    if (savingRef.current) return;
+    sourceRef.current = tasks.find(task => task.id === String(e.active.id)) ?? null;
+    setDragWidth(e.active.rect.current.initial?.width);
     draggedRef.current = true;
     if (typeof navigator !== "undefined" && "vibrate" in navigator) navigator.vibrate(12); // haptic (Android)
     setActiveId(String(e.active.id));
@@ -210,43 +212,39 @@ export function KanbanBoard({
     }, 0);
   }
 
-  function handleDragEnd(e: DragEndEvent) {
-    setActiveId(null);
-    releaseDragGuard();
-    const { active, over } = e;
-    if (!over) return;
-    const overId = String(over.id);
-    const dragged = tasks.find((t) => t.id === active.id);
-    if (!dragged || overId === dragged.id) return;
-
-    let destStatus: TaskStatus;
-    let overTaskId: string | null = null;
-    if (overId.startsWith("col:")) {
-      destStatus = overId.slice(4) as TaskStatus;
-    } else {
-      const overTask = tasks.find((t) => t.id === overId);
-      if (!overTask) return;
-      destStatus = overTask.status;
-      overTaskId = overTask.id;
-    }
-
-    const dest = byColumn[destStatus].filter((t) => t.id !== dragged.id);
-    const index = overTaskId ? Math.max(0, dest.findIndex((t) => t.id === overTaskId)) : dest.length;
-    const position = positionForIndex(
-      dest.map((t) => t.position),
-      index,
-    );
-    applyMove({ id: dragged.id, status: destStatus, position });
+  function resolveDrop(e: DragOverEvent | DragEndEvent) {
+    if (!e.over) return null;
+    const translated = e.active.rect.current.translated;
+    const source = tasks.find(task => task.id === String(e.active.id));
+    const target = tasks.find(task => task.id === String(e.over?.id));
+    const after = e.activatorEvent.type === "keydown" && source && target && source.status === target.status
+      ? byColumn[source.status].indexOf(target) > byColumn[source.status].indexOf(source)
+      : !!translated && translated.top + translated.height / 2 > e.over.rect.top + e.over.rect.height / 2;
+    return boardDrop(tasks, String(e.active.id), String(e.over.id), after);
+  }
+  async function handleDragEnd(e: DragEndEvent) {
+    const destination = resolveDrop(e);
+    const dragged = sourceRef.current;
+    setActiveId(null); setDrop(null); releaseDragGuard();
+    if (!destination || !dragged || savingRef.current) return;
+    savingRef.current = true; setSaving(true);
+    try {
+      await applyMove({ id: dragged.id, status: destination.status, position: destination.position, updatedAt: dragged.updatedAt, operationId: crypto.randomUUID() });
+    } catch { /* Hook restores the card and presents a useful error. */ }
+    finally { savingRef.current = false; setSaving(false); }
   }
 
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCorners}
+      collisionDetection={args => { const hits = pointerWithin(args); return hits.length ? hits.filter(hit => !String(hit.id).startsWith("col:")).length ? hits.filter(hit => !String(hit.id).startsWith("col:")) : hits : args.pointerCoordinates ? [] : closestCorners(args); }}
+      onDragOver={event => setDrop(resolveDrop(event))}
+      onDragMove={event => setDrop(resolveDrop(event))}
+      accessibility={{ screenReaderInstructions: { draggable: "Pressione espaço para mover. Use as setas para escolher a posição, espaço para soltar e Escape para cancelar." } }}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
       onDragCancel={() => {
-        setActiveId(null);
+        setActiveId(null); setDrop(null);
         releaseDragGuard();
       }}
     >
@@ -259,7 +257,8 @@ export function KanbanBoard({
             dot={col.dot}
             items={byColumn[col.status]}
             membersById={membersById}
-            dragDisabled={dragDisabled}
+            dragDisabled={dragDisabled || saving}
+            insertion={drop?.status === col.status ? drop.beforeId : undefined}
             onOpenTask={openGuarded}
             onAddTask={onAddTask}
             canCreate={canCreate && !selectMode}
@@ -273,17 +272,19 @@ export function KanbanBoard({
           />
         ))}
       </div>
-      <DragOverlay>
+      {saving && <p role="status" className="sr-only">Salvando posição da tarefa</p>}
+      {typeof document !== "undefined" && createPortal(<DragOverlay adjustScale={false} dropAnimation={null} zIndex={100}>
         {activeTask ? (
-          <div className="scale-[1.02] rounded-xl shadow-md ring-1 ring-border">
+          <div style={{ width: dragWidth }} className="pointer-events-none rounded-xl shadow-xl">
             <TaskCard
               task={activeTask}
+              dragHandleSpace
               membersById={membersById}
               clientName={showClient ? clientNameById?.[activeTask.projectId] : undefined}
             />
           </div>
         ) : null}
-      </DragOverlay>
+      </DragOverlay>, document.body)}
     </DndContext>
   );
 }
@@ -295,6 +296,7 @@ function Column({
   items,
   membersById,
   dragDisabled,
+  insertion,
   onOpenTask,
   onAddTask,
   canCreate = true,
@@ -312,6 +314,7 @@ function Column({
   items: Task[];
   membersById: Record<string, string>;
   dragDisabled?: boolean;
+  insertion?: string | null;
   onOpenTask: (id: string) => void;
   onAddTask: (status: TaskStatus, initialTitle?: string) => void;
   canCreate?: boolean;
@@ -338,7 +341,7 @@ function Column({
   };
 
   return (
-    <section aria-labelledby={`col-${status}`} className="flex min-w-0 flex-col">
+    <section ref={setNodeRef} aria-labelledby={`col-${status}`} className="flex min-h-64 min-w-0 flex-col">
       <div className="flex items-center gap-2.5 px-1 pb-3">
         <Dot kind={dot} />
         <span id={`col-${status}`} className="text-[13px] font-medium">
@@ -381,15 +384,15 @@ function Column({
         )}
       </div>
       <div
-        ref={setNodeRef}
-        className={`flex min-h-[80px] flex-col gap-2.5 rounded-xl transition-colors ${
+        className={`flex min-h-[80px] flex-1 flex-col gap-2.5 rounded-xl transition-colors ${
           isOver ? "bg-card/50 outline outline-1 outline-dashed outline-border" : ""
         }`}
       >
         <SortableContext items={items.map((t) => t.id)} strategy={verticalListSortingStrategy}>
           {items.map((t) => (
+            <div key={t.id} className="relative">
+            {insertion === t.id && <div aria-hidden="true" className="pointer-events-none absolute -top-1.5 inset-x-0 h-0.5 rounded-full bg-primary" />}
             <SortableCard
-              key={t.id}
               task={t}
               onOpen={() => onOpenTask(t.id)}
               membersById={membersById}
@@ -398,9 +401,10 @@ function Column({
               selectMode={selectMode}
               selected={isSelected?.(t.id)}
               onToggleSelect={onToggleSelect}
-            />
+            /></div>
           ))}
         </SortableContext>
+        {insertion === null && <div aria-hidden="true" className="pointer-events-none h-0.5 rounded-full bg-primary" />}
 
         {/* composer inline no rodapé (tarefa nasce no fim, acima dele) */}
         {canCreate && supportsQuick && composerOpen && (

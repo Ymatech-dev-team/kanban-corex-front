@@ -1,0 +1,14 @@
+import { fireEvent, render, screen } from "@testing-library/react";
+import { beforeEach, expect, it, vi } from "vitest";
+import type { ReactNode } from "react";
+import type { Task } from "@/lib/types";
+import { KanbanBoard } from "./kanban-board";
+const fixture=vi.hoisted(()=>({ handlers:{} as Record<string, (event: unknown)=>unknown>, move:vi.fn() }));
+vi.mock("@/lib/hooks/use-tasks",()=>({useMoveTask:()=>({mutateAsync:fixture.move})}));
+vi.mock("./task-card",()=>({TaskCard:({task,onOpen}:{task:Task;onOpen?:()=>void})=><button onClick={onOpen}>{task.title}</button>}));
+vi.mock("@dnd-kit/core",()=>({DndContext:({children,...props}:{children:ReactNode})=>{fixture.handlers=props as typeof fixture.handlers;return <>{children}</>;},DragOverlay:({children}:{children:ReactNode})=><div data-testid="overlay">{children}</div>,MouseSensor:class{},TouchSensor:class{},KeyboardSensor:class{},useSensor:vi.fn(),useSensors:vi.fn(),pointerWithin:()=>[],closestCorners:()=>[{id:"col:TODO"}],useDroppable:()=>({setNodeRef:vi.fn(),isOver:false})}));
+vi.mock("@dnd-kit/sortable",()=>({SortableContext:({children}:{children:ReactNode})=><>{children}</>,useSortable:()=>({setNodeRef:vi.fn(),setActivatorNodeRef:vi.fn(),attributes:{},listeners:{}}),verticalListSortingStrategy:vi.fn(),sortableKeyboardCoordinates:vi.fn()}));
+const tasks=[{id:"a",title:"Alpha",status:"TODO",position:1,updatedAt:"2026-11-12T00:00:00Z"},{id:"b",title:"Beta",status:"DOING",position:1,updatedAt:"2026-11-12T00:00:00Z"}] as Task[];
+beforeEach(()=>fixture.move.mockReset());
+it("offers a separate accessible drag handle and preserves opening card",()=>{const open=vi.fn();render(<KanbanBoard tasks={tasks} projectId="p" membersById={{}} onOpenTask={open} onAddTask={vi.fn()}/>);fireEvent.click(screen.getByRole("button",{name:"Mover tarefa: Alpha"}));expect(open).not.toHaveBeenCalled();fireEvent.click(screen.getByText("Alpha"));expect(open).toHaveBeenCalledWith("a");});
+it("cancels outside pointer drops instead of choosing nearest column",()=>{render(<KanbanBoard tasks={tasks} projectId="p" membersById={{}} onOpenTask={vi.fn()} onAddTask={vi.fn()}/>);expect(fixture.handlers.collisionDetection({pointerCoordinates:{x:-10,y:-10}})).toEqual([]);expect(fixture.handlers.collisionDetection({pointerCoordinates:null})).toEqual([{id:"col:TODO"}]);});

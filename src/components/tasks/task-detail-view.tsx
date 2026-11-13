@@ -358,7 +358,7 @@ export function TaskDetailView({ taskId, panel = false, onClose, closeRef }: {
     const position = positionForIndex(column.others, slot);
     const nextIndex = column.index + dir;
     try {
-      await move.mutateAsync({ id: task.id, status: task.status, position });
+      await move.mutateAsync({ id: task.id, status: task.status, position, updatedAt: task.updatedAt });
       // Re-semeia do dado fresco: traz updatedAt/título atuais (pega edição de terceiro) e mantém o
       // token do Save honesto — bumpar só o updatedAt local mascararia conflito. Como as setas só ficam
       // ativas com o form limpo, re-semear não descarta edição do usuário. [lente concorrência]

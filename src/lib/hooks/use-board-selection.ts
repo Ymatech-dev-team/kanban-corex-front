@@ -129,7 +129,7 @@ export function useBoardSelection(opts: {
     const base = allTasks
       .filter((t) => t.status === status && !selectedIds.has(t.id))
       .reduce((mx, t) => Math.max(mx, t.position), 0);
-    const moves = selected.map((t, i) => ({ id: t.id, status, position: base + i + 1 }));
+    const moves = selected.map((t, i) => ({ id: t.id, status, position: base + i + 1, updatedAt: t.updatedAt, operationId: crypto.randomUUID() }));
     bulkMove.mutate(
       { moves },
       {
