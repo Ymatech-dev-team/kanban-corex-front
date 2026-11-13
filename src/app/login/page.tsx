@@ -3,6 +3,7 @@
 import { ThemeToggle } from "@/components/shell/theme-toggle";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import Image from "next/image";
 import type { AxiosError } from "axios";
 import { api } from "@/lib/api";
@@ -12,6 +13,7 @@ import type { LoginInput } from "@sistema-tasks/contracts";
 
 export default function LoginPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,6 +22,8 @@ export default function LoginPage() {
     setError(null);
     try {
       const { data } = await api.post<{ mustChangePassword: boolean }>("/auth/login", values);
+      // Nova sessão começa sem cache de outra pessoa. [produto-telas S1]
+      queryClient.clear();
       if (data.mustChangePassword) {
         // Leva a senha temporária pro 1º acesso via relay EM MEMÓRIA (não storage). [hardening T6]
         setTempPassword(values.password);

@@ -39,15 +39,17 @@
   --warning-foreground: #fff;
   --danger: #b33f3b;
   --danger-foreground: #fff;
+  --rule: var(--corex-blue); /* régua de 2px dos cabeçalhos de seção (SectionHeader) */
   --segment: var(--surface);
   --segment-foreground: var(--foreground);
-  --radius: .5rem;
-  --field-radius: .5rem;
+  --radius: .125rem; /* estrutura: cartões, linhas, painéis, overlays (RF1) */
+  --field-radius: .25rem; /* controles: botões, campos (RF1) */
   --surface-shadow: none;
   --overlay-shadow: 0 12px 36px #091e2b20;
   --scrollbar-thumb: color-mix(in srgb, var(--foreground) 25%, transparent);
   --font-sans: var(--font-manrope), sans-serif;
   --font-display: var(--font-manrope), sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
   --motion-fast: 140ms;
   --motion-panel: 200ms;
   --motion-ease: cubic-bezier(.2,.8,.2,1);
@@ -64,6 +66,7 @@
   --muted: #b7c9cb;
   --border: #2d4a52;
   --focus: var(--corex-turquoise);
+  --rule: var(--corex-turquoise);
   --success: #57dbc2;
   --success-foreground: var(--corex-blue);
   --warning: #efc477;
@@ -110,9 +113,17 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --radius-lg: .75rem;
-  --radius-md: .5rem;
-  --radius-sm: .375rem;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+  /* Sem pílulas. A escala do HeroUI deriva de --radius; aqui ela é fixada: 2px estrutura, 4px controles. [RF1]
+     Botões e abas usam rounded-3xl (controle: 4px); chips, folhas e listas usam 2xl/xl (estrutura: 2px). */
+  --radius-xs: .125rem;
+  --radius-sm: .125rem;
+  --radius-md: .25rem;
+  --radius-lg: .25rem;
+  --radius-xl: .125rem;
+  --radius-2xl: .125rem;
+  --radius-3xl: .25rem;
+  --radius-4xl: .25rem;
 }
 body { background: var(--background); color: var(--foreground); font-family: var(--font-manrope), sans-serif; }
 ::selection { background: var(--corex-turquoise); color: var(--corex-blue); }
@@ -134,12 +145,42 @@ body { background: var(--background); color: var(--foreground); font-family: var
 .corex-logo-dark { display: none; }
 :root.dark .corex-logo-light { display: none; }
 :root.dark .corex-logo-dark { display: block; }
+/* Horários, durações, IDs, nomes de checks e contagens: Plex Mono, algarismos tabulares. [RF2] */
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.corex-tabular { font-variant-numeric: tabular-nums; }
 .ui-button { transition: background-color var(--motion-fast), color var(--motion-fast), border-color var(--motion-fast); }
 .ui-button[aria-busy="true"] { cursor: progress; }
 .corex-toast-region { bottom: max(1rem, env(safe-area-inset-bottom)); }
 @media(max-width:1023px) { .corex-home { padding: 1.5rem 1rem; } .corex-toast-region { bottom: calc(76px + env(safe-area-inset-bottom)); } }
 @media(pointer:coarse) { input:not([type="checkbox"]):not([type="radio"]), textarea, select { font-size: 16px!important; } }
-@media(prefers-reduced-motion:reduce) { *, *::before, *::after { scroll-behavior: auto!important; animation-duration: .01ms!important; transition-duration: .01ms!important; } }
+@media(prefers-reduced-motion:reduce) { *, *::before, *::after { scroll-behavior: auto!important; animation-duration: .01ms!important; animation-iteration-count: 1!important; transition-duration: .01ms!important; } }
+
+/* Estrutura em 2px (cartões, painéis, overlays, tabelas, abas, avisos); controles ficam em 4px pela escala acima.
+   O HeroUI desenha esses painéis com 3xl, 2xl+6px ou radius*2.5 (8px, 5px, 4px); aqui todos voltam a --radius. [RF1] */
+@layer components {
+.card, .popover, .toast, .alert, .accordion--surface, .toolbar--attached,
+.modal__dialog, .alert-dialog__dialog,
+.dropdown__popover, .select__popover, .combo-box__popover, .autocomplete__popover,
+.color-picker__popover, .date-picker__popover, .date-range-picker__popover,
+.table-root--primary, .tabs__list-container { border-radius: var(--radius); }
+}
+
+/* Movimento: nada passa de --motion-panel (200 ms). O HeroUI usa 250–350 ms nas classes abaixo.
+   Fora de @layer de propósito: vence a especificidade do pacote (inclusive [data-entering]) e continua
+   abaixo do reduced-motion, que é !important. [RNF1] */
+.accordion__indicator, .alert-dialog__trigger, .avatar__image, .button, .calendar__nav-button, .calendar__cell,
+.close-button, .color-slider .color-slider__thumb, .disclosure__indicator, .drawer__trigger, .drawer__backdrop,
+.dropdown__trigger, .error-message, .field-error, .list-box-item, .list-box-item__indicator, .menu-item,
+.menu-item__indicator, .meter .meter__fill, .modal__trigger, .pagination__link, .progress-bar .progress-bar__fill,
+.progress-circle .progress-circle__fill-circle, .range-calendar__nav-button, .slider .slider__thumb,
+.switch__control, .switch__thumb, .tabs__indicator, .toggle-button,
+[data-slot="list-box-item-indicator--checkmark"], [data-slot="menu-item-indicator--checkmark"], [data-slot="menu-item-indicator--dot"] {
+  transition-duration: var(--motion-panel);
+}
+.alert-dialog__container[data-entering="true"], .modal__container[data-entering="true"],
+.autocomplete__popover[data-entering="true"], .input-otp__slot-value { animation-duration: var(--motion-panel); }
+.toast { --toast-enter-duration: var(--motion-panel); --toast-exit-duration: var(--motion-panel); }
+.drawer__content { --drawer-enter-duration: var(--motion-panel); --drawer-exit-duration: var(--motion-panel); }
 
 /* Layout-only buttons retain HeroUI interaction and accessibility. */
 @layer components {

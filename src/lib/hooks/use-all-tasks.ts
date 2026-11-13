@@ -14,10 +14,17 @@ interface AllTasksResponse {
   hasMore: boolean;
 }
 
+/** `q` (busca por título, RB4): aparada antes de enviar; vazia não vai para a API. A chave de cache usa `query` como veio. */
+function requestParams(query: Record<string, string>): Record<string, string> {
+  const { q, ...rest } = query;
+  const text = q?.trim();
+  return text ? { ...rest, q: text } : rest;
+}
+
 export function useAllTasks(query: Record<string, string>) {
   return useQuery<AllTasksResponse>({
     queryKey: allTasksKey(query),
-    queryFn: async () => (await api.get<AllTasksResponse>("/tasks", { params: query })).data,
+    queryFn: async () => (await api.get<AllTasksResponse>("/tasks", { params: requestParams(query) })).data,
   });
 }
 

@@ -45,7 +45,7 @@ const FIELD_LABEL: Record<string, string> = {
   dueDate: "prazo",
 };
 
-function icon(type: string): ReactNode {
+export function activityIcon(type: string): ReactNode {
   const cls = "size-[11px] text-muted-foreground";
   switch (type) {
     case "CREATED": return <Plus className={cls} aria-hidden />;
@@ -64,7 +64,7 @@ function str(v: unknown): string | null {
 }
 
 /** Descreve o evento em texto (interpolação — React escapa, sem HTML bruto). [SEC-303] */
-function describe(e: TaskActivity, nameOf: (id: string) => string): ReactNode {
+export function describeActivity(e: TaskActivity, nameOf: (id: string) => string): ReactNode {
   const who = <span className="font-medium">{e.actorName}</span>;
   const p = e.payload;
   // nome do alvo: prefere o snapshot gravado no payload; senão resolve ao vivo pelos membros. [review #2]
@@ -98,7 +98,7 @@ function describe(e: TaskActivity, nameOf: (id: string) => string): ReactNode {
   }
 }
 
-function when(iso: string): string {
+export function when(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
   const sameYear = d.getFullYear() === new Date().getFullYear();
@@ -110,39 +110,25 @@ function when(iso: string): string {
     minute: "2-digit",
   });
 }
-function whenFull(iso: string): string {
+export function whenFull(iso: string): string {
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? "" : d.toLocaleString("pt-BR", { dateStyle: "long", timeStyle: "short" });
 }
 
-export function ActivityTab({
-  taskId,
-  membersById,
-  enabled,
-}: {
-  taskId: string;
-  membersById: Record<string, string>;
-  enabled: boolean;
-}) {
-  const q = useTaskActivity(taskId, enabled);
+/**
+ * Formulário de comentário: rascunho por tarefa em localStorage, chave de idempotência estável por tentativa,
+ * rascunho e chave mantidos se o envio falhar. Extraído do ActivityTab sem mudar comportamento; a folha usa o mesmo. [RF-J3, RF-J4, RF33]
+ */
+export function CommentComposer({ taskId, className }: { taskId: string; className?: string }) {
   const add = useAddComment(taskId);
-  const edit = useEditComment(taskId);
-  const del = useDeleteComment(taskId);
-  const nameOf = (id: string) => membersById[id] ?? "alguém sem acesso";
-  const items = q.data?.pages.flatMap((p) => p.items) ?? [];
-
   const [draft, setDraft] = useState("");
   const [failed, setFailed] = useState(false);
-  const [editing, setEditing] = useState<{ id: string; body: string } | null>(null);
-  const [confirmDel, setConfirmDel] = useState<string | null>(null);
   const sendKey = useRef<string | null>(null); // chave de idempotência estável por tentativa [review C2]
 
   // rascunho por tarefa: carrega ao abrir, persiste ao digitar (não perde ao fechar o modal). [RF-J3]
   useEffect(() => {
     setDraft(loadDraft(taskId));
     setFailed(false);
-    setEditing(null);
-    setConfirmDel(null);
     sendKey.current = null;
   }, [taskId]);
   useEffect(() => {
@@ -167,6 +153,46 @@ export function ActivityTab({
       setFailed(true); // mantém o rascunho E a chave pra reenviar [RF-J4]
     }
   }
+
+  return (
+    <div className={className}>
+      <Textarea
+        value={draft}
+        aria-label="Novo comentário"
+        onChange={(e) => {
+          setDraft(e.target.value);
+          if (failed) setFailed(false);
+        }}
+        maxLength={5000}
+        placeholder="Escrever um comentário"
+        className="min-h-[60px]"
+      />
+      <div className="mt-2 flex items-center justify-between gap-2">
+        {failed ? (
+          <span className="flex items-center gap-1.5 text-[12px] text-amber">
+            <X className="size-3.5" /> Não enviado — tente de novo
+          </span>
+        ) : (
+          <span />
+        )}
+        <Button type="button" onClick={submit} disabled={!draft.trim() || add.isPending}>
+          {add.isPending ? "Enviando…" : failed ? "Reenviar" : "Comentar"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Um comentário com edição e remoção (só quando `canManage`). `card` é o formato da aba Atividade;
+ * `diary` é a linha do Diário da folha (a hora fica na coluna ao lado). Texto sempre como texto (RNF3).
+ */
+export function CommentItem({ activity: e, taskId, variant = "card" }: { activity: TaskActivity; taskId: string; variant?: "card" | "diary" }) {
+  const edit = useEditComment(taskId);
+  const del = useDeleteComment(taskId);
+  const [editing, setEditing] = useState<{ id: string; body: string } | null>(null);
+  const [confirmDel, setConfirmDel] = useState<string | null>(null);
+
   async function saveEdit() {
     if (!editing || edit.isPending) return;
     const body = editing.body.trim();
@@ -178,6 +204,114 @@ export function ActivityTab({
       /* toast no hook; mantém em edição */
     }
   }
+
+  const controls = e.canManage && e.body !== null && editing?.id !== e.id && (
+    <span className="ml-auto flex gap-1">
+      <Button variant="unstyled"
+        type="button"
+        aria-label="Editar comentário"
+        onClick={() => setEditing({ id: e.id, body: e.body ?? "" })}
+        className="rounded-sm text-muted-foreground/70 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <Pencil className="size-3.5" />
+      </Button>
+      <Button variant="unstyled"
+        type="button"
+        aria-label="Remover comentário"
+        onClick={() => setConfirmDel(e.id)}
+        className="rounded-sm text-muted-foreground/70 outline-none transition-colors hover:text-amber focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <Trash2 className="size-3.5" />
+      </Button>
+    </span>
+  );
+  const body = editing?.id === e.id ? (
+    <div className="flex flex-col gap-2">
+      <Textarea
+        value={editing.body}
+        aria-label="Editar comentário"
+        onChange={(ev) => setEditing({ id: e.id, body: ev.target.value })}
+        maxLength={5000}
+        className="min-h-[60px]"
+      />
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="secondary" onClick={() => setEditing(null)}>
+          Cancelar
+        </Button>
+        <Button type="button" onClick={saveEdit} disabled={!editing.body.trim() || edit.isPending}>
+          {edit.isPending ? "Salvando…" : "Salvar"}
+        </Button>
+      </div>
+    </div>
+  ) : e.body === null ? (
+    <p className="text-[13px] italic text-muted-foreground">comentário removido</p>
+  ) : (
+    <p className="whitespace-pre-wrap break-words text-[13px] text-foreground">{e.body}</p>
+  );
+  const confirm = confirmDel === e.id && (
+    <div className="mt-2 flex items-center gap-2 text-[12px] text-muted-foreground">
+      Remover este comentário?
+      <Button variant="unstyled"
+        type="button"
+        disabled={del.isPending}
+        onClick={() => {
+          del.mutate(e.id);
+          setConfirmDel(null);
+        }}
+        className="rounded-sm font-medium text-destructive outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+      >
+        Remover
+      </Button>
+      <Button variant="unstyled"
+        type="button"
+        onClick={() => setConfirmDel(null)}
+        className="rounded-sm outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        Cancelar
+      </Button>
+    </div>
+  );
+
+  if (variant === "diary") {
+    return (
+      <div className="min-w-0">
+        <div className="flex items-center gap-2 text-[13px]">
+          <span><span className="font-medium">{e.actorName}</span> comentou{e.editedAt ? <span className="text-muted-foreground"> · editado</span> : null}</span>
+          {controls}
+        </div>
+        <div className="mt-0.5">{body}</div>
+        {confirm}
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-lg border border-border bg-card px-3 py-2">
+      <div className="mb-1 flex items-center gap-2">
+        <span className="text-[12.5px] font-medium">{e.actorName}</span>
+        <time dateTime={e.createdAt} title={whenFull(e.createdAt)} className="text-[11px] text-muted-foreground">
+          {when(e.createdAt)}
+          {e.editedAt ? " · editado" : ""}
+        </time>
+        {controls}
+      </div>
+      {body}
+      {confirm}
+    </div>
+  );
+}
+
+export function ActivityTab({
+  taskId,
+  membersById,
+  enabled,
+}: {
+  taskId: string;
+  membersById: Record<string, string>;
+  enabled: boolean;
+}) {
+  const q = useTaskActivity(taskId, enabled);
+  const nameOf = (id: string) => membersById[id] ?? "alguém sem acesso";
+  const items = q.data?.pages.flatMap((p) => p.items) ?? [];
 
   return (
     <div className="flex flex-col">
@@ -208,92 +342,14 @@ export function ActivityTab({
                   <span className="absolute -left-[26px] flex size-[22px] items-center justify-center rounded-full bg-surface-tertiary text-[10px] font-medium text-foreground">
                     {initials(e.actorName)}
                   </span>
-                  <div className="rounded-lg border border-border bg-card px-3 py-2">
-                    <div className="mb-1 flex items-center gap-2">
-                      <span className="text-[12.5px] font-medium">{e.actorName}</span>
-                      <time
-                        dateTime={e.createdAt}
-                        title={whenFull(e.createdAt)}
-                        className="text-[11px] text-muted-foreground"
-                      >
-                        {when(e.createdAt)}
-                        {e.editedAt ? " · editado" : ""}
-                      </time>
-                      {e.canManage && e.body !== null && editing?.id !== e.id && (
-                        <span className="ml-auto flex gap-1">
-                          <Button variant="unstyled"
-                            type="button"
-                            aria-label="Editar comentário"
-                            onClick={() => setEditing({ id: e.id, body: e.body ?? "" })}
-                            className="rounded-sm text-muted-foreground/70 outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                          >
-                            <Pencil className="size-3.5" />
-                          </Button>
-                          <Button variant="unstyled"
-                            type="button"
-                            aria-label="Remover comentário"
-                            onClick={() => setConfirmDel(e.id)}
-                            className="rounded-sm text-muted-foreground/70 outline-none transition-colors hover:text-amber focus-visible:ring-2 focus-visible:ring-ring"
-                          >
-                            <Trash2 className="size-3.5" />
-                          </Button>
-                        </span>
-                      )}
-                    </div>
-                    {editing?.id === e.id ? (
-                      <div className="flex flex-col gap-2">
-                        <Textarea
-                          value={editing.body}
-                          aria-label="Editar comentário"
-                          onChange={(ev) => setEditing({ id: e.id, body: ev.target.value })}
-                          maxLength={5000}
-                          className="min-h-[60px]"
-                        />
-                        <div className="flex justify-end gap-2">
-                          <Button type="button" variant="secondary" onClick={() => setEditing(null)}>
-                            Cancelar
-                          </Button>
-                          <Button type="button" onClick={saveEdit} disabled={!editing.body.trim() || edit.isPending}>
-                            {edit.isPending ? "Salvando…" : "Salvar"}
-                          </Button>
-                        </div>
-                      </div>
-                    ) : e.body === null ? (
-                      <p className="text-[13px] italic text-muted-foreground">comentário removido</p>
-                    ) : (
-                      <p className="whitespace-pre-wrap break-words text-[13px] text-foreground">{e.body}</p>
-                    )}
-                    {confirmDel === e.id && (
-                      <div className="mt-2 flex items-center gap-2 text-[12px] text-muted-foreground">
-                        Remover este comentário?
-                        <Button variant="unstyled"
-                          type="button"
-                          disabled={del.isPending}
-                          onClick={() => {
-                            del.mutate(e.id);
-                            setConfirmDel(null);
-                          }}
-                          className="rounded-sm font-medium text-destructive outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-                        >
-                          Remover
-                        </Button>
-                        <Button variant="unstyled"
-                          type="button"
-                          onClick={() => setConfirmDel(null)}
-                          className="rounded-sm outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                        >
-                          Cancelar
-                        </Button>
-                      </div>
-                    )}
-                  </div>
+                  <CommentItem activity={e} taskId={taskId} />
                 </div>
               ) : (
                 <div key={e.id} role="article" className="relative mb-3.5 last:mb-0">
-                  <span className="absolute -left-6 flex size-[18px] items-center justify-center rounded-full border border-border bg-card">
-                    {icon(e.type)}
+                  <span className="absolute -left-6 flex size-[18px] items-center justify-center rounded-sm border border-border bg-card">
+                    {activityIcon(e.type)}
                   </span>
-                  <div className="text-[12.5px] text-foreground">{describe(e, nameOf)}</div>
+                  <div className="text-[12.5px] text-foreground">{describeActivity(e, nameOf)}</div>
                   <time
                     dateTime={e.createdAt}
                     title={whenFull(e.createdAt)}
@@ -322,31 +378,7 @@ export function ActivityTab({
       </div>
 
       {/* composer — comentar exige acesso ao cliente (garantido no backend); barra real lá. [RF-C1/C6] */}
-      <div className="mt-3 border-t border-border pt-3">
-        <Textarea
-          value={draft}
-          aria-label="Novo comentário"
-          onChange={(e) => {
-            setDraft(e.target.value);
-            if (failed) setFailed(false);
-          }}
-          maxLength={5000}
-          placeholder="Escrever um comentário"
-          className="min-h-[60px]"
-        />
-        <div className="mt-2 flex items-center justify-between gap-2">
-          {failed ? (
-            <span className="flex items-center gap-1.5 text-[12px] text-amber">
-              <X className="size-3.5" /> Não enviado — tente de novo
-            </span>
-          ) : (
-            <span />
-          )}
-          <Button type="button" onClick={submit} disabled={!draft.trim() || add.isPending}>
-            {add.isPending ? "Enviando…" : failed ? "Reenviar" : "Comentar"}
-          </Button>
-        </div>
-      </div>
+      <CommentComposer taskId={taskId} className="mt-3 border-t border-border pt-3" />
     </div>
   );
 }

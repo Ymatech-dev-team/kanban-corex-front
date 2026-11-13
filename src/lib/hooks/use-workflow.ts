@@ -1,7 +1,8 @@
-import { useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useMutation, useQuery, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
-import type { WorkflowState, WorkflowCommand, InitializeWorkflowInput } from "@sistema-tasks/contracts";
+import type { WorkflowState, WorkflowCommand, InitializeWorkflowInput, WorkflowTeamItem } from "@sistema-tasks/contracts";
 import { api } from "@/lib/api";
+import { httpStatus } from "@/lib/http-error";
 
 export interface WorkflowAction {
   id: string;
@@ -17,6 +18,8 @@ export interface WorkflowAction {
   version: number;
   options?: string[];
   response?: string | null;
+  /** ISO; o backend sempre devolve (task_action_requests."createdAt"). */
+  createdAt?: string;
 }
 export interface WorkflowSnapshot {
   state: WorkflowState | null;
@@ -67,6 +70,54 @@ export function useWorkflowMonitoring() {
   });
 }
 
+/** Feed da equipe (RB1): execuções vivas da organização visíveis ao usuário. Exige `tarefas.ver_globais`. */
+export const teamWorkflowsKey = ["workflow-monitoring", "team"] as const;
+export const TEAM_FEED_LIMIT = 300;
+const TEAM_PAGE_SIZE = 100;
+export function useTeamWorkflows(options: { enabled?: boolean } = {}) {
+  const query = useInfiniteQuery({
+    queryKey: teamWorkflowsKey,
+    enabled: options.enabled ?? true,
+    initialPageParam: null as string | null,
+    queryFn: async ({ pageParam }) => (await api.get<{ items: WorkflowTeamItem[]; nextCursor: string | null }>("/tasks/workflows/team", { params: { limit: TEAM_PAGE_SIZE, ...(pageParam ? { cursor: pageParam } : {}) } })).data,
+    getNextPageParam: page => page.nextCursor ?? undefined,
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: false,
+    refetchOnWindowFocus: true,
+  });
+  // Acesso revogado (401/403/404): o feed antigo some em vez de continuar visível. Rede/5xx mantém o último estado.
+  const errorStatus = httpStatus(query.error);
+  const accessLost = errorStatus === 401 || errorStatus === 403 || errorStatus === 404;
+  // Dedup por taskId (o keyset pode deslocar itens entre páginas se o feed mudar durante a busca); teto de 300.
+  const items = useMemo(() => {
+    if (accessLost) return [];
+    const seen = new Set<string>();
+    const all: WorkflowTeamItem[] = [];
+    for (const page of query.data?.pages ?? []) for (const item of page.items) if (!seen.has(item.taskId)) { seen.add(item.taskId); all.push(item); }
+    return all.slice(0, TEAM_FEED_LIMIT);
+  }, [query.data, accessLost]);
+  const { hasNextPage, isFetchingNextPage, isError, fetchNextPage } = query;
+  const loaded = query.data?.pages.reduce((n, page) => n + page.items.length, 0) ?? 0;
+  const pageCount = query.data?.pages.length ?? 0;
+  // Busca as páginas seguintes até o teto de itens ou até nextCursor === null. O backend pode devolver página curta
+  // ou vazia com nextCursor (itens descartados por permissão): isso NÃO é fim do feed. `pageCount` religa o efeito
+  // a cada página, mesmo que `loaded` não mude (página vazia).
+  useEffect(() => {
+    if (hasNextPage && !isFetchingNextPage && !isError && loaded < TEAM_FEED_LIMIT) void fetchNextPage();
+  }, [hasNextPage, isFetchingNextPage, isError, loaded, pageCount, fetchNextPage]);
+  // Campos explícitos, sem espalhar `query`: o spread lê `promise` (rejeição não tratada em erro) e assina todos os campos.
+  const { isLoading, isPending, isSuccess, isError: failed, error, isFetching, isFetchNextPageError, dataUpdatedAt, status, refetch } = query;
+  return {
+    /** `undefined` quando o acesso foi perdido: ninguém deve ler o feed antigo por aqui. */
+    data: accessLost ? undefined : query.data,
+    items,
+    /** Há mais execuções além do teto: avisar "mostrando as 300 mais recentes". */
+    truncated: !accessLost && !!hasNextPage && loaded >= TEAM_FEED_LIMIT,
+    status, isLoading, isPending, isSuccess, isError: failed, error, isFetching, isFetchingNextPage, isFetchNextPageError, hasNextPage, dataUpdatedAt, refetch, fetchNextPage,
+  };
+}
+
+
 export function workflowMessage(error: unknown): string {
   const status = (error as { response?: { status?: number } })?.response?.status;
   if (status === 400) {
@@ -100,7 +151,7 @@ export function useWorkflowWrite(taskId: string) {
       }
     },
     onSettled: async () => {
-      await Promise.all([cache.invalidateQueries({ queryKey: workflowKey(taskId) }), cache.invalidateQueries({ queryKey: myActionsKey }), cache.invalidateQueries({ queryKey: monitoringKey }), cache.invalidateQueries({ queryKey: ["task", taskId] }), cache.invalidateQueries({ queryKey: ["tasks"] }), cache.invalidateQueries({ queryKey: ["eng-tasks"] })]);
+      await Promise.all([cache.invalidateQueries({ queryKey: workflowKey(taskId) }), cache.invalidateQueries({ queryKey: myActionsKey }), cache.invalidateQueries({ queryKey: monitoringKey }), cache.invalidateQueries({ queryKey: teamWorkflowsKey }), cache.invalidateQueries({ queryKey: ["task", taskId] }), cache.invalidateQueries({ queryKey: ["tasks"] }), cache.invalidateQueries({ queryKey: ["eng-tasks"] })]);
     },
   });
 }

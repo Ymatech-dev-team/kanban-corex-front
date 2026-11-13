@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ListTodo, SearchX } from "lucide-react";
 import { PERMISSIONS, type TaskStatus } from "@sistema-tasks/contracts";
 import { useMe } from "@/lib/hooks/use-me";
 import { hasPermission } from "@/lib/hooks/use-can";
@@ -10,6 +9,8 @@ import { useProjects } from "@/lib/hooks/use-projects";
 import { useEngagements } from "@/lib/hooks/use-engagements";
 import { useAccessibleMembers } from "@/lib/hooks/use-members";
 import { useAllTasks, useGlobalMoveTask } from "@/lib/hooks/use-all-tasks";
+import { useTeamWorkflows } from "@/lib/hooks/use-workflow";
+import { useNow } from "@/lib/hooks/use-now";
 import {
   parseFilters,
   filtersToSearchParams,
@@ -17,13 +18,16 @@ import {
   parseView,
   hasAnyFilter,
   writeStoredClientProject,
+  filterByFluxo,
   DEFAULT_FILTERS,
   type GlobalFilters,
   type TaskView,
 } from "@/lib/global-filters";
-import { BoardSkeleton, BoardError, EmptyClients } from "@/components/board/board-states";
+import { BoardSkeleton, BoardError, EmptyClients, RowsSkeleton } from "@/components/board/board-states";
 import { KanbanBoard } from "@/components/board/kanban-board";
 import { TaskCalendar } from "@/components/board/task-calendar";
+import { TaskCardExtrasProvider } from "@/components/board/task-card";
+import { buildLiveByTask, useMyOpenActions } from "@/components/query-bar";
 import { GlobalFilterBar } from "./global-filter-bar";
 import { GlobalTaskTable, type EngagementLite } from "./global-task-table";
 import { GlobalCreateTaskDialog } from "./global-create-task-dialog";
@@ -38,6 +42,13 @@ export function GlobalTasksView() {
   const filters = useMemo(() => parseFilters(new URLSearchParams(sp.toString())), [sp]);
 
   // Gate da aba global: sem tarefas.ver_globais, não entra (redireciona quando o /me resolve). [tarefas-visao-global]
+  // Título da aba, no mesmo padrão da Agora.
+  useEffect(() => {
+    const previous = document.title;
+    document.title = "Tarefas · Corex Tasks";
+    return () => { document.title = previous; };
+  }, []);
+
   const me = useMe();
   const canView = hasPermission(me.data?.permissions, PERMISSIONS.tarefas_ver_globais);
   const canCreate = hasPermission(me.data?.permissions, PERMISSIONS.tarefas_criar); // gate do "+" [criar-mais-rapido RF-12]
@@ -73,7 +84,21 @@ export function GlobalTasksView() {
     return q;
   }, [filters, view]);
   const all = useAllTasks(query);
+  // Digitar em `q` troca a chave da consulta: em vez de piscar o esqueleto a cada busca, a lista anterior fica visível até a nova chegar.
+  // Vale só quando o que mudou foi o `q` (outro filtro mostraria tarefas que não batem). `useAllTasks` é do F0 e não ganhou keepPreviousData.
+  const baseKey = useMemo(() => JSON.stringify({ ...query, q: undefined }), [query]);
+  const [lastShown, setLastShown] = useState<{ baseKey: string; data: NonNullable<typeof all.data> } | null>(null);
+  if (all.data && lastShown?.data !== all.data) setLastShown({ baseKey, data: all.data });
+  const shown = all.data ?? (lastShown?.baseKey === baseKey ? lastShown.data : undefined);
+  const refreshing = !all.data && !!shown && all.isFetching;
   const move = useGlobalMoveTask(query);
+
+  // Estado vivo: o feed da equipe (mesmo cache da Agora) cruzado com os pedidos abertos para mim. Alimenta a linha viva
+  // do cartão e da tabela, o filtro de estado do fluxo (RF23) e as contagens das visões. Falha do feed = sem linha viva.
+  const team = useTeamWorkflows({ enabled: canView });
+  const myActions = useMyOpenActions();
+  const now = useNow(30_000);
+  const liveByTaskId = useMemo(() => buildLiveByTask(team.items, myActions, now), [team.items, myActions, now]);
 
   // Navega mantendo/limpando os params de filtro/view (sempre replace — filtro não é entrada de histórico). [RF-C1/E1]
   function navigate(next: GlobalFilters, opts?: { view?: TaskView }) {
@@ -126,13 +151,25 @@ export function GlobalTasksView() {
     [accessibleMembers.data],
   );
 
-  const tasks = all.data?.tasks ?? [];
+  // RF23: com `fluxo` ativo, só aparecem tarefas cujo fluxo está no estado pedido; tarefa sem fluxo some.
+  const tasks = useMemo(() => filterByFluxo(shown?.tasks ?? [], liveByTaskId, filters.fluxo), [shown, filters.fluxo, liveByTaskId]);
+  const fluxoLoading = !!filters.fluxo && team.isLoading;
+  const fluxoError = !!filters.fluxo && team.isError;
+  const projectNameById = useMemo(() => {
+    const out: Record<string, string> = {};
+    for (const item of team.items) if (item.projectId && item.projectName) out[item.projectId] = item.projectName;
+    for (const [id, e] of Object.entries(engagementsById)) if (!e.isGeneral) out[id] = e.name;
+    return out;
+  }, [team.items, engagementsById]);
   const count = tasks.length;
-  const countLabel = all.isLoading
+  const countLabel = all.isLoading && !shown
     ? ""
-    : all.data?.hasMore
+    : shown?.hasMore
       ? `${count}+ tarefas`
       : `${count} ${count === 1 ? "tarefa" : "tarefas"}`;
+  // Contagem na aba só onde é exata para a lista atual: a visão ativa, sem busca por texto e sem "mais resultados".
+  // As demais abas não mostram número (contagens do feed e da lista seriam de origens diferentes).
+  const activeCount = !all.isLoading && !all.isError && !shown?.hasMore && !filters.q && !refreshing && !fluxoLoading && !fluxoError ? count : undefined;
   const showOpenBoard = !!filters.cliente && !!filters.projeto;
   const showContext = !(filters.cliente && filters.projeto);
   const showClient = !filters.cliente; // kicker de cliente só quando cruza clientes
@@ -163,21 +200,21 @@ export function GlobalTasksView() {
   if (clients.length === 0) return <EmptyClients onCreate={() => router.push("/clientes")} />;
 
   let body: React.ReactNode;
-  if (all.isLoading) {
-    body = <BoardSkeleton />;
+  if ((all.isLoading && !shown) || fluxoLoading) {
+    body = view === "kanban" ? <BoardSkeleton /> : <RowsSkeleton />;
   } else if (all.isError) {
     body = <BoardError onRetry={() => all.refetch()} />;
+  } else if (fluxoError) {
+    body = <BoardError onRetry={() => team.refetch()} />;
   } else if (tasks.length === 0) {
     body = hasAnyFilter(filters) ? (
       <EmptyState
-        icon={<SearchX className="size-5" />}
-        title="Nenhuma tarefa bate nos filtros"
-        desc="Ajuste ou limpe os filtros pra ver mais."
-        action={<Button variant="secondary" onClick={() => navigate({ ...DEFAULT_FILTERS })}>Limpar filtros</Button>}
+        title={filters.q ? "Nenhuma tarefa encontrada" : "Nenhuma tarefa bate nos filtros"}
+        desc={filters.q ? "Nenhum título combina com a busca e os filtros atuais." : "Ajuste ou limpe os filtros pra ver mais."}
+        action={<Button variant="secondary" className="max-md:min-h-11" onClick={() => navigate({ ...DEFAULT_FILTERS })}>Limpar filtros</Button>}
       />
     ) : (
       <EmptyState
-        icon={<ListTodo className="size-5" />}
         title="Você não tem tarefas"
         desc="Quando houver tarefas nos seus clientes, elas aparecem aqui."
       />
@@ -200,17 +237,15 @@ export function GlobalTasksView() {
     body = <TaskCalendar tasks={tasks} onOpenTask={openTask} membersById={membersById} />;
   } else {
     body = (
-      <div className="flex-1 overflow-auto p-6">
-        <div className="mx-auto max-w-5xl">
-          <GlobalTaskTable
-            tasks={tasks}
-            membersById={membersById}
-            clientsById={clientsById}
-            engagementsById={engagementsById}
-            showContext={showContext}
-            onOpenTask={openTask}
-          />
-        </div>
+      <div className="flex-1 overflow-auto px-4 pb-10 pt-1 lg:px-6">
+        <GlobalTaskTable
+          tasks={tasks}
+          membersById={membersById}
+          clientsById={clientsById}
+          engagementsById={engagementsById}
+          showContext={showContext}
+          onOpenTask={openTask}
+        />
       </div>
     );
   }
@@ -229,35 +264,27 @@ export function GlobalTasksView() {
         respDisabled={accessibleMembers.isLoading}
         countLabel={countLabel}
         showOpenBoard={showOpenBoard}
-        onOpenBoard={() => router.push(`/clientes/${filters.cliente}/projetos/${filters.projeto}`)}
+        onOpenBoard={() => router.push(`/clientes/${encodeURIComponent(filters.cliente!)}/projetos/${encodeURIComponent(filters.projeto!)}`)}
+        meId={me.data?.userId}
+        activeCount={activeCount}
       />
 
-      <div className="flex min-h-0 flex-1 flex-col">{body}</div>
+      <TaskCardExtrasProvider value={{ live: liveByTaskId, now, engagementNameById: projectNameById }}>
+        <div aria-busy={refreshing || undefined} className="flex min-h-0 flex-1 flex-col">{body}</div>
+      </TaskCardExtrasProvider>
 
       <GlobalCreateTaskDialog status={addStatus} onOpenChange={(o) => !o && setAddStatus(null)} />
     </div>
   );
 }
 
-function EmptyState({
-  icon,
-  title,
-  desc,
-  action,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  desc: string;
-  action?: React.ReactNode;
-}) {
+/** Estado vazio: texto à esquerda (título + uma linha), ação abaixo; sem ícone em moldura. */
+function EmptyState({ title, desc, action }: { title: string; desc: string; action?: React.ReactNode }) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-3 py-16 text-center">
-      <div className="flex size-12 items-center justify-center rounded-full border border-border bg-card text-muted-foreground">
-        {icon}
-      </div>
+    <div className="flex flex-1 flex-col items-start gap-3 px-4 py-10 text-left lg:px-6">
       <div>
-        <h2 className="text-base font-medium tracking-tight">{title}</h2>
-        <p className="mt-1 max-w-xs text-sm text-muted-foreground">{desc}</p>
+        <h2 className="text-base font-bold tracking-tight">{title}</h2>
+        <p className="mt-1 max-w-md text-sm text-muted">{desc}</p>
       </div>
       {action}
     </div>

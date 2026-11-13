@@ -1,9 +1,10 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
-import { ActivityTab } from "./activity-tab";
+import { ActivityTab, CommentComposer } from "./activity-tab";
 import type { TaskActivity } from "@/lib/types";
 
 const state: { items: TaskActivity[]; hasNextPage: boolean } = { items: [], hasNextPage: false };
+const addMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/hooks/use-task-activity", () => {
   const mut = () => ({ mutate: vi.fn(), mutateAsync: vi.fn(async () => ({})), isPending: false });
@@ -18,7 +19,8 @@ vi.mock("@/lib/hooks/use-task-activity", () => {
       fetchNextPage: vi.fn(),
       refetch: vi.fn(),
     }),
-    useAddComment: mut,
+    idemKey: () => "k1",
+    useAddComment: () => ({ mutate: vi.fn(), mutateAsync: addMock, isPending: false }),
     useEditComment: mut,
     useDeleteComment: mut,
   };
@@ -74,5 +76,26 @@ describe("ActivityTab", () => {
     expect(screen.getByText(/comentário removido/)).toBeInTheDocument();
     expect(screen.getByLabelText("Editar comentário")).toBeInTheDocument();
     expect(screen.getByLabelText("Remover comentário")).toBeInTheDocument();
+  });
+});
+
+describe("CommentComposer (formulário extraído, usado também no Diário da folha)", () => {
+  it("mantém o rascunho e reenvia com a MESMA chave de idempotência depois de falha", async () => {
+    localStorage.clear();
+    addMock.mockReset();
+    addMock.mockRejectedValueOnce(new Error("rede")).mockResolvedValue({});
+    render(<CommentComposer taskId="t9" />);
+    const box = screen.getByLabelText("Novo comentário");
+    fireEvent.change(box, { target: { value: "Primeiro texto" } });
+    await waitFor(() => expect(localStorage.getItem("sdt_cdraft_t9")).toBe("Primeiro texto"));
+    fireEvent.click(screen.getByRole("button", { name: "Comentar" }));
+    expect(await screen.findByText(/Não enviado/)).toBeInTheDocument();
+    expect(box).toHaveValue("Primeiro texto");
+    fireEvent.click(screen.getByRole("button", { name: "Reenviar" }));
+    await waitFor(() => expect(addMock).toHaveBeenCalledTimes(2));
+    expect(addMock.mock.calls[0][0]).toEqual({ body: "Primeiro texto", key: "k1" });
+    expect(addMock.mock.calls[1][0]).toEqual({ body: "Primeiro texto", key: "k1" });
+    await waitFor(() => expect(box).toHaveValue(""));
+    expect(localStorage.getItem("sdt_cdraft_t9")).toBeNull();
   });
 });
